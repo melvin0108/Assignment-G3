@@ -1,0 +1,6 @@
+case_id,priority,status_code,fraud_type_code,owner_employee_id,opened_at,closed_at,legal_hold
+CASE-0001,high,open,sar,EMP-0016,2025-11-19T00:00:00Z,,false
+CASE-0002,low,open,card_fraud,EMP-0009,2025-11-06T02:21:41Z,,false
+CASE-0003,low,suspended,sar,EMP-0008,2025-06-14T06:50:12Z,,false
+CASE-0004,medium,suspended,sar,EMP-0014,2025-12-11T01:49:46Z,,true
+CASE-0005,low,on_hold,card_fraud,EMP-0013,2025-08-25T15:12:01Z,,false

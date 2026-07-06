@@ -1,0 +1,6 @@
+contact_id,customer_id,direction,contact_method,do_not_contact,contacted_at,employee_id,note
+CTL-0001,CUST-0079,inbound,email,false,2026-07-02T10:48:23Z,EMP-0008,
+CTL-0002,CUST-0079,inbound,sms,false,2026-06-14T06:18:50Z,EMP-0015,"Caller confirmed name Henry Lewis (ilee@example.org, +61452029609, card 9934-4934-8440-2636)."
+CTL-0003,CUST-0087,outbound,post,false,2026-06-27T14:50:24Z,EMP-0016,
+CTL-0004,CUST-0131,outbound,email,true,2026-06-07T13:05:47Z,EMP-0016,
+CTL-0005,CUST-0130,outbound,sms,false,2026-06-05T05:15:19Z,EMP-0019,

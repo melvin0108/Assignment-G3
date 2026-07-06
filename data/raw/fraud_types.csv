@@ -1,0 +1,5 @@
+fraud_type_code,description,severity
+card_fraud,Card compromise,high
+account_takeover,Account takeover,high
+sar,Suspicious Activity Report,critical
+none,Not fraud,low

@@ -1,0 +1,26 @@
+note_id,case_id,author_employee_id,note_text,created_at
+NOTE-00001,CASE-0003,EMP-0017,Awaiting device fingerprint analysis from security team.,2026-07-01T12:28:44Z
+NOTE-00002,CASE-0001,EMP-0019,"Reviewed linked transactions, pattern consistent with merchant profile.",2026-06-19T13:40:01Z
+NOTE-00003,CASE-0002,EMP-0014,Customer confirmed authorised usage. No further action.,2026-06-29T17:13:56Z
+NOTE-00004,CASE-0002,EMP-0007,"Spoke to customer (name ""Stacey Martin"", ibrandt@example.net, +61466568938, card 7952-2113-4606-3352). Card compromised, reissue requested.",2026-07-05T13:41:38Z
+NOTE-00005,CASE-0005,EMP-0011,Customer confirmed authorised usage. No further action.,2026-06-22T14:28:13Z
+NOTE-00006,CASE-0004,EMP-0014,"Reviewed linked transactions, pattern consistent with merchant profile.",2026-06-20T08:33:39Z
+NOTE-00007,CASE-0005,EMP-0011,Awaiting device fingerprint analysis from security team.,2026-06-28T23:43:19Z
+NOTE-00008,CASE-0002,EMP-0004,Customer confirmed authorised usage. No further action.,2026-06-12T12:43:13Z
+NOTE-00009,CASE-0001,EMP-0006,Customer confirmed authorised usage. No further action.,2026-06-15T17:57:46Z
+NOTE-00010,CASE-0001,EMP-0019,"Reviewed linked transactions, pattern consistent with merchant profile.",2026-06-08T04:14:54Z
+NOTE-00011,CASE-0005,EMP-0012,Customer confirmed authorised usage. No further action.,2026-06-06T13:35:44Z
+NOTE-00012,CASE-0005,EMP-0013,Awaiting device fingerprint analysis from security team.,2026-06-11T00:15:30Z
+NOTE-00013,CASE-0001,EMP-0014,Awaiting device fingerprint analysis from security team.,2026-06-29T12:36:37Z
+NOTE-00014,CASE-0003,EMP-0014,"Reviewed linked transactions, pattern consistent with merchant profile.",2026-06-09T14:37:06Z
+NOTE-00015,CASE-0002,EMP-0014,Customer confirmed authorised usage. No further action.,2026-06-25T16:38:37Z
+NOTE-00016,CASE-0003,EMP-0016,"Spoke to customer (name ""Paul Carlson"", tasha01@example.net, +61414402146, card 1877-5418-6838-3435). Card compromised, reissue requested.",2026-06-20T06:03:00Z
+NOTE-00017,CASE-0004,EMP-0014,SAR filed - legal hold. Do not disclose.,2026-06-09T18:57:59Z
+NOTE-00018,CASE-0003,EMP-0013,Awaiting device fingerprint analysis from security team.,2026-06-24T00:47:33Z
+NOTE-00019,CASE-0004,EMP-0018,Awaiting device fingerprint analysis from security team.,2026-06-26T14:04:17Z
+NOTE-00020,CASE-0004,EMP-0015,Customer confirmed authorised usage. No further action.,2026-06-27T18:59:44Z
+NOTE-00021,CASE-0005,EMP-0017,Awaiting device fingerprint analysis from security team.,2026-06-10T20:41:47Z
+NOTE-00022,CASE-0003,EMP-0002,Awaiting device fingerprint analysis from security team.,2026-06-09T02:57:39Z
+NOTE-00023,CASE-0003,EMP-0016,Customer confirmed authorised usage. No further action.,2026-06-26T07:00:21Z
+NOTE-00024,CASE-0005,EMP-0004,Customer confirmed authorised usage. No further action.,2026-06-11T12:01:10Z
+NOTE-00025,CASE-0003,EMP-0003,"Reviewed linked transactions, pattern consistent with merchant profile.",2026-06-13T01:16:13Z

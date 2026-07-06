@@ -1,0 +1,11 @@
+case_id,party_type,party_id,role
+CASE-0002,customer,CUST-0030,merchant
+CASE-0003,customer,MCH-9999,subject
+CASE-0001,third_party,TP-1113,subject
+CASE-0004,third_party,TP-7787,subject
+CASE-0005,third_party,TP-8900,merchant
+CASE-0005,suspect,MCH-0177,subject
+CASE-0005,customer,CUST-0149,subject
+CASE-0005,customer,CUST-0131,merchant
+CASE-0004,customer,CUST-0051,subject
+CASE-0001,customer,CUST-0140,reporter

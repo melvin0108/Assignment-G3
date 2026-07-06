@@ -1,0 +1,1203 @@
+source_table,record_key,rule_id,rule_name,failure_reason,severity
+customers,CUST-0131,DQ-CUST-EMAIL-FMT,email must match pattern if present,email is empty,quarantine
+customers,CUST-0113,DQ-CUST-EMAIL-FMT,email must match pattern if present,email is empty,quarantine
+customers,CUST-0142,DQ-CUST-EMAIL-FMT,email must match pattern if present,email is empty,quarantine
+customers,CUST-0124,DQ-CUST-EMAIL-FMT,email must match pattern if present,email is empty,quarantine
+customers,CUST-0066,DQ-CUST-EMAIL-FMT,email must match pattern if present,email is empty,quarantine
+customers,CUST-0099,DQ-CUST-EMAIL-FMT,email must match pattern if present,email is empty,quarantine
+customers,CUST-0104,DQ-CUST-EMAIL-FMT,email must match pattern if present,email is empty,quarantine
+customers,CUST-0010,DQ-CUST-EMAIL-FMT,email must match pattern if present,email is empty,quarantine
+customers,CUST-0006,DQ-CUST-EMAIL-FMT,email must match pattern if present,email is empty,quarantine
+customers,CUST-0004,DQ-CUST-EMAIL-FMT,email must match pattern if present,email is empty,quarantine
+customers,CUST-0044,DQ-CUST-EMAIL-FMT,email must match pattern if present,email is empty,quarantine
+customers,CUST-0038,DQ-CUST-ID-DUP,customer_id must be unique,exact duplicate customer_id,quarantine
+customers,CUST-0025,DQ-CUST-ID-DUP,customer_id must be unique,exact duplicate customer_id,quarantine
+customers,CUST-0045,DQ-CUST-ID-DUP,customer_id must be unique,exact duplicate customer_id,quarantine
+customers,CUST-0041,DQ-CUST-ID-DUP,customer_id must be unique,exact duplicate customer_id,quarantine
+customers,CUST-0020,DQ-CUST-ID-DUP,customer_id must be unique,exact duplicate customer_id,quarantine
+customers,CUST-0067,DQ-CUST-ID-DUP,customer_id must be unique,exact duplicate customer_id,quarantine
+customers,CUST-0066,DQ-CUST-ID-DUP,customer_id must be unique,exact duplicate customer_id,quarantine
+customers,CUST-1150,DQ-CUST-NEAR-DUP,no two customers share name+dob+address+tax_id,near-duplicate of CUST-0057,quarantine
+customers,CUST-1151,DQ-CUST-NEAR-DUP,no two customers share name+dob+address+tax_id,near-duplicate of CUST-0053,quarantine
+customers,CUST-1152,DQ-CUST-NEAR-DUP,no two customers share name+dob+address+tax_id,near-duplicate of CUST-0075,quarantine
+customers,CUST-1153,DQ-CUST-NEAR-DUP,no two customers share name+dob+address+tax_id,near-duplicate of CUST-0001,quarantine
+customers,CUST-1154,DQ-CUST-NEAR-DUP,no two customers share name+dob+address+tax_id,near-duplicate of CUST-0035,quarantine
+customers,CUST-1155,DQ-CUST-NEAR-DUP,no two customers share name+dob+address+tax_id,near-duplicate of CUST-0032,quarantine
+customers,CUST-1156,DQ-CUST-NEAR-DUP,no two customers share name+dob+address+tax_id,near-duplicate of CUST-0072,quarantine
+employees,EMP-0021,DQ-EMP-EMAIL-UNIQ,email must be unique,duplicate email melissa.flynn@nab-mock.dev,quarantine
+employees,EMP-0021,DQ-EMP-NAME-NEAR-DUP,flag near-duplicate employee names,near-duplicate of EMP-0001,quarantine
+accounts,ACC-0225,DQ-ACC-CUST-FK,customer_id must exist in customers,orphan customer_id,quarantine
+accounts,ACC-0033,DQ-ACC-CUST-FK,customer_id must exist in customers,orphan customer_id,quarantine
+accounts,ACC-0214,DQ-ACC-CUST-FK,customer_id must exist in customers,orphan customer_id,quarantine
+accounts,ACC-0079,DQ-ACC-CUST-FK,customer_id must exist in customers,orphan customer_id,quarantine
+accounts,ACC-0179,DQ-ACC-CUST-FK,customer_id must exist in customers,orphan customer_id,quarantine
+accounts,ACC-0173,DQ-ACC-CUST-FK,customer_id must exist in customers,orphan customer_id,quarantine
+accounts,ACC-0116,DQ-ACC-CUST-FK,customer_id must exist in customers,orphan customer_id,quarantine
+accounts,ACC-0115,DQ-ACC-CUST-FK,customer_id must exist in customers,orphan customer_id,quarantine
+accounts,ACC-0112,DQ-ACC-CUST-FK,customer_id must exist in customers,orphan customer_id,quarantine
+accounts,ACC-0182,DQ-ACC-CUST-FK,customer_id must exist in customers,orphan customer_id,quarantine
+accounts,ACC-0060,DQ-ACC-CUST-FK,customer_id must exist in customers,orphan customer_id,quarantine
+accounts,ACC-0095,DQ-ACC-CUST-FK,customer_id must exist in customers,orphan customer_id,quarantine
+accounts,ACC-0178,DQ-ACC-CUST-FK,customer_id must exist in customers,orphan customer_id,quarantine
+accounts,ACC-0198,DQ-ACC-CUST-FK,customer_id must exist in customers,orphan customer_id,quarantine
+accounts,ACC-0010,DQ-ACC-CUST-FK,customer_id must exist in customers,orphan customer_id,quarantine
+accounts,ACC-0216,DQ-ACC-CUST-FK,customer_id must exist in customers,orphan customer_id,quarantine
+accounts,ACC-0001,DQ-ACC-CUST-FK,customer_id must exist in customers,orphan customer_id,quarantine
+accounts,ACC-0018,DQ-ACC-OPENDATE-FUTURE,open_date must not be in the future,future open_date,quarantine
+accounts,ACC-0166,DQ-ACC-OPENDATE-FUTURE,open_date must not be in the future,future open_date,quarantine
+accounts,ACC-0138,DQ-ACC-OPENDATE-FUTURE,open_date must not be in the future,future open_date,quarantine
+accounts,ACC-0048,DQ-ACC-OPENDATE-FUTURE,open_date must not be in the future,future open_date,quarantine
+accounts,ACC-0202,DQ-ACC-OPENDATE-FUTURE,open_date must not be in the future,future open_date,quarantine
+accounts,ACC-0156,DQ-ACC-OPENDATE-FUTURE,open_date must not be in the future,future open_date,quarantine
+accounts,ACC-0220,DQ-ACC-OPENDATE-FUTURE,open_date must not be in the future,future open_date,quarantine
+accounts,ACC-0152,DQ-ACC-OPENDATE-FUTURE,open_date must not be in the future,future open_date,quarantine
+accounts,ACC-0103,DQ-ACC-OPENDATE-FUTURE,open_date must not be in the future,future open_date,quarantine
+accounts,ACC-0094,DQ-ACC-OPENDATE-FUTURE,open_date must not be in the future,future open_date,quarantine
+cards,CARD-0139,DQ-CARD-PAN-LEAK,masked_pan must be masked (no full PAN),unmasked PAN leakage,quarantine
+cards,CARD-0183,DQ-CARD-PAN-LEAK,masked_pan must be masked (no full PAN),unmasked PAN leakage,quarantine
+cards,CARD-0092,DQ-CARD-PAN-LEAK,masked_pan must be masked (no full PAN),unmasked PAN leakage,quarantine
+cards,CARD-0062,DQ-CARD-PAN-LEAK,masked_pan must be masked (no full PAN),unmasked PAN leakage,quarantine
+cards,CARD-0041,DQ-CARD-PAN-LEAK,masked_pan must be masked (no full PAN),unmasked PAN leakage,quarantine
+cards,CARD-0142,DQ-CARD-PAN-LEAK,masked_pan must be masked (no full PAN),unmasked PAN leakage,quarantine
+cards,CARD-0054,DQ-CARD-PAN-LEAK,masked_pan must be masked (no full PAN),unmasked PAN leakage,quarantine
+cards,CARD-0009,DQ-CARD-PAN-LEAK,masked_pan must be masked (no full PAN),unmasked PAN leakage,quarantine
+cards,CARD-0207,DQ-CARD-PAN-LEAK,masked_pan must be masked (no full PAN),unmasked PAN leakage,quarantine
+cards,CARD-0070,DQ-CARD-PAN-LEAK,masked_pan must be masked (no full PAN),unmasked PAN leakage,quarantine
+cards,CARD-0197,DQ-CARD-PAN-LEAK,masked_pan must be masked (no full PAN),unmasked PAN leakage,quarantine
+cards,CARD-0053,DQ-CARD-PAN-LEAK,masked_pan must be masked (no full PAN),unmasked PAN leakage,quarantine
+cards,CARD-0198,DQ-CARD-PAN-LEAK,masked_pan must be masked (no full PAN),unmasked PAN leakage,quarantine
+cards,CARD-0002,DQ-CARD-PAN-LEAK,masked_pan must be masked (no full PAN),unmasked PAN leakage,quarantine
+cards,CARD-0257,DQ-CARD-PAN-LEAK,masked_pan must be masked (no full PAN),unmasked PAN leakage,quarantine
+cards,CARD-0076,DQ-CARD-PAN-LEAK,masked_pan must be masked (no full PAN),unmasked PAN leakage,quarantine
+cards,CARD-0259,DQ-CARD-PAN-LEAK,masked_pan must be masked (no full PAN),unmasked PAN leakage,quarantine
+cards,CARD-0050,DQ-CARD-PAN-LEAK,masked_pan must be masked (no full PAN),unmasked PAN leakage,quarantine
+cards,CARD-0179,DQ-CARD-PAN-LEAK,masked_pan must be masked (no full PAN),unmasked PAN leakage,quarantine
+cards,CARD-0155,DQ-CARD-PAN-LEAK,masked_pan must be masked (no full PAN),unmasked PAN leakage,quarantine
+cards,CARD-0187,DQ-CARD-EXPIRED-ACTIVE,active card must not have a past expiry,expired-but-active,quarantine
+cards,CARD-0015,DQ-CARD-EXPIRED-ACTIVE,active card must not have a past expiry,expired-but-active,quarantine
+cards,CARD-0144,DQ-CARD-EXPIRED-ACTIVE,active card must not have a past expiry,expired-but-active,quarantine
+cards,CARD-0139,DQ-CARD-EXPIRED-ACTIVE,active card must not have a past expiry,expired-but-active,quarantine
+cards,CARD-0090,DQ-CARD-EXPIRED-ACTIVE,active card must not have a past expiry,expired-but-active,quarantine
+cards,CARD-0233,DQ-CARD-EXPIRED-ACTIVE,active card must not have a past expiry,expired-but-active,quarantine
+cards,CARD-0023,DQ-CARD-EXPIRED-ACTIVE,active card must not have a past expiry,expired-but-active,quarantine
+cards,CARD-0225,DQ-CARD-EXPIRED-ACTIVE,active card must not have a past expiry,expired-but-active,quarantine
+cards,CARD-0106,DQ-CARD-EXPIRED-ACTIVE,active card must not have a past expiry,expired-but-active,quarantine
+cards,CARD-0217,DQ-CARD-EXPIRED-ACTIVE,active card must not have a past expiry,expired-but-active,quarantine
+cards,CARD-0135,DQ-CARD-EXPIRED-ACTIVE,active card must not have a past expiry,expired-but-active,quarantine
+cards,CARD-0162,DQ-CARD-EXPIRED-ACTIVE,active card must not have a past expiry,expired-but-active,quarantine
+cards,CARD-0044,DQ-CARD-EXPIRED-ACTIVE,active card must not have a past expiry,expired-but-active,quarantine
+cards,CARD-0269,DQ-CARD-EXPIRED-ACTIVE,active card must not have a past expiry,expired-but-active,quarantine
+cards,CARD-0189,DQ-CARD-EXPIRED-ACTIVE,active card must not have a past expiry,expired-but-active,quarantine
+cards,CARD-0082,DQ-CARD-EXPIRED-ACTIVE,active card must not have a past expiry,expired-but-active,quarantine
+cards,CARD-0007,DQ-CARD-DUP,card_id must be unique,duplicate card,quarantine
+cards,CARD-0081,DQ-CARD-DUP,card_id must be unique,duplicate card,quarantine
+cards,CARD-0069,DQ-CARD-DUP,card_id must be unique,duplicate card,quarantine
+cards,CARD-0082,DQ-CARD-DUP,card_id must be unique,duplicate card,quarantine
+cards,CARD-0022,DQ-CARD-DUP,card_id must be unique,duplicate card,quarantine
+cards,CARD-0020,DQ-CARD-DUP,card_id must be unique,duplicate card,quarantine
+cards,CARD-0077,DQ-CARD-DUP,card_id must be unique,duplicate card,quarantine
+cards,CARD-0019,DQ-CARD-DUP,card_id must be unique,duplicate card,quarantine
+cards,CARD-0063,DQ-CARD-DUP,card_id must be unique,duplicate card,quarantine
+cards,CARD-0005,DQ-CARD-DUP,card_id must be unique,duplicate card,quarantine
+cards,CARD-0081,DQ-CARD-DUP,card_id must be unique,duplicate card,quarantine
+cards,CARD-0121,DQ-CARD-DUP,card_id must be unique,duplicate card,quarantine
+merchants,MCH-0031,DQ-MERCH-RISK-CASING,"risk_rating must be in {low,medium,high}",inconsistent casing,quarantine
+merchants,MCH-0036,DQ-MERCH-RISK-CASING,"risk_rating must be in {low,medium,high}",inconsistent casing,quarantine
+merchants,MCH-0047,DQ-MERCH-RISK-CASING,"risk_rating must be in {low,medium,high}",inconsistent casing,quarantine
+merchants,MCH-0101,DQ-MERCH-RISK-CASING,"risk_rating must be in {low,medium,high}",inconsistent casing,quarantine
+merchants,MCH-0001,DQ-MERCH-RISK-CASING,"risk_rating must be in {low,medium,high}",inconsistent casing,quarantine
+merchants,MCH-0167,DQ-MERCH-RISK-CASING,"risk_rating must be in {low,medium,high}",inconsistent casing,quarantine
+merchants,MCH-0141,DQ-MERCH-RISK-CASING,"risk_rating must be in {low,medium,high}",inconsistent casing,quarantine
+merchants,MCH-0027,DQ-MERCH-RISK-CASING,"risk_rating must be in {low,medium,high}",inconsistent casing,quarantine
+merchants,MCH-0050,DQ-MERCH-RISK-CASING,"risk_rating must be in {low,medium,high}",inconsistent casing,quarantine
+merchants,MCH-0009,DQ-MERCH-RISK-CASING,"risk_rating must be in {low,medium,high}",inconsistent casing,quarantine
+merchants,MCH-0185,DQ-MERCH-RISK-CASING,"risk_rating must be in {low,medium,high}",inconsistent casing,quarantine
+merchants,MCH-0150,DQ-MERCH-RISK-CASING,"risk_rating must be in {low,medium,high}",inconsistent casing,quarantine
+merchants,MCH-0099,DQ-MERCH-RISK-CASING,"risk_rating must be in {low,medium,high}",inconsistent casing,quarantine
+merchants,MCH-0128,DQ-MERCH-RISK-CASING,"risk_rating must be in {low,medium,high}",inconsistent casing,quarantine
+merchants,MCH-0114,DQ-MERCH-RISK-CASING,"risk_rating must be in {low,medium,high}",inconsistent casing,quarantine
+merchants,MCH-0123,DQ-MERCH-RISK-CASING,"risk_rating must be in {low,medium,high}",inconsistent casing,quarantine
+merchants,MCH-0103,DQ-MERCH-RISK-CASING,"risk_rating must be in {low,medium,high}",inconsistent casing,quarantine
+merchants,MCH-0065,DQ-MERCH-RISK-CASING,"risk_rating must be in {low,medium,high}",inconsistent casing,quarantine
+merchants,MCH-0171,DQ-MERCH-RISK-CASING,"risk_rating must be in {low,medium,high}",inconsistent casing,quarantine
+merchants,MCH-0182,DQ-MERCH-RISK-CASING,"risk_rating must be in {low,medium,high}",inconsistent casing,quarantine
+merchants,MCH-0138,DQ-MERCH-RISK-CASING,"risk_rating must be in {low,medium,high}",inconsistent casing,quarantine
+merchants,MCH-0195,DQ-MERCH-RISK-CASING,"risk_rating must be in {low,medium,high}",inconsistent casing,quarantine
+merchants,MCH-0166,DQ-MERCH-RISK-CASING,"risk_rating must be in {low,medium,high}",inconsistent casing,quarantine
+merchants,MCH-0037,DQ-MERCH-RISK-CASING,"risk_rating must be in {low,medium,high}",inconsistent casing,quarantine
+transactions,TXN-000002,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000004,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000008,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000017,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000018,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000025,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000034,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000015,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000012,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000042,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000007,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000046,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000009,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000047,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000047,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000050,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000052,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000052,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000053,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000054,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000058,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000059,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000061,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000062,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000062,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000016,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000065,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000066,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000067,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000001,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000068,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000024,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000072,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000076,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000080,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000081,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000082,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000086,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000088,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000089,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000093,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000094,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000097,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000102,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000104,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000106,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000108,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000115,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000118,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000121,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000122,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000128,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000129,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000129,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000130,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000096,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000138,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000140,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000140,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000141,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000141,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000141,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000149,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000150,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000152,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000156,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000057,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000157,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000159,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000161,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000162,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000049,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000165,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000176,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000179,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000181,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000190,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000198,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000201,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000209,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000212,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000218,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000219,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000221,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000208,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000224,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000227,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000229,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000230,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000235,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000236,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000237,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000238,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000183,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000256,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000257,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000270,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000272,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000273,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000274,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000274,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000276,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000279,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000280,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000286,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000288,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000290,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000291,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000292,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000297,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000301,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000306,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000307,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000308,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000315,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000323,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000105,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000327,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000328,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000328,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000329,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000303,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000333,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000154,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000143,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000342,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000347,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000351,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000355,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000334,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000126,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000358,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000225,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000361,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000249,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000137,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000371,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000372,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000375,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000376,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000109,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000378,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000382,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000385,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000252,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000388,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000388,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000397,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000401,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000402,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000406,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000409,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000418,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000419,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000434,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000439,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000443,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000445,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000448,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000448,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000449,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000450,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000451,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000454,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000455,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000456,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000456,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000467,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000472,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000479,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000480,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000352,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000486,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000492,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000493,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000495,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000496,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000500,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000501,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000502,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000502,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000502,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000503,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000436,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000509,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000509,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000283,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000519,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000523,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000525,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000528,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000532,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000532,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000533,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000534,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000538,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000548,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000559,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000560,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000540,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000394,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000573,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000580,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000583,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000587,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000588,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000590,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000595,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000597,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000339,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000601,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000603,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000599,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000608,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000608,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000609,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000610,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000475,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000612,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000622,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000624,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000628,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000629,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000637,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000637,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000637,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000638,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000640,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000641,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000646,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000647,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000651,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000487,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000652,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000656,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000658,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000659,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000662,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000663,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000664,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000665,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000671,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000674,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000682,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000684,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000513,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000692,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000693,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000695,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000695,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000695,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000700,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000703,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000537,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000709,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000711,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000711,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000715,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000716,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000717,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000718,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000720,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000723,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000724,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000725,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000726,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000726,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000727,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000729,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000730,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000731,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000735,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000558,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000737,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000749,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000607,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000751,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000751,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000698,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000764,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000766,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000768,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000771,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000775,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000779,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000781,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000781,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000783,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000787,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000787,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000788,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000795,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000795,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000804,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000805,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000626,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000813,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000815,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000821,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000694,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000822,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000826,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000830,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000833,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000835,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000836,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000837,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000838,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000841,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000845,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000846,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000849,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000654,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000859,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000861,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000862,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000799,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000873,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000873,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000875,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000882,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000883,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000886,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000886,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000741,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000897,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000897,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000840,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000900,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000655,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000782,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000908,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000909,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000910,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000911,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000912,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000913,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000898,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000915,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000881,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000759,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000918,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000919,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000702,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000927,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000930,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000932,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000934,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000939,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000939,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-000941,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000945,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000858,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000960,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000960,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000864,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000966,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000967,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000968,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000970,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000975,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000972,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000985,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000989,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000993,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-000994,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001001,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001002,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001004,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001005,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001007,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001011,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000874,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000935,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001017,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001018,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001021,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000807,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000987,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001026,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001030,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001032,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001034,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001035,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001037,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001039,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001003,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001046,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001050,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001051,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001059,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001064,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001065,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001070,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001072,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001073,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001060,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001081,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001083,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001088,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001027,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001013,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001096,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001097,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001099,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001102,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001106,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001107,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001109,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000843,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001115,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001119,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000948,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000947,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001124,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001130,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001104,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001134,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001129,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001135,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001143,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001144,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001146,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001148,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001150,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001154,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001160,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001161,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001164,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001164,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001165,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001166,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001166,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001169,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001169,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001172,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001177,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001180,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-000944,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001187,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001187,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001192,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001195,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001196,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001197,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001048,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001204,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001193,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001206,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001208,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001179,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001218,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001220,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001223,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001224,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001225,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001229,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001231,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001232,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001238,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001240,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001149,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001091,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-000983,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001251,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001010,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001258,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-000991,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001260,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001261,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001263,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001265,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001266,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001270,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-000963,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001275,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001276,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001277,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001277,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001277,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001278,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001279,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001279,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001283,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001281,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001288,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001156,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001301,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001301,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001290,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001305,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001309,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001309,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001311,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001314,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001314,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001167,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001317,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001318,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001320,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001322,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001329,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001331,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001090,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001126,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001344,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001066,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001141,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001348,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001315,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001350,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001353,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001202,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001356,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001312,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001361,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001364,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001369,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001370,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001380,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001381,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001341,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001080,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001384,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001339,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001392,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001394,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001397,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001398,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001400,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001400,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001402,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001402,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001403,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001411,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001421,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001422,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001293,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001214,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001433,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001436,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001437,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001443,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001445,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001445,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001226,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001453,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001455,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001457,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001459,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001463,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001470,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001470,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001471,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001448,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001474,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001475,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001351,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001494,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001497,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001295,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001499,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001212,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001505,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001509,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001511,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001513,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001526,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001536,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001542,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001543,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001544,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001546,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001551,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001564,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001565,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001569,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001571,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001573,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001574,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001574,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001378,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001580,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001581,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001582,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001584,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001593,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001560,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001483,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001604,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001609,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001612,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001614,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001619,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001621,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001622,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001626,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001451,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001629,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001632,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001633,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001645,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001646,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001646,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001636,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001653,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001658,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001520,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001659,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001663,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001672,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001404,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001681,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001688,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001689,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001691,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001697,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001702,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001703,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001706,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001711,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001685,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001714,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001717,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001718,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001725,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001726,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001727,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001729,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001731,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001733,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001741,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001743,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001749,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001577,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001753,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001637,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001759,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001760,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001760,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001762,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001764,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001771,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001771,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001776,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001781,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001782,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001664,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001789,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001794,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001795,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001795,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001798,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001692,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001808,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001811,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001650,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001817,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001553,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001819,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001820,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001824,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001826,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001828,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001830,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001831,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001832,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001651,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001840,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001843,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001843,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001844,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001845,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001847,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001850,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001853,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001860,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001861,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001864,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001873,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001880,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001883,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001888,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001890,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001841,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001907,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001907,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001911,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001915,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001924,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001931,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001932,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001928,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001938,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001939,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001865,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001904,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001946,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001947,DQ-TXN-TS-FUTURE,txn_ts must not be in the future,future timestamp,quarantine
+transactions,TXN-001732,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001956,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001959,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001960,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001960,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001966,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001874,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001972,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001974,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001974,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001976,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001977,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001982,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001983,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-001935,DQ-TXN-ID-DUP,transaction_id must be unique,duplicate transaction_id,quarantine
+transactions,TXN-001987,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001988,DQ-TXN-MERCH-REQ,merchant_id is required,missing merchant_id,quarantine
+transactions,TXN-001989,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+transactions,TXN-001995,DQ-TXN-AMT-POS,amount must be > 0,negative amount,quarantine
+transactions,TXN-001996,DQ-TXN-ACCT-FK,account_id must exist in accounts,orphan account+card,quarantine
+transactions,TXN-002000,DQ-TXN-CARD-ACTIVE,transaction must use an active card,uses closed card,quarantine
+auth_attempts,AUTH-000007,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000011,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000030,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000035,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000048,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000064,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000087,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000089,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000105,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000105,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000108,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000110,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000141,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000152,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000153,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000171,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000175,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000185,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000192,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000196,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000208,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000209,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000218,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000233,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000238,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000254,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000285,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000325,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000325,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000329,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000337,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000343,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000349,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000350,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000378,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000405,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000432,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000435,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000452,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000474,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000498,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000513,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000514,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000527,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000533,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000552,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000559,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000561,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000572,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000585,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000587,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000596,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000621,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000629,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000637,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000642,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000644,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000674,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000695,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000700,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000702,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000721,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000743,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000758,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000772,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000773,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000780,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000805,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000808,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000816,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000817,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000818,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000820,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000842,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000854,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000855,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000864,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000867,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000897,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000907,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000912,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000921,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000924,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000954,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-000956,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-000959,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001013,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001018,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001022,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001042,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001060,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001074,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001077,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001105,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001138,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001139,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001140,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001155,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001155,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001168,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001224,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001230,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001251,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001272,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001286,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001294,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001299,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001314,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001348,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001367,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001369,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001371,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001402,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001406,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001411,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001412,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001416,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001436,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001441,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001454,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001474,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001478,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001480,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001483,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001487,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001509,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001530,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001544,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001550,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001550,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001555,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001558,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001586,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001590,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001592,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001592,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001607,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001612,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001616,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001619,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001642,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001650,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001660,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001671,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001672,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001672,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001690,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001717,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001735,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001736,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001759,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001770,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001777,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001823,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001838,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001839,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001851,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001855,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001871,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001888,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001905,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001907,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001918,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001921,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001930,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001932,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001935,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001961,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001968,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-001972,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001982,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-001989,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-002011,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-002018,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-002020,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-002030,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-002032,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-002037,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-002038,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-002045,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-002062,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-002077,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-002085,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-002086,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-002096,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-002101,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-002136,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-002138,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-002143,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-002160,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-002164,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-002176,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-002185,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-002192,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-002195,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-002196,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-002205,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-002210,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-002213,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-002227,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-002235,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-002242,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-002256,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-002269,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-002270,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-002283,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-002290,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-002298,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-002314,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-002331,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-002345,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-002360,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-002363,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+auth_attempts,AUTH-002370,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-002379,DQ-AUTH-TS-ORDER,auth_ts must not be later than txn_ts,auth after transaction,quarantine
+auth_attempts,AUTH-002395,DQ-AUTH-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000007,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000008,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000014,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000034,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000048,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000053,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000059,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000095,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000117,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000135,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000144,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000147,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000184,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000200,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000242,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000265,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000276,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000285,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000286,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000288,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000304,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000318,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000343,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000350,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000355,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000356,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000357,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000360,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000383,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000400,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000407,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000421,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000440,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000463,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000464,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000487,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000494,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000504,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000513,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000515,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000518,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000533,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000571,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000576,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000579,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000594,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000596,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000620,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000639,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000643,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000657,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000667,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000668,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000673,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000681,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000690,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000697,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000710,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000714,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000716,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000718,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000720,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000734,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000744,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000805,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000830,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000831,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000841,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000850,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000878,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000910,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000913,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000917,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000920,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000926,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000937,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000940,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000952,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-000961,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000962,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-000967,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-001014,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-001016,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-001040,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-001040,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-001131,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-001155,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-001163,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-001169,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-001177,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-001185,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-001188,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-001205,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-001225,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-001230,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-001236,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-001249,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-001259,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-001264,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-001300,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-001318,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-001335,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-001347,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-001363,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-001367,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-001368,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-001370,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-001375,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-001376,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-001397,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-001437,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-001447,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-001462,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-001526,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-001531,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-001533,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-001533,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-001544,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+transaction_devices,DEV-001547,DQ-DEV-TYPE-REQ,device_type is required,missing device_type,quarantine
+transaction_devices,DEV-001574,DQ-DEV-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+disputes,DSP-0012,DQ-DISP-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+disputes,DSP-0036,DQ-DISP-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+disputes,DSP-0026,DQ-DISP-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+disputes,DSP-0017,DQ-DISP-STATUS-ENUM,status must be lowercase enum value,status casing 'Open',quarantine
+disputes,DSP-0019,DQ-DISP-STATUS-ENUM,status must be lowercase enum value,status casing 'Open',quarantine
+disputes,DSP-0005,DQ-DISP-REASON-REQ,reason_code is required,missing reason_code,quarantine
+disputes,DSP-0040,DQ-DISP-REASON-REQ,reason_code is required,missing reason_code,quarantine
+chargebacks,CBK-0005,DQ-CBK-DISP-FK,dispute_id must exist in disputes,orphan dispute_id,quarantine
+fraud_alerts,ALT-0006,DQ-ALT-SCORE-RANGE,"score must be within [0,1]",score out of range,quarantine
+investigation_cases,CASE-0004,DQ-CASE-LEGALHOLD,legal_hold cases excluded from AI output,legal_hold=true (must-not-expose),quarantine
+investigation_cases,CASE-0005,DQ-CASE-STATUS-ENUM,status_code must be in case_status_types,status 'on_hold' not in enum,quarantine
+investigation_cases,CASE-0001,DQ-CASE-STALE,open cases older than 180 days are stale,stale open case,quarantine
+investigation_notes,NOTE-00004,DQ-NOTE-PII-LEAK,note_text must not contain raw PII/PAN,leaked PII and PAN in free text,quarantine
+investigation_notes,NOTE-00016,DQ-NOTE-PII-LEAK,note_text must not contain raw PII/PAN,leaked PII and PAN in free text,quarantine
+investigation_notes,NOTE-00017,DQ-NOTE-LEGALHOLD,notes on legal_hold cases must not reach AI,note on legal_hold case,quarantine
+case_transactions,CASE-0002|TXN-999999,DQ-CASETXN-TXN-FK,transaction_id must exist in transactions,orphan transaction_id,quarantine
+case_parties,CASE-0003|customer|MCH-9999,DQ-CASEPARTY-RESOLVE,party_id must resolve per party_type,customer party_id not in customers,quarantine
+case_parties,CASE-0005|suspect|MCH-0177,DQ-CASEPARTY-TYPE-ENUM,"party_type must be in {customer,merchant,third_party}",invalid party_type,quarantine
+customer_contact_logs,CTL-0004,DQ-CTL-DNC-VIOLATION,no outbound contact when do_not_contact=true,DNC business-rule break,quarantine
+customer_contact_logs,CTL-0002,DQ-CTL-NOTE-PII,note must not contain raw PII/PAN,leaked PII in contact note,quarantine

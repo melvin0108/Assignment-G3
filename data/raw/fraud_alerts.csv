@@ -1,0 +1,11 @@
+alert_id,transaction_id,rule_name,score,triggered_at,disposition
+ALT-0001,TXN-000222,geo_mismatch,0.86,2026-06-09T10:56:06Z,dismissed
+ALT-0002,TXN-000641,high_value_night,0.6,2026-07-01T01:31:12Z,false_positive
+ALT-0003,TXN-001816,high_value_night,0.58,2026-06-18T11:09:24Z,escalated_to_case
+ALT-0004,TXN-000116,geo_mismatch,0.58,2026-06-07T14:01:31Z,false_positive
+ALT-0005,TXN-000463,geo_mismatch,0.66,2026-06-12T22:35:08Z,false_positive
+ALT-0006,TXN-000626,geo_mismatch,3.36,2026-06-24T13:50:05Z,true_positive
+ALT-0007,TXN-001402,new_device_high_value,0.68,2026-06-27T08:47:06Z,true_positive
+ALT-0008,TXN-001522,high_value_night,0.79,2026-06-22T18:40:14Z,open
+ALT-0009,TXN-001488,high_value_night,0.79,2026-06-30T22:20:22Z,false_positive
+ALT-0010,TXN-000196,velocity_5min,0.64,2026-07-01T03:53:55Z,open
