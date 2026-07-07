@@ -42,13 +42,9 @@ def seq_id(prefix: str, i: int, width: int = 4) -> str:
     return f"{prefix}{i:0{width}d}"
 
 
-def masked_pan(rng: _random.Random) -> str:
-    """Properly masked PAN: 12 mask chars + last 4 (data-model §4.3)."""
-    return "############" + str(rng.randint(1000, 9999))
-
 
 def full_pan(rng: _random.Random) -> str:
-    """Intentionally UNMASKED PAN (defect — leakage)."""
+    """Synthetic raw PAN for Bronze; downstream pipeline must mask it."""
     return f"{rng.randint(1000,9999)}-{rng.randint(1000,9999)}-{rng.randint(1000,9999)}-{rng.randint(1000,9999)}"
 
 

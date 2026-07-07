@@ -235,7 +235,7 @@ All 11 acceptance criteria must pass:
 
 | Shape | Rules | Implementation |
 |---|---|---|
-| **(a) Single-row predicate** | `DQ-TXN-AMT-POS`, `DQ-TXN-MERCH-REQ`, `DQ-TXN-TS-FUTURE`, `DQ-ACC-OPENDATE-FUTURE`, `DQ-CUST-EMAIL-FMT`, `DQ-CARD-PAN-LEAK`, `DQ-CARD-EXPIRED-ACTIVE`, `DQ-MERCH-RISK-CASING`, `DQ-DISP-STATUS-ENUM`, `DQ-DISP-REASON-REQ`, `DQ-CASE-STATUS-ENUM`, `DQ-ALT-SCORE-RANGE`, `DQ-DEV-TYPE-REQ`, `DQ-NOTE-PII-LEAK`, `DQ-CTL-NOTE-PII`, uniqueness `DQ-CUST-ID-DUP`/`DQ-TXN-ID-DUP`/`DQ-CARD-DUP`/`DQ-EMP-EMAIL-UNIQ` | `WHERE NOT <predicate>` (also expressible as DLT `EXPECT` if DLT Bronze chosen) |
+| **(a) Single-row predicate** | `DQ-TXN-AMT-POS`, `DQ-TXN-MERCH-REQ`, `DQ-TXN-TS-FUTURE`, `DQ-ACC-OPENDATE-FUTURE`, `DQ-CUST-EMAIL-FMT`, `DQ-CARD-EXPIRED-ACTIVE`, `DQ-MERCH-RISK-CASING`, `DQ-DISP-STATUS-ENUM`, `DQ-DISP-REASON-REQ`, `DQ-CASE-STATUS-ENUM`, `DQ-ALT-SCORE-RANGE`, `DQ-DEV-TYPE-REQ`, `DQ-NOTE-PII-LEAK`, `DQ-CTL-NOTE-PII`, uniqueness `DQ-CUST-ID-DUP`/`DQ-TXN-ID-DUP`/`DQ-CARD-DUP`/`DQ-EMP-EMAIL-UNIQ` | `WHERE NOT <predicate>` (also expressible as DLT `EXPECT` if DLT Bronze chosen) |
 | **(b) Cross-record / join / window** | FK anti-joins `DQ-ACC-CUST-FK`, `DQ-TXN-ACCT-FK`, `DQ-AUTH-TXN-FK`, `DQ-DISP-TXN-FK`, `DQ-CBK-DISP-FK`, `DQ-DEV-TXN-FK`, `DQ-CASETXN-TXN-FK`; `DQ-TXN-CARD-ACTIVE`, `DQ-AUTH-TS-ORDER`, `DQ-CASE-STALE`, `DQ-CUST-NEAR-DUP`, `DQ-EMP-NAME-NEAR-DUP`, `DQ-CASEPARTY-RESOLVE`, `DQ-CASEPARTY-TYPE-ENUM`, `DQ-CTL-DNC-VIOLATION` | failure query with JOIN / anti-join / window — **NOT** EXPECT |
 | **(c) AI-exclusion** | `DQ-CASE-LEGALHOLD`, `DQ-NOTE-LEGALHOLD` | writes an evidence row; **primary effect** = Silver AI-context / AI-view exclusion |
 
@@ -267,7 +267,7 @@ All 11 acceptance criteria must pass:
 | `dq_results` non-empty, counts consistent with quarantine | AC5, AC10 |
 | Masking-effectiveness (no raw PII in unprivileged/Silver AI-view; tokenize determinism; mask-per-role) | AC7, AC9 |
 | `legal_hold` exclusion (no legal_hold case_id in AI-view; legal_hold notes absent) | AC9 |
-| Raw PAN absent past Bronze | AC7, AC9 |
+| Raw PAN absent from Silver AI output | AC7, AC9 |
 | Lineage completeness (every final Silver AI-context field traces to Bronze) | AC8 |
 | Final Silver context metadata fields present | AC8 |
 | Reconciliation silver = bronze − quarantined − rejected (+warned) | AC6, AC10 |

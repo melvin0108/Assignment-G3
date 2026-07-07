@@ -103,7 +103,7 @@ DATE_DIM_RANGE = (date(2023, 1, 1), RUN_DATE)  # inclusive daily calendar
 TABLE_SCHEMAS = {
     "customers": ["customer_id", "first_name", "last_name", "dob", "email", "phone", "address", "tax_id", "created_at"],
     "accounts": ["account_id", "customer_id", "product_type", "open_date", "status", "currency"],
-    "cards": ["card_id", "account_id", "card_type", "masked_pan", "expiry", "status"],
+    "cards": ["card_id", "account_id", "card_type", "pan", "expiry", "status"],
     "merchants": ["merchant_id", "name", "mcc", "country", "risk_rating", "status"],
     "merchant_categories": ["mcc", "category_name", "category_group"],
     "channels": ["channel_code", "channel_name"],

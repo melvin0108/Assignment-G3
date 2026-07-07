@@ -83,7 +83,7 @@ Output: one `<table>.csv` per table (column order matches the contracts) plus `_
 mock/
   config.py     # enums, ID prefixes, reference data, TABLE_SCHEMAS (column order),
                 #   GENERATION_ORDER, BASE_VOLUMES, RUN_DATE  — keep in sync with data-model.md
-  helpers.py    # Faker/RNG setup + value helpers (masked_pan, full_pan, tax_id, iso, ...)
+  helpers.py    # Faker/RNG setup + value helpers (full_pan, tax_id, iso, ...)
   defects.py    # DefectManifest (collects + writes _defects_manifest.csv)
   generators.py # one gen_<table>() per table + the GENERATORS registry
   generate.py   # CLI: argparse, count derivation, CSV streaming, summary
@@ -115,7 +115,7 @@ Full inventory and field-level contracts in **`docs/data-model.md`**. Summary:
 
 Each rule is a row in `dq_rule` (`rule_id`, `layer`, `target_table`, `severity ∈ {reject, quarantine, warn}`, expression/sql). Outcome → `dq_result` (pass/fail counts, sample failed keys); individual failed rows → `quarantine_record` with `(record_key, rule_id, failure_reason, disposition)`. Disposition ∈ `rejected | quarantined | masked | allowed_with_warning`. Quarantine schema is fixed in `docs/data-model.md` §7.
 
-**Rule ID naming** (already used by the mock layer, keep consistent when adding Silver rules): `DQ-<TABLE>-<CHECK>`, e.g. `DQ-TXN-AMT-POS`, `DQ-CUST-EMAIL-FMT`, `DQ-CARD-PAN-LEAK`, `DQ-ACC-CUST-FK`. Every `man.add(...)` call in `generators.py` is paired with one of these — the set of distinct rule IDs injected there is the minimum the Silver engine must implement.
+**Rule ID naming** (already used by the mock layer, keep consistent when adding Silver rules): `DQ-<TABLE>-<CHECK>`, e.g. `DQ-TXN-AMT-POS`, `DQ-CUST-EMAIL-FMT`, `DQ-ACC-CUST-FK`. Every `man.add(...)` call in `generators.py` is paired with one of these — the set of distinct rule IDs injected there is the minimum the Silver engine must implement.
 
 ## Intended command interface (dbt/pipeline layers — not yet implemented)
 
@@ -154,4 +154,4 @@ docs/
 - **Identifiers:** stable string keys (`customer_id`, `transaction_id`, `case_id`), built from `config.PFX` prefixes via `helpers.seq_id`. Surrogate hash keys only in silver/gold.
 - **Determinism:** all generators take a seed; reruns from the same seed reproduce the same defects (essential for tests).
 - **Timestamps:** store as ISO-8601 UTC (`helpers.iso` → `%Y-%m-%dT%H:%M:%SZ`); never rely on local time. Dates via `helpers.iso_date`.
-- **PII is never committed** unmasked; `data/raw` is git-ignored except for a small masked sample kept under `data/sample/`.
+- Raw PII in generated source files is synthetic and stays out of Git; `data/raw` is git-ignored. Masked samples, if needed, belong under `data/sample/`.

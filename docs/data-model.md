@@ -37,7 +37,7 @@ Legend — **PII**: 🔴 high · 🟠 medium · ⚪ none. **DQ defects** are int
 |---|---|---|---|---|
 | `customers` | one row per customer | Customer master | 🔴 | missing email; exact-dup `customer_id`; near-dup (name+dob+address+tax_id) |
 | `accounts` | one row per account | Bank accounts | ⚪ | orphan `customer_id`; future `open_date` |
-| `cards` | one row per card | Payment cards | 🔴 | unmasked `masked_pan` (PAN leakage); expired-but-active; closed |
+| `cards` | one row per card | Payment cards | 🔴 | raw synthetic `pan`; expired-but-active; closed |
 | `customer_contact_logs` | one row per contact attempt | Contact history + DNC | 🟠 | outbound to `do_not_contact=true`; note leaking PII |
 
 ### B. Reference / dimensions
@@ -123,11 +123,11 @@ Defects: orphan `customer_id` (CUST-9999); future `open_date`.
 | card_id | string | req | `^CARD-\d{4}$` | CARD-3001 | PK | — | not null; unique |
 | account_id | string | req | exists in accounts | ACC-2001 | FK→accounts | — | RI |
 | card_type | string | req | {debit,credit} | debit | — | — | in enum |
-| masked_pan | string | req | masked `#{8,12}\d{4}` or `\*+\d{4}` | ############1234 | — | payment | **no full PAN**; leakage → quarantine |
+| pan | string | req | synthetic PAN `^\d{4}-\d{4}-\d{4}-\d{4}$` | 4532-1111-2222-3333 | — | payment | raw in Bronze; must be masked/tokenized from Silver onward |
 | expiry | string | req | `^\d{4}-(0[1-9]\|1[0-2])$` | 2027-08 | — | — | format; past+active → business-rule fail |
 | status | string | req | {active,blocked,expired,closed} | active | — | — | in enum (§5) |
 
-Defects: unmasked `masked_pan` (full PAN leakage); expired-but-active; closed card.
+Defects: expired-but-active; closed card. Raw synthetic PAN is expected in Bronze so masking can be implemented and tested in the pipeline.
 
 ### 4.4 `merchants` — grain: one row per merchant
 | field | type | req/opt | accepted / pattern | example | key | PII | quality rule |
@@ -295,7 +295,7 @@ Per-layer handling. Bronze keeps raw; Silver masks; Gold redacts/excludes.
 | customers.address | sensitive | raw | hash | excluded | ❌ | hash / drop |
 | customers.dob | sensitive | raw | generalize (age band) | excluded | ❌ | drop / generalize |
 | customers.tax_id | sensitive | raw | hash | excluded | ❌ | hash / drop |
-| cards.masked_pan | payment | masked (last 4) | masked (last 4) | last-4 only | ✅ last-4 | keep masked; raw PAN never persists |
+| cards.pan | payment | raw | mask/tokenize, keep last-4 derivative only | last-4 only | ✅ last-4 | raw PAN may exist only in Bronze; no full PAN past Silver |
 | employees.full_name | staff | raw | hash | excluded | ❌ | hash |
 | employees.email | staff | raw | mask/hash | excluded | ❌ | mask/hash |
 | investigation_notes.note_text | free-text | raw | redact PII, then keep | flagged/limited | ⚠️ flagged | regex/NLP redaction |
@@ -354,8 +354,8 @@ Physically populated in Silver, but **defined here** so invalid records are gene
 - [x] Stale/outdated — `investigation_cases` (open >180d), `merchants`/`branches` (closed)
 - [x] Inconsistent status values — `disputes.status`, `investigation_cases.status_code`, `merchants.risk_rating`
 - [x] Referential-integrity breaks — `accounts`, `disputes`, `chargebacks`, bridges, conditional `case_parties`
-- [x] Sensitive fields needing masking — `customers`, `cards.masked_pan`, `employees`, `investigation_notes`
-- [x] Must-not-expose-to-AI — `legal_hold` cases/notes, raw PAN leakage, DNC contact logs
+- [x] Sensitive fields needing masking — `customers`, `cards.pan`, `employees`, `investigation_notes`
+- [x] Must-not-expose-to-AI — `legal_hold` cases/notes, raw PAN past Silver, DNC contact logs
 
 ## 10. Key relationships
 
