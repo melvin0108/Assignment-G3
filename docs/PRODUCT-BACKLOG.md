@@ -5,7 +5,7 @@
 | **Project** | NAB Core Data Engineer assignment - "TAC@NABVNSC22" |
 | **Scenario** | Transaction investigation using transactions, disputes, chargebacks, merchants, fraud alerts, cases, notes, and related reference data |
 | **Goal** | Turn generated banking data into trusted, governed, Silver-layer context that is safe for an internal AI consumer to read |
-| **Platform assumption** | Databricks Free Edition + Unity Catalog, using catalog `tx_inv` and schemas such as `bronze`, `silver`, and `gov` if supported by the tenant |
+| **Platform assumption** | Databricks Free Edition + Unity Catalog — workspace catalog is `g3_catalog` (verified); schemas `bronze` ✓ and `silver` ✓ created, `gov` ⬜ planned but not yet created |
 | **Status** | Mock data generation complete; backlog created; Databricks workspace linked with GitHub; catalog and layer schemas created; source data uploaded to Databricks Volume; Bronze ingestion under review; Silver, governance, tests, and demo evidence still to build |
 | **Last updated** | 2026-07-07 |
 
