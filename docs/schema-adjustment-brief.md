@@ -64,7 +64,7 @@ This is required by the assignment and should exist before mock data is generate
 Resolve current mismatches before creating Bronze files:
 
 - `customer.tax_id` appears in the model but not the Bronze sample.
-- `card.masked_pan` in the model conflicts with `pan` in the Bronze sample.
+- `cards.pan` is the source field; masking is implemented downstream in Silver/AI-safe outputs.
 - `customer_contact_log` mentions Do-Not-Contact logic but no field currently supports it.
 - `case_party.party_id` needs explicit resolution rules based on `party_type`.
 

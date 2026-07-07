@@ -30,7 +30,7 @@ Bronze is the **immutable landing zone**. It makes **one promise** and nothing m
 |---|---|---|---|
 | `customers.csv` → `bronze.customers` | Customer master | 🔴 | missing email; near-duplicate person (same name+dob+addr, diff id) |
 | `accounts.csv` → `bronze.accounts` | Bank accounts | — | orphan `customer_id` (RI break); future `open_date` |
-| `cards.csv` → `bronze.cards` | Payment cards | 🔴 | unmasked PAN leakage; expired-but-active; duplicate card |
+| `cards.csv` → `bronze.cards` | Payment cards | 🔴 | raw synthetic PAN; expired-but-active; duplicate card |
 | `merchants.csv` → `bronze.merchants` | Merchant master | — | closed merchant still referenced; inconsistent risk casing |
 | `merchant_categories.csv` → `bronze.merchant_categories` | MCC reference | — | enum/RI lookup |
 | `transactions.csv` → `bronze.transactions` | **The big fact (stress target)** | — | dup `txn_id`; negative amount; missing `merchant_id`; orphan account+card; future timestamp |
@@ -73,13 +73,13 @@ Defects: `ACC-2005` → orphan `customer_id` (CUST-9999 doesn't exist); `ACC-200
 
 ### `cards.csv` (PII)
 ```csv
-card_id,account_id,card_type,masked_pan,expiry,status
-CARD-3001,ACC-2001,debit,############1234,2027-08,active
+card_id,account_id,card_type,pan,expiry,status
+CARD-3001,ACC-2001,debit,4532-1111-2222-1234,2027-08,active
 CARD-3002,ACC-2002,debit,4532-1111-2222-3333,2024-02,active
-CARD-3003,ACC-2003,credit,############5678,2028-11,active
-CARD-3004,ACC-2004,debit,############9012,2025-03,closed
+CARD-3003,ACC-2003,credit,4532-3333-4444-5678,2028-11,active
+CARD-3004,ACC-2004,debit,4532-5555-6666-9012,2025-03,closed
 ```
-Defects: `CARD-3002` `masked_pan` is **unmasked** (full PAN leakage) and `expiry` 2024-02 is past but `status=active`; `CARD-3001` already-masked (good). Field name is `masked_pan` (matches data-model §4.3).
+Defects: `CARD-3002` has `expiry` 2024-02 in the past but `status=active`; `CARD-3004` is closed. `pan` is intentionally raw synthetic source data and must be masked/tokenized by the Silver pipeline.
 
 ### `merchants.csv`
 ```csv

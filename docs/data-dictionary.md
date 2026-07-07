@@ -37,7 +37,7 @@ Derived fact and child-table counts follow the generator ratios in
 | `customers` | 5,000 | one row per customer | `customer_id`, `first_name`, `last_name`, `dob`, `email`, `phone`, `address`, `tax_id`, `created_at` |
 | `employees` | 200 | one row per employee or investigator | `employee_id`, `full_name`, `email`, `team`, `role` |
 | `accounts` | 7,500 | one row per account | `account_id`, `customer_id`, `product_type`, `open_date`, `status`, `currency` |
-| `cards` | 9,000 | one row per payment card | `card_id`, `account_id`, `card_type`, `masked_pan`, `expiry`, `status` |
+| `cards` | 9,000 | one row per payment card | `card_id`, `account_id`, `card_type`, `pan`, `expiry`, `status` |
 | `merchants` | 2,000 | one row per merchant | `merchant_id`, `name`, `mcc`, `country`, `risk_rating`, `status` |
 | `transactions` | 2,000,000 | one row per transaction event | `transaction_id`, `account_id`, `card_id`, `merchant_id`, `channel`, `amount`, `currency`, `txn_ts`, `status` |
 | `auth_attempts` | 2,400,000 | one row per authorization attempt | `attempt_id`, `transaction_id`, `decision`, `decline_reason`, `auth_ts` |

@@ -61,7 +61,7 @@ python -m mock.generate --seed 42 --out data/raw
 2. **Defect injection**: each generator then mutates/inserts a controlled number
    of rows (driven by `--defect-rate`) to reproduce the documented defects, e.g.
    duplicate `transaction_id`, negative `amount`, orphan FKs, future timestamps,
-   unmasked PAN, PII in free text, `legal_hold` cases, DNC violations, enum
+   raw PAN requiring downstream masking, PII in free text, `legal_hold` cases, DNC violations, enum
    casing. Every injected row is logged to the manifest.
 
 Defect → rule mapping is defined inline in `mock/generators.py` (rule ids match
@@ -71,7 +71,7 @@ the brief's DQ requirements and `docs/data-model.md` §7).
 ```
 mock/
   config.py     # enums, ID prefixes, table schemas, generation order, volumes
-  helpers.py    # Faker/RNG setup + value helpers (masked_pan, tax_id, ts, ...)
+  helpers.py    # Faker/RNG setup + value helpers (full_pan, tax_id, ts, ...)
   defects.py    # DefectManifest (writes _defects_manifest.csv)
   generators.py # one generator per table + the GENERATORS registry
   generate.py   # CLI: argparse, count derivation, CSV streaming, summary

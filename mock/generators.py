@@ -19,7 +19,7 @@ from datetime import timedelta
 
 from . import config as C
 from .helpers import (
-    iso, iso_date, run_now, seq_id, masked_pan, full_pan, tax_id, phone_au,
+    iso, iso_date, run_now, seq_id, full_pan, tax_id, phone_au,
     amount, past_ts, future_ts,
 )
 
@@ -234,7 +234,7 @@ def gen_cards(ctx, n):
             "card_id": seq_id(C.PFX["card"], i),
             "account_id": rng.choice(acct_ids),
             "card_type": rng.choice(C.CARD_TYPE),
-            "masked_pan": masked_pan(rng),
+            "pan": full_pan(rng),
             "expiry": f"{rng.randint(2024, 2030)}-{rng.randint(1, 12):02d}",
             "status": rng.choices(C.CARD_STATUS, weights=[80, 5, 5, 10])[0],
         })
@@ -246,11 +246,7 @@ def gen_cards(ctx, n):
         closed_cards = [rows[0]["card_id"]]
     ctx.pools["closed_cards"] = closed_cards
 
-    # --- defects: PAN leakage, expired-but-active, duplicate card ---
-    for idx in ctx.sample_indices(n, ctx.defect_count(n, 0.5)):
-        rows[idx]["masked_pan"] = full_pan(rng)
-        man.add("cards", rows[idx]["card_id"], "DQ-CARD-PAN-LEAK",
-                "masked_pan must be masked (no full PAN)", "unmasked PAN leakage")
+    # --- defects: expired-but-active, duplicate card ---
     for idx in ctx.sample_indices(n, ctx.defect_count(n, 0.4)):
         rows[idx]["expiry"] = "2024-02"
         rows[idx]["status"] = "active"
