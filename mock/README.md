@@ -14,16 +14,16 @@ pip install -r requirements.txt   # just: Faker
 ## Usage
 
 ```bash
-# default dev volumes (transactions=50,000)
+# default assignment baseline (transactions=2,000,000)
 python -m mock.generate
 
 # fast demo / test run
 python -m mock.generate --transactions 2000 --customers 150
 
-# scale all volumes 10x
-python -m mock.generate --scale 10
+# scale down for a smaller local sample
+python -m mock.generate --scale 0.25
 
-# stress test (~2,000,000 transactions, streaming)
+# explicit stress test (~2,000,000 transactions, streaming)
 python -m mock.generate --stress
 
 # generate only some tables
@@ -41,11 +41,11 @@ python -m mock.generate --seed 42 --out data/raw
 |---|---|---|
 | `--seed` | `42` | RNG seed; same seed → identical data + defects |
 | `--out` | `data/raw` | output directory (one CSV per table) |
-| `--customers` | derived | override customer count (drives accounts/cards) |
-| `--transactions` | `50000` | override transaction count (drives facts) |
+| `--customers` | `5000` | override customer count (drives accounts/cards) |
+| `--transactions` | `2000000` | override transaction count (drives facts) |
 | `--scale` | `1.0` | multiplier on base volumes |
 | `--defect-rate` | `0.05` | fraction of eligible rows that get a defect |
-| `--stress` | off | sets `transactions=2,000,000` |
+| `--stress` | off | explicitly sets `transactions=2,000,000` |
 | `--tables` | all | comma-separated subset to generate |
 | `--no-manifest` | off | skip the defects manifest |
 

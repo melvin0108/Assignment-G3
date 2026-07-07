@@ -65,10 +65,10 @@ The only executable component today. Generates the Bronze source CSVs defined in
 ```bash
 pip install -r requirements.txt            # only dep: Faker
 
-python -m mock.generate                    # default: transactions=50,000 -> data/raw/
+python -m mock.generate                    # default: transactions=2,000,000 -> data/raw/
 python -m mock.generate --transactions 2000 --customers 150   # fast demo
-python -m mock.generate --scale 10         # 10x all volumes
-python -m mock.generate --stress           # ~2,000,000 transactions (streaming)
+python -m mock.generate --scale 0.25       # smaller local sample
+python -m mock.generate --stress           # explicit ~2,000,000 transactions (streaming)
 python -m mock.generate --tables customers,accounts,transactions   # subset only
 python -m mock.generate --defect-rate 0.15 --seed 42 --out data/raw
 ```

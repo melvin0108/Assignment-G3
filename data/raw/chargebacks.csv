@@ -1,9 +1,0 @@
-chargeback_id,dispute_id,scheme,amount,stage,processed_at
-CBK-0001,DSP-0009,mastercard,238.81,pre_arbitration,2026-07-03T12:48:33Z
-CBK-0002,DSP-0019,amex,253.03,pre_arbitration,2026-06-21T03:08:57Z
-CBK-0003,DSP-0034,visa,29.25,reversed,2026-06-25T18:35:03Z
-CBK-0004,DSP-0022,amex,394.13,won,2026-06-24T06:47:48Z
-CBK-0005,DSP-9999,visa,492.93,reversed,2026-06-25T21:11:27Z
-CBK-0006,DSP-0009,visa,135.92,representment,2026-06-17T15:33:24Z
-CBK-0007,DSP-0025,mastercard,313.95,won,2026-06-20T13:38:08Z
-CBK-0008,DSP-0038,mastercard,213.47,lost,2026-06-18T13:08:08Z

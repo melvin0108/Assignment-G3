@@ -2,16 +2,16 @@
 
 Examples
 --------
-# default dev volumes (transactions=50,000) -> data/raw/
+# default assignment baseline (transactions=2,000,000) -> data/raw/
 python -m mock.generate
 
 # small fast run for a quick demo / test
 python -m mock.generate --transactions 2000 --customers 150 --out data/raw
 
-# scale everything up 10x
-python -m mock.generate --scale 10
+# scale everything down for a smaller local sample
+python -m mock.generate --scale 0.25
 
-# stress test (~2M transactions) — streaming, memory-bounded
+# explicit stress test (~2M transactions) — streaming, memory-bounded
 python -m mock.generate --stress --out data/raw
 
 # only a subset of tables
@@ -91,7 +91,7 @@ def main(argv=None):
     ap.add_argument("--defect-rate", type=float, default=0.05,
                     help="fraction of eligible rows that get a defect (default 0.05)")
     ap.add_argument("--stress", action="store_true",
-                    help="shortcut: transactions=2,000,000 for stress testing")
+                    help="shortcut: transactions=2,000,000 for explicit stress testing")
     ap.add_argument("--tables", default=None,
                     help="comma-separated subset of tables to generate (default: all)")
     ap.add_argument("--no-manifest", action="store_true", help="skip writing _defects_manifest.csv")

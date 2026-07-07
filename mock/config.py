@@ -2,7 +2,8 @@
 
 Single source of truth for: the pinned run date, ID prefixes, enums
 (data-model.md §5), reference/lookup data, table CSV column order, generation
-order, and base volumes. Keep this in sync with docs/data-model.md.
+order, and base volumes. Keep this in sync with docs/data-dictionary.md and
+docs/data-model.md.
 """
 from datetime import date
 
@@ -140,8 +141,8 @@ GENERATION_ORDER = [
 
 # Base volumes. 0 / missing means "derived in generate.build_counts()".
 BASE_VOLUMES = {
-    "customers": 500,
-    "employees": 20,
-    "merchants": 200,
-    "transactions": 50000,
+    "customers": 5000,
+    "employees": 200,
+    "merchants": 2000,
+    "transactions": 2000000,
 }
