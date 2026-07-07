@@ -6,7 +6,7 @@
 | **Scenario** | Transaction investigation using transactions, disputes, chargebacks, merchants, fraud alerts, cases, notes, and related reference data |
 | **Goal** | Turn generated banking data into trusted, governed, Silver-layer context that is safe for an internal AI consumer to read |
 | **Platform assumption** | Databricks Free Edition + Unity Catalog, using catalog `tx_inv` and schemas such as `bronze`, `silver`, and `gov` if supported by the tenant |
-| **Status** | Mock data layer complete; pipeline, governance, tests, and demo evidence still to build |
+| **Status** | Mock data generation complete; backlog created; Databricks workspace linked with GitHub; catalog and layer schemas created; source data uploaded to Databricks Volume; Bronze ingestion under review; Silver, governance, tests, and demo evidence still to build |
 | **Last updated** | 2026-07-07 |
 
 ### Team & Status Key
@@ -30,6 +30,15 @@
 ## 1. Context
 
 The repository already has a mock data generator (`mock/`) that creates source CSV files and a `_defects_manifest.csv`. The manifest is the known list of intentionally injected data problems and should be used as evidence when validating data-quality work.
+
+Current completed work reported by the team:
+
+- Mock data generation is complete.
+- Backlog list is created.
+- Databricks workspace is set up and linked with the GitHub repository.
+- Catalog and layer schemas are created.
+- Generated source data has been uploaded to Databricks Volume.
+- Data ingestion into the Bronze layer has been written and is under review.
 
 The backlog below is not a strict step-by-step waterfall plan. It is a work-and-adapt list. Each epic states a premise and the outcomes it should produce. The team can pull items in the order that creates the fastest learning, as long as the final release still proves the required controls: ingestion, Silver data, data quality, quarantine, masking, access control, lineage, AI-safe output, tests, stress evidence, and runbook.
 
@@ -124,10 +133,10 @@ These are current implementation assumptions. They can change if the team learns
 
 | ID | Backlog item | Objective | Deliverable / completion evidence | Size | Assignee | Status |
 |---|---|---|---|---|---|---|
-| E1-I1 | Define the minimum local and Databricks setup needed for the first working demo. | Avoid setting up tools or permissions that do not yet serve a visible outcome. | Short setup note in the runbook with required accounts, workspace assumptions, and first commands. | S | M1 | To Do |
+| E1-I1 | Define the minimum local and Databricks setup needed for the first working demo. | Avoid setting up tools or permissions that do not yet serve a visible outcome. | Databricks workspace exists, GitHub repo is linked, catalog/layer schemas exist, and the setup assumptions are noted for the team. | S | M1 | Done |
 | E1-I2 | Create or refine simple project commands for common actions such as generating mock data, uploading data, running the pipeline, testing, and cleaning local outputs. | Give the team shared entrypoints so work is repeatable. | `make` targets or equivalent scripts exist and each has a short description. | M | M5 | To Do |
 | E1-I3 | Agree the first demonstrable slice of the pipeline. | Let the team learn from a small end-to-end outcome before expanding scope. | Runbook section names the first slice, the tables involved, and what it should prove. | S | M1 | To Do |
-| E1-I4 | Record the team ownership model and how work moves between `To Do`, `In Progress`, `Review`, and `Done`. | Make responsibilities visible without forcing a fixed delivery sequence. | This backlog and/or runbook shows owner, status meaning, and review expectations. | S | M5 | To Do |
+| E1-I4 | Record the team ownership model and how work moves between `To Do`, `In Progress`, `Review`, and `Done`. | Make responsibilities visible without forcing a fixed delivery sequence. | This backlog and/or runbook shows owner, status meaning, and review expectations. | S | M5 | Done |
 | E1-I5 | Check which Unity Catalog security features are available in the Databricks tenant. | Learn early whether column masks and dynamic views can support the intended privacy controls. | Short note records supported features and fallback approach if needed. | S | M1 | To Do |
 
 ### Epic 2 - Source Data Landing and Raw Data Capture
@@ -138,9 +147,9 @@ These are current implementation assumptions. They can change if the team learns
 
 | ID | Backlog item | Objective | Deliverable / completion evidence | Size | Assignee | Status |
 |---|---|---|---|---|---|---|
-| E2-I1 | Prepare the raw-data storage locations for generated source files. | Give each source table a predictable place to land before ingestion. | Landing locations exist or are documented for all generated tables. | S | M1 | To Do |
-| E2-I2 | Create raw/Bronze tables for all source files using source-like columns plus standard metadata. | Preserve the original data while adding fields needed for audit, rerun, and lineage. | All expected raw tables exist and include required metadata columns. | M | M1 | To Do |
-| E2-I3 | Load generated source files into the raw/Bronze tables in a repeatable way. | Prove the team can move data from local mock output into the platform without duplicating rows. | Re-running the same load does not duplicate records; source file metadata is available. | M | M1 | To Do |
+| E2-I1 | Prepare the raw-data storage locations for generated source files. | Give each source table a predictable place to land before ingestion. | Landing locations exist or are documented for all generated tables. | S | M1 | Done |
+| E2-I2 | Create raw/Bronze tables for all source files using source-like columns plus standard metadata. | Preserve the original data while adding fields needed for audit, rerun, and lineage. | All expected raw tables exist and include required metadata columns. | M | M1 | Review |
+| E2-I3 | Load generated source files into the raw/Bronze tables in a repeatable way. | Prove the team can move data from local mock output into the platform without duplicating rows. | Re-running the same load does not duplicate records; source file metadata is available. | M | M1 | Review |
 | E2-I4 | Load the defects manifest as a reference table for validation. | Bring the known expected data problems into the platform for later reconciliation. | Manifest table exists and contains the generated defect rows. | S | M2 | To Do |
 | E2-I5 | Add a simple raw-load validation check. | Catch missing files, missing rows, or broken ingestion early. | Row counts match source files, and the check result is saved or printed for review. | S | M5 | To Do |
 
@@ -322,7 +331,7 @@ Suggested ownership lanes:
 
 ## 11. Release Checklist
 
-- [ ] Source data can be generated and loaded into raw/Bronze storage.
+- [ ] Source data can be generated and loaded into raw/Bronze storage. *(Bronze ingestion is written and under review.)*
 - [ ] Silver outputs exist for the required source domains.
 - [ ] DQ checks run and produce rule-level summaries.
 - [ ] Failed records are quarantined with useful reasons.
