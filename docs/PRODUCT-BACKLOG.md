@@ -1,327 +1,344 @@
-# Product Backlog — NAB Transaction-Investigation Pipeline
+# Product Backlog - NAB Transaction-Investigation Pipeline
 
 | | |
 |---|---|
-| **Project** | NAB Core Data Engineer assignment — "TAC@NABVNSC22" |
-| **Scenario** | Transaction investigation (transactions, disputes/chargebacks, merchants, fraud alerts, investigation notes) |
-| **Goal** | Turn mock banking data into trusted, governed, **Silver-layer AI-ready context**, enforcing **Zero Trust AI at the data layer** before any AI consumer may read it |
-| **Platform** | Databricks Free Edition + Unity Catalog (catalog `tx_inv`; schemas `bronze` / `silver` / `gov`; landing Volume `/Volumes/tx_inv/landing/<table>/`) |
-| **Status** | Mock data layer ✅ complete · Pipeline ⬜ to build |
+| **Project** | NAB Core Data Engineer assignment - "TAC@NABVNSC22" |
+| **Scenario** | Transaction investigation using transactions, disputes, chargebacks, merchants, fraud alerts, cases, notes, and related reference data |
+| **Goal** | Turn generated banking data into trusted, governed, Silver-layer context that is safe for an internal AI consumer to read |
+| **Platform assumption** | Databricks Free Edition + Unity Catalog, using catalog `tx_inv` and schemas such as `bronze`, `silver`, and `gov` if supported by the tenant |
+| **Status** | Mock data layer complete; pipeline, governance, tests, and demo evidence still to build |
 | **Last updated** | 2026-07-07 |
 
-### Team & status key
-**Rule: each task is assigned to exactly one member at a time** (pairing is allowed, but every row has one accountable owner).
+### Team & Status Key
 
-**Status values:** `To Do` · `In Progress` · `Blocked` · `Review` · `Done`  *(all tasks start at `To Do`)*
+**Rule:** each backlog item has one accountable owner at a time. Pairing is allowed, but the table should show who is responsible for moving the item forward.
 
-**Members (placeholders — replace with real names):**
+**Status values:** `To Do` - `In Progress` - `Blocked` - `Review` - `Done`
 
-| ID | Overall pipeline ownership | Specific responsibilities | Main handoff / deliverable |
-|---|---|---|---|
-| **M1** | Owns the platform foundation and the main pipeline flow from raw files to final AI-ready Silver context. | Create the Databricks catalog, schemas, landing volume, upload helper, Bronze ingestion, pipeline run tracking, orchestration job, and final `silver.investigation_context_ai` view. | A runnable Databricks job that can ingest source CSVs, build Bronze, track each run, and produce the final AI-safe context surface. |
-| **M2** | Owns data-quality rules, quarantine, governance evidence, and access policy metadata. | Build the 36-rule registry, run each rule as an executable failure query, write failed records to quarantine, populate DQ results, and seed field-level access policy tables. | Governance tables that explain what failed, why it failed, what users are allowed to see, and which records are blocked from AI use. |
-| **M3** | Owns Silver cleansing and privacy controls for people and account data. | Transform customers, employees, accounts, and cards into typed Silver tables; tokenize or mask personal data; install column masks; emit lineage for masked and AI-bound fields. | Silver tables for customer/account entities that are clean, typed, masked, and safe for non-PII users. |
-| **M4** | Owns Silver cleansing for transaction activity plus referential-integrity and scale checks. | Transform transactions, authorization attempts, and device data; mark orphan foreign-key records; keep unsafe/unjoinable rows out of AI context; run the 2M-transaction stress test. | Silver activity tables that preserve transaction evidence, identify broken joins, and prove the pipeline can handle the required scale. |
-| **M5** | Owns investigation-domain Silver tables, automated tests, evidence, runbook, and demo packaging. | Transform reference data, disputes, chargebacks, fraud alerts, cases, notes, bridges, and contact logs; redact free-text PII; build tests; prepare samples, runbook, and demo script. | Verifiable evidence that the full pipeline works, protects sensitive data, and can be reproduced by another engineer. |
+**Members (placeholders - replace with real names):**
 
-> Swap `M1`–`M5` for your real team members. Each task has one accountable owner; pairing is still allowed.
+| ID | Main area of ownership | What this person is accountable for |
+|---|---|---|
+| **M1** | Platform flow and final AI context | Keeps the runnable pipeline path coherent: environment choices, ingestion flow, orchestration, and final AI-facing data surface. |
+| **M2** | Data quality and governance rules | Owns the rules, quarantine evidence, DQ summaries, and access-policy metadata that explain what data can be trusted or used. |
+| **M3** | People/account Silver data and privacy | Owns cleaned Silver outputs for customer, employee, account, and card data, including masking or tokenization of sensitive fields. |
+| **M4** | Transaction activity and scale | Owns cleaned transaction, authorization, and device activity, including broken relationship handling and stress-run evidence. |
+| **M5** | Investigation data, validation, and demo evidence | Owns investigation-domain Silver data, tests, runbook, sample outputs, and final demo packaging. |
 
 ---
 
 ## 1. Context
 
-We have a working **mock data generator** (`mock/`, Python + Faker) that produces 25 Bronze source CSVs plus a `_defects_manifest.csv` (the ground-truth list of every intentionally-injected bad record) into `data/raw/`. **Everything downstream — Bronze ingestion, Silver cleansing, DQ engine, quarantine, PII masking, lineage, Silver AI-ready context, and tests — still needs to be built.**
+The repository already has a mock data generator (`mock/`) that creates source CSV files and a `_defects_manifest.csv`. The manifest is the known list of intentionally injected data problems and should be used as evidence when validating data-quality work.
 
-This backlog is the dependency-ordered path to **all 11 grading criteria green**, sequenced so a thin end-to-end slice is demoable before fanning out to the full scope.
+The backlog below is not a strict step-by-step waterfall plan. It is a work-and-adapt list. Each epic states a premise and the outcomes it should produce. The team can pull items in the order that creates the fastest learning, as long as the final release still proves the required controls: ingestion, Silver data, data quality, quarantine, masking, access control, lineage, AI-safe output, tests, stress evidence, and runbook.
 
-### In scope (full comprehensive build)
-- 25 Bronze tables → governed Silver pipeline on Databricks; no separate Gold layer
-- Silver AI-ready context output/table/view for the internal AI consumer
-- All **36 injected DQ rules** executable (not just described)
-- All **7 governance tables** populated each run
-- Role-based **PII masking** (UC column masks + redaction)
-- End-to-end **lineage** and **metadata**
-- **Quarantine** of failed records with reasons
-- Automated **tests** producing evidence + a reproducible **runbook**
-- ~2M-transaction stress target
+### In Scope
 
-### Out of scope
-- Real customer / confidential NAB data · personal AWS accounts · production AI integration · Docker (optional) · Figma / user research / SDVF
+- Ingest all generated source tables into a raw/Bronze area.
+- Build governed Silver outputs for investigation use.
+- Provide an AI-ready Silver context surface for internal AI use.
+- Execute all injected data-quality rules and record failed records with reasons.
+- Protect sensitive data through masking, redaction, tokenization, removal, or controlled access.
+- Produce governance evidence: run tracking, DQ results, quarantine, lineage, masking policy, and access policy.
+- Provide automated validation and a reproducible demo runbook.
+- Record evidence that the pipeline can handle the required larger transaction volume.
+
+### Out of Scope
+
+- Real customer data.
+- Production AI integration.
+- Production infrastructure hardening beyond what is needed for the assignment.
+- UI design, Figma, user research, or SDVF.
 
 ---
 
-## 2. Architecture decisions
+## 2. Working Assumptions
 
-| Area | Decision | Rationale |
+These are current implementation assumptions. They can change if the team learns that a simpler or more reliable approach is better.
+
+| Area | Current assumption | Adaptation rule |
 |---|---|---|
-| **Transformation engine** | **SQL notebooks** orchestrated as one Databricks Job; DQ as a **rule-registry → failure-query** pattern | Many of the 36 rules are **cross-record** (FK anti-joins, `DQ-TXN-CARD-ACTIVE`, `DQ-AUTH-TS-ORDER`, near-duplicate windows, conditional `DQ-CASEPARTY-RESOLVE`, free-text PII regex). DLT `EXPECT … ON VIOLATION` evaluates **single-row predicates only** and silently cannot express these. A uniform "SELECT of failing rows" covers all 36 and emits the exact `failure_reason` / `disposition` / `raw_record` the quarantine contract needs. |
-| **Bronze ingest** | **`COPY INTO`** (default); DLT streaming tables optional | Idempotent, simple, no serverless cost/quirks on Free Edition. |
-| **PII enforcement** | **UC column masks** on Silver (+ Bronze defense-in-depth) + redaction inside transforms | Storage-level: even `SELECT *` by a non-privileged role cannot read raw PII. |
-| **AI-safe surface** | **UC dynamic view `silver.investigation_context_ai`** — only `ai_allowed` columns, `legal_hold` rows excluded — for the `ai_consumer` role | The physical Zero-Trust surface (load-bearing for AC7/AC9) while keeping Silver as the terminal layer. |
-| **DQ oracle** | `_defects_manifest.csv` → `gov._defects_manifest_staging` | Ground truth; the manifest-vs-quarantine reconciliation test is the master DQ evidence. |
-
-> ⚠️ **Verify first (Epic 1):** confirm the Free Edition tenant supports UC **column masks + dynamic views**. This is load-bearing for the Zero-Trust surface; if unsupported, fall back to view-level masking and document it.
+| Data platform | Use Databricks with Unity Catalog if available in the tenant. | If a feature is not supported, document the fallback and keep the same security outcome. |
+| Raw ingestion | Use a simple repeatable batch load into Bronze tables. | If DLT is easier in the tenant, record the reason and keep the same metadata and idempotency evidence. |
+| Data quality | Store rules in a registry and run executable failure queries. | Rule implementation can vary by rule shape, but every rule must produce auditable results. |
+| Sensitive data | Mask, redact, tokenize, hash, or remove sensitive fields before AI use. | The exact method can differ by field, but unsafe raw values must not appear in the AI surface. |
+| AI surface | Provide a Silver AI-ready table or view with only allowed fields. | The physical implementation may be a table or view if it proves the same access and exclusion controls. |
+| Validation | Use automated checks where possible and keep manual demo checks only where automation is not practical. | Add tests as each capability becomes stable instead of waiting until the end. |
 
 ---
 
-## 3. Grading rubric → epic coverage
+## 3. Grading Rubric Coverage
 
-All 11 acceptance criteria must pass:
-
-| # | Acceptance criterion | Primary epic(s) |
+| # | Acceptance criterion | Where it is mainly proven |
 |---|---|---|
 | AC1 | Repo understandable by another engineer | E1, E8 |
-| AC2 | Pipeline runs source → Silver AI-ready output end-to-end | E2, E4, E7, E8 |
-| AC3 | Mock data has valid + invalid records | (mock — done) |
-| AC4 | Data contracts match implementation | E1, E2, E5, E8 |
-| AC5 | DQ checks are **executable**, not just described | E3, E8 |
-| AC6 | Failed records quarantined with useful reasons | E3, E8 |
-| AC7 | Sensitive fields masked/redacted/tokenised/removed before AI output | E4, E5, E7 |
-| AC8 | Final Silver output has metadata + source traceability | E2, E6, E7 |
-| AC9 | AI output exposes no unsafe/unsupported data | E7, E8 |
-| AC10 | Tests/validation runnable + produce evidence | E8 (starts in E4) |
-| AC11 | Runbook clear enough to reproduce the demo | E8 |
+| AC2 | Pipeline runs source to Silver AI-ready output | E2, E4, E6, E7 |
+| AC3 | Mock data has valid and invalid records | Existing mock generator |
+| AC4 | Data contracts match implementation | E2, E4, E7 |
+| AC5 | DQ checks are executable, not only described | E3, E7 |
+| AC6 | Failed records are quarantined with useful reasons | E3, E5, E7 |
+| AC7 | Sensitive fields are protected before AI output | E4, E5, E6, E7 |
+| AC8 | Final Silver output has metadata and traceability | E2, E5, E6, E7 |
+| AC9 | AI output exposes no unsafe or unsupported data | E5, E6, E7 |
+| AC10 | Tests and validation are runnable and produce evidence | E7 |
+| AC11 | Runbook is clear enough to reproduce the demo | E1, E8 |
 
 ---
 
-## 4. Readiness, sizing, and success
+## 4. How to Use This Backlog
 
-### Story point scale
+### Backlog Principles
 
-| Story points | Brief description |
-|---|---|
-| 1 | Very simple task with minimal effort and no meaningful dependency. |
-| 2 | Simple task with slightly more work than 1; low complexity and low uncertainty. |
-| 3 | Moderate task with some complexity, small dependencies, or light validation work. |
-| 5 | Medium-complexity task requiring multiple steps, dependencies, or some unknowns. |
-| 8 | Complex task; do not assign. Break into smaller stories of 5 points or less. |
-| 13 | Very complex task; do not assign. Break into smaller stories of 5 points or less. |
+- Start with the smallest useful outcome, not the largest setup.
+- Treat each epic as a capability area, not a fixed phase.
+- Pull work when its premise is clear and its completion evidence is testable.
+- Move or split items if new learning shows they belong in a different epic.
+- Keep platform setup lightweight until it is needed by a deliverable.
+- Add validation near the work being built instead of saving all tests for the end.
 
 ### Definition of Ready
 
-- Backlog item has one accountable owner, clear acceptance criteria, and a known source-of-truth document or contract.
-- Dependencies are named, including upstream tables, DQ rules, UC permissions, or pipeline stages.
-- Verification is defined as an executable check, query, test, or documented demo step.
-- Any uncertainty large enough to make the story exceed 5 points has been split or moved to a spike.
+- The item has one accountable owner.
+- The objective explains why the item matters.
+- The deliverable is clear enough to review.
+- The completion evidence can be checked by a query, command, test, screenshot, or short written note.
+- Unknowns are small enough to handle inside the item; otherwise the item should become a short discovery task.
 
 ### Definition of Done
 
-- **Backlog item:** SQL/notebook merged; runs clean on seed 42; any DQ rule it touches reconciles to the manifest; relevant test green.
-- **Epic:** all stories done; the rubric AC(s) it owns are demonstrable via an executable command.
-- **Release:** all 11 ACs green; `make mock → upload → ingest → build → test` reproduces identical quarantine counts from a clean state; final output is produced in Silver; 2M-row stress run recorded in the runbook; Confluence page links repo + outputs + runbook.
-
-### Definition of Success
-
-- The team can run the pipeline from mock data to final Silver AI-ready context and explain each control in the walkthrough.
-- DQ, quarantine, masking, access, lineage, metadata, tests, and runbook evidence satisfy all 11 acceptance criteria.
-- The final Silver AI view exposes only approved fields, excludes unsafe records, and contains enough source references for answer verification.
-
-**Effort key:** S = small, M = medium, L = large. Story points estimate individual backlog items and are capped at 5.
+- The deliverable exists in the repo, Databricks workspace, or documented evidence location.
+- The completion evidence has been checked.
+- Any changed contract, rule, or assumption is reflected in the relevant documentation.
+- Sensitive-data and AI-safety effects have been considered if the item touches user, account, card, note, or case data.
 
 ---
 
-## 5. The backlog — 8 epics (dependency-ordered)
+## 5. Adaptive Product Backlog
 
-> Sequencing principle: prove the **entire pattern on one table** in **Epic 4 (thin slice)** — touching all 11 rubric items minimally — then fan out to all 25 tables / 36 rules.
+### Epic 1 - Shared Working Model and Minimum Runnable Skeleton
 
-### Epic 1 — Platform & Unity Catalog scaffolding
-**Goal:** reproducible, script-provisioned workspace + repo entrypoints. · **Effort M · ~2 days · Track A · Depends on: — · Covers AC1, AC11**
+**Premise:** The team needs a lightweight way to work together and run the project, but should avoid heavy platform setup before the purpose of each setup item is clear.
 
-| ID | Task | Objective | Acceptance (verifiable) | Story Points | Assignee | Status |
-|----|------|-----------|-------------------------|--------------|----------|--------|
-| E1-S1 | Create the main Databricks catalog `tx_inv` and the three schemas `bronze`, `silver`, and `gov`. | Give the project a clear place to store raw ingested data, cleaned data, and governance evidence. | Catalog + 3 schemas exist; setup SQL is idempotent (re-run = no-op). | 2 | M1 | To Do |
-| E1-S2 | Create landing folders in the Volume path `/Volumes/tx_inv/landing/<table>/` for all 25 source tables. | Give every generated CSV table a predictable upload location before ingestion starts. | One directory per table; generated by looping `config.TABLE_SCHEMAS`. | 3 | M1 | To Do |
-| E1-S3 | Create Unity Catalog roles/groups for PII users, masked users, AI consumers, the pipeline runner, and auditors, then grant only the permissions each role needs. | Prevent accidental access to raw sensitive data and make the Zero Trust design enforceable. | Each role has exactly the grants `access_policies` requires. | 5 | M1 | To Do |
-| E1-S4 | Create the `pipeline_runs` governance table and a `run_id` generator using the format `RUN-YYYYMMDD-<seq>`. | Let every pipeline execution be tracked from start to finish with counts and status. | One row opened at Job start, closed at end. | 3 | M1 | To Do |
-| E1-S5 | Add project entrypoints: `Makefile` targets (`mock`, `upload`, `ingest`, `build`, `test`, `clean`), Databricks Job JSON, `pipelines/`, `tests/`, `docs/runbook.md` skeleton, and `.gitignore` rules. | Make the project easy for another engineer to run without guessing the commands or folder layout. | `make` targets exist and are documented; large generated data is git-ignored. | 5 | M5 | To Do |
-| E1-S6 | Test whether this Databricks tenant supports Unity Catalog column masks and dynamic views. | Confirm the privacy design can be implemented as planned, or document the fallback before building on it. | Result (supported / fallback) recorded in runbook. | 2 | M1 | To Do |
-| E1-S7 | Build an upload helper that copies `data/raw/*.csv` files into the matching landing Volume folders. | Move locally generated mock data into Databricks in a repeatable way. | Idempotent upload; re-run does not duplicate. | 3 | M1 | To Do |
+**Outcome:** Another engineer can understand the repo, run basic commands, and see how work is organized.
 
-### Epic 2 — Bronze layer: ingest 25 tables (raw + metadata)
-**Goal:** all 25 source CSVs as Delta in `bronze.<table>`, all-STRING, append-only, with the 8 mandatory metadata columns; manifest ingested as the test oracle. · **Effort M · ~2–3 days · Track A · Depends on: E1 · Covers AC2, AC4, AC8, AC10**
+| ID | Backlog item | Objective | Deliverable / completion evidence | Size | Assignee | Status |
+|---|---|---|---|---|---|---|
+| E1-I1 | Define the minimum local and Databricks setup needed for the first working demo. | Avoid setting up tools or permissions that do not yet serve a visible outcome. | Short setup note in the runbook with required accounts, workspace assumptions, and first commands. | S | M1 | To Do |
+| E1-I2 | Create or refine simple project commands for common actions such as generating mock data, uploading data, running the pipeline, testing, and cleaning local outputs. | Give the team shared entrypoints so work is repeatable. | `make` targets or equivalent scripts exist and each has a short description. | M | M5 | To Do |
+| E1-I3 | Agree the first demonstrable slice of the pipeline. | Let the team learn from a small end-to-end outcome before expanding scope. | Runbook section names the first slice, the tables involved, and what it should prove. | S | M1 | To Do |
+| E1-I4 | Record the team ownership model and how work moves between `To Do`, `In Progress`, `Review`, and `Done`. | Make responsibilities visible without forcing a fixed delivery sequence. | This backlog and/or runbook shows owner, status meaning, and review expectations. | S | M5 | To Do |
+| E1-I5 | Check which Unity Catalog security features are available in the Databricks tenant. | Learn early whether column masks and dynamic views can support the intended privacy controls. | Short note records supported features and fallback approach if needed. | S | M1 | To Do |
 
-| ID | Task | Objective | Acceptance (verifiable) | Story Points | Assignee | Status |
-|----|------|-----------|-------------------------|--------------|----------|--------|
-| E2-S1 | Generate Bronze table definitions for all 25 CSV sources, storing every business column as `STRING` plus the 8 required metadata columns. | Keep Bronze as a faithful raw landing layer while adding audit fields needed for tracing and reruns. | 25 tables; each has the 8 metadata columns. | 5 | M1 | To Do |
-| E2-S2 | Load each CSV into its matching Bronze table using `COPY INTO`, including source file metadata, source record ID, row hash, and rescued-data capture. | Make ingestion repeatable and trace every Bronze row back to its original file and record. | Idempotent; re-ingest of same files adds 0 rows. | 5 | M1 | To Do |
-| E2-S3 | Confirm the ingestion approach: use `COPY INTO` by default and document when DLT would be used instead. | Avoid later confusion about why the project chose a simpler batch ingestion pattern. | Decision + alternative documented in runbook. | 2 | M1 | To Do |
-| E2-S4 | Add a Bronze row-count test for every source table. | Prove that all CSV rows landed in Bronze and no rows were silently lost. | `count(bronze.<table>)` == non-header CSV lines, all 25; `_rescued_data` null on clean tables. | 3 | M5 | To Do |
-| E2-S5 | Load `_defects_manifest.csv` into `gov._defects_manifest_staging` as raw strings. | Bring the known list of injected bad records into Databricks so tests can compare expected and actual failures. | Table populated with raw STRING copy of the oracle. | 2 | M2 | To Do |
+### Epic 2 - Source Data Landing and Raw Data Capture
 
-### Epic 3 — DQ rule registry + failure-engine + quarantine  🔴 critical-path bottleneck
-**Goal:** the core engine — a `dq_rules` catalog (all 36 rules currently emitted by the generator/manifest) + a generic failure-extractor that writes one row per failing record to `quarantine_records`, aggregated into `dq_results`. · **Effort L · ~3–4 days · Track B · Depends on: E2 · Covers AC5, AC6, AC10. Start the moment E2 lands.**
+**Premise:** The team needs a reliable raw-data base before cleansing, DQ, and AI-safety work can be trusted.
 
-| ID | Task | Objective | Acceptance (verifiable) | Story Points | Assignee | Status |
-|----|------|-----------|-------------------------|--------------|----------|--------|
-| E3-S1 | Create `gov.dq_rules` and seed all 36 data-quality rules with rule ID, layer, target table, severity, SQL expression, rule name, and category. | Store every data-quality rule in one governed table so rules are executable and reviewable. | Exactly the 36 rule IDs from `mock/generators.py` / `_defects_manifest.csv`; columns match the contract. | 3 | M2 | To Do |
-| E3-S2 | Assign each rule a severity and category, including special flags for rules that block records from AI use. | Make downstream behavior clear: reject, warn, allow with warning, or exclude from AI context. | AI-exclusion rules (`DQ-CASE-LEGALHOLD`, `DQ-NOTE-LEGALHOLD`) flagged; warn/allowed-with-warning set where the brief rewards it. | 2 | M2 | To Do |
-| E3-S3 | Build a failure-extractor notebook that accepts a `rule_id`, runs that rule, and writes each failed record to quarantine. | Turn the rule registry into real executable checks instead of only documentation. | Emits one `quarantine_records` row per (record × rule) with all contract columns including `raw_record=to_json(bronze row)`. | 5 | M2 | To Do |
-| E3-S4 | Create and populate `gov.dq_results` with pass/fail totals for each rule in each run. | Give the demo and tests a quick summary of data-quality results without reading every quarantined row. | Per (`run_id × rule_id`): total / passed / failed / sample_failed_keys[]. | 3 | M2 | To Do |
-| E3-S5 | Label each of the 36 rules as single-row, cross-record, or AI-exclusion (see §6). | Help engineers choose the correct SQL pattern for each rule and avoid using row-only checks for join/window rules. | Each rule tagged single-row / cross-record / ai-exclusion. | 3 | M2 | To Do |
-| E3-S6 | Add disposition logic that maps rule severity to the action taken, and allows one record to fail multiple rules. | Preserve full evidence when the same bad record has more than one problem. | One record carrying multiple failures produces multiple quarantine rows. | 3 | M2 | To Do |
+**Outcome:** Generated source files can be loaded into raw/Bronze tables with enough metadata to trace and rerun the load.
 
-### Epic 4 — Thin vertical slice: customers raw → Silver AI context  🟢 MVP demo
-**Goal:** prove the entire pattern on **one table** so all 11 rubric items are demoable before fanning out. Pick `customers` (has PII → masking; has 3 DQ rules → `DQ-CUST-EMAIL-FMT`/`ID-DUP`/`NEAR-DUP`; feeds final Silver context via `case_parties`). · **Effort M · ~2 days · Track C · Depends on: E2, E3 · Covers all 11 (each minimally)**
+| ID | Backlog item | Objective | Deliverable / completion evidence | Size | Assignee | Status |
+|---|---|---|---|---|---|---|
+| E2-I1 | Prepare the raw-data storage locations for generated source files. | Give each source table a predictable place to land before ingestion. | Landing locations exist or are documented for all generated tables. | S | M1 | To Do |
+| E2-I2 | Create raw/Bronze tables for all source files using source-like columns plus standard metadata. | Preserve the original data while adding fields needed for audit, rerun, and lineage. | All expected raw tables exist and include required metadata columns. | M | M1 | To Do |
+| E2-I3 | Load generated source files into the raw/Bronze tables in a repeatable way. | Prove the team can move data from local mock output into the platform without duplicating rows. | Re-running the same load does not duplicate records; source file metadata is available. | M | M1 | To Do |
+| E2-I4 | Load the defects manifest as a reference table for validation. | Bring the known expected data problems into the platform for later reconciliation. | Manifest table exists and contains the generated defect rows. | S | M2 | To Do |
+| E2-I5 | Add a simple raw-load validation check. | Catch missing files, missing rows, or broken ingestion early. | Row counts match source files, and the check result is saved or printed for review. | S | M5 | To Do |
 
-| ID | Task | Objective | Acceptance (verifiable) | Story Points | Assignee | Status |
-|----|------|-----------|-------------------------|--------------|----------|--------|
-| E4-S1 | Build the first Silver transform for `customers`: cast columns to proper types, tokenize customer names, mask email/phone, hash address and tax ID, and convert date of birth to age band. | Prove the raw-to-clean pattern on a table that contains sensitive customer information. | Silver columns + types match contract; no raw PII in non-privileged view. | 5 | M3 | To Do |
-| E4-S2 | Add Unity Catalog column masks to the sensitive customer fields, with raw values visible only to `fraud_ops_pii_clear`. | Make sure privacy protection works at the storage/query layer, not only inside one transform. | Mask registered in `masking_policies`; behaves per role. | 3 | M3 | To Do |
-| E4-S3 | Run the three customer data-quality rules through the E3 failure engine. | Prove the DQ engine can find known customer defects and quarantine them correctly. | `quarantine_records` matches manifest (EMAIL-FMT=11, ID-DUP=7, NEAR-DUP=7 on seed 42). | 3 | M3 | To Do |
-| E4-S4 | Write customer lineage rows to `metadata_lineage`, mapping each important Bronze field to its Silver field. | Show how the final data can be traced back to the raw source. | Bronze field → silver field mapping present. | 2 | M3 | To Do |
-| E4-S5 | Build a minimal `silver.investigation_context` table and `silver.investigation_context_ai` view for 1-2 sample cases. | Demonstrate the full pipeline pattern from raw customer data to AI-safe context before scaling to all tables. | AI-ready context grain present; a `legal_hold` case is excluded. | 5 | M1 | To Do |
-| E4-S6 | Add the first automated manifest-vs-quarantine test for customer records only. | Prove the project can compare expected bad records with actual quarantined records. | Test passes; proves the test strategy. | 3 | M5 | To Do |
+### Epic 3 - Data-Quality Rules and Issue Handling
 
-> **Demo gate:** this epic is the MVP walkthrough. Do not fan out until it demos clean.
+**Premise:** The assignment requires bad records to be found by executable checks, not only described in documentation.
 
-### Epic 5 — Silver fan-out: all 25 tables + PII masking + column masks
-**Goal:** replicate the E4 Silver pattern across the remaining 24 tables; full PII matrix; column masks everywhere PII exists. · **Effort L · ~4–5 days · Track C/D (parallel by table group) · Depends on: E4 · Covers AC4, AC6, AC7, AC9**
+**Outcome:** Data-quality rules can be run, failed records are captured with reasons, and results can be compared with the defects manifest.
 
-| ID | Task | Objective | Acceptance (verifiable) | Story Points | Assignee | Status |
-|----|------|-----------|-------------------------|--------------|----------|--------|
-| E5-S1a | Build Silver transforms for reference tables: `merchant_categories`, `channels`, `case_status_types`, `dispute_reason_codes`, `fraud_types`, `countries`, `currencies`, `branches`, `date_dim`, and `merchants`. | Clean and type the lookup data that other Silver tables use for labels, categories, and joins. | Types conformed; matches contracts. | 5 | M5 | To Do |
-| E5-S1b | Build Silver transforms for `employees`, `accounts`, and `cards`, including hashed employee names, masked/hashed employee emails, and card PAN masking that keeps only the last 4 digits. | Protect staff and cardholder information while keeping useful investigation fields. | No full PAN persists past Silver. | 5 | M3 | To Do |
-| E5-S1c | Build Silver transforms for `transactions`, `auth_attempts`, and `transaction_devices`, including typed amounts/timestamps and hashed or truncated device identifiers. | Clean the activity data that drives investigations while reducing device-related privacy risk. | Types conformed; device PII hashed. | 5 | M4 | To Do |
-| E5-S1d | Build Silver transforms for disputes, chargebacks, fraud alerts, investigation cases, notes, case-to-transaction links, case parties, and customer contact logs. | Clean the investigation records that explain why a transaction is being reviewed. | Types conformed; matches contracts. | 5 | M5 | To Do |
-| E5-S2 | Standardize allowed text values, such as lowercase `risk_rating` and `disputes.status`, and mapping `on_hold` to `suspended` while still recording the original defect. | Make Silver values consistent for users while keeping evidence that the raw record was invalid. | Conformance applied; original defect still flagged. | 3 | M5 | To Do |
-| E5-S3 | Redact personal data from free-text fields in `investigation_notes.note_text` and `customer_contact_logs.note`, and store `_pii_flags` showing what was found. | Stop emails, phone numbers, and card numbers from leaking through notes written by humans. | No raw email/phone/PAN in Silver notes; still-leaking rows quarantined. | 5 | M5 | To Do |
-| E5-S4 | Install column masks for every PII field listed in the data model and register each masked field in `masking_policies`. | Apply privacy controls consistently across all Silver tables, not only the customer slice. | Every §6-matrix field masked at storage layer. | 5 | M3 | To Do |
-| E5-S5 | Handle near-duplicate customer and employee records by quarantining duplicates and keeping the earliest trusted record. | Prevent duplicate people from confusing investigations while preserving evidence of the duplicate rows. | Duplicate quarantined; earliest by `_ingest_ts`/PK kept. | 3 | M3 | To Do |
-| E5-S6 | Mark orphan foreign-key rows in Silver, keep them for audit, and make sure the final AI context does not join them as if they were valid. | Preserve raw evidence without letting broken relationships create misleading AI context. | Orphan row present + marked; quarantine row carries `failure_reason`. | 5 | M4 | To Do |
+| ID | Backlog item | Objective | Deliverable / completion evidence | Size | Assignee | Status |
+|---|---|---|---|---|---|---|
+| E3-I1 | Create a data-quality rule inventory from the generator, manifest, and data-model documents. | Make the expected rule set visible before implementing individual checks. | Rule inventory includes rule ID, target data, short description, severity, and expected handling. | M | M2 | To Do |
+| E3-I2 | Group rules by implementation pattern, such as single-record checks, relationship checks, duplicate checks, text checks, or AI-exclusion checks. | Help the team implement rules with the right level of logic instead of forcing one pattern onto all checks. | Each rule has an implementation pattern and owner. | S | M2 | To Do |
+| E3-I3 | Build the common quarantine output for failed records. | Keep a consistent record of what failed, why it failed, and which run found it. | Quarantine output contains run ID, rule ID, source table, record key, reason, severity, and raw-record reference or snapshot. | M | M2 | To Do |
+| E3-I4 | Implement executable checks for the highest-value or first-slice rules. | Prove the rule approach on a small useful set before implementing all rules. | Selected rules produce pass/fail results and quarantine rows that can be reviewed. | M | M2 | To Do |
+| E3-I5 | Expand rule execution until all injected rules are covered. | Satisfy the assignment requirement that all intended defects are checked. | All expected rule IDs have runnable checks and result records. | L | M2 | To Do |
+| E3-I6 | Compare actual quarantined records with the defects manifest. | Prove that the DQ implementation catches the intended bad records and avoids unexpected false positives. | Reconciliation report shows match quality per rule, with exceptions explained. | M | M5 | To Do |
 
-### Epic 6 — Governance tables population
-**Goal:** all 7 governance tables reliably populated each run and queryable for the DQ-evidence / lineage / privacy deliverables. · **Effort M · ~2 days · Track B · Depends on: E3, E5 · Covers AC6, AC8, AC9**
+### Epic 4 - Silver Data Products and Sensitive-Data Treatment
 
-| ID | Task | Objective | Acceptance (verifiable) | Story Points | Assignee | Status |
-|----|------|-----------|-------------------------|--------------|----------|--------|
-| E6-S1 | Finalize and version the seeded `dq_rules` table so the 36 rules do not change unexpectedly between runs. | Keep the rule list stable for evidence, grading, and repeatable tests. | 36 rows; stable across runs. | 2 | M2 | To Do |
-| E6-S2 | Populate `dq_results` every time the pipeline runs. | Provide a run-level summary of how many records passed or failed each rule. | Counts + sample keys per rule. | 3 | M2 | To Do |
-| E6-S3 | Populate `quarantine_records` every time the pipeline runs, partitioned by `run_id`. | Keep detailed evidence of every failed record and make it easy to inspect a single run. | Appended; partitioned by `run_id`. | 3 | M2 | To Do |
-| E6-S4 | Update `pipeline_runs` with one complete row for every Databricks Job run. | Show when the run started, when it ended, whether it succeeded, and how many rows moved through each stage. | start/end, status, per-stage counts (bronze_in, silver_out, quarantine, ai_context_out). | 3 | M1 | To Do |
-| E6-S5 | Emit `metadata_lineage` rows from each Silver transform and the final AI-context build. | Let reviewers trace important final fields back to their original Bronze source columns. | source→target field mapping; covers all AI-context-bound + masked fields. | 5 | M3 | To Do |
-| E6-S6 | Seed `masking_policies` with one row for each masked field. | Document which fields are sensitive and what masking rule protects them. | Matches §6 matrix. | 3 | M3 | To Do |
-| E6-S7 | Seed `access_policies` with one row per field showing whether it is internal-only, customer-facing, or AI-allowed. | Drive the AI-safe view and grants from explicit policy metadata instead of hidden assumptions. | Drives Silver AI-view `ai_allowed` filter + UC grants. | 3 | M2 | To Do |
+**Premise:** The raw data needs to become typed, cleaner, and safer before it can support investigation or AI use.
 
-### Epic 7 — Silver AI-ready context + Zero-Trust enforcement
-**Goal:** build `silver.investigation_context` (one doc per case, `legal_hold` excluded) from all Silver tables; final AI-ready contract; enforce Zero-Trust via the UC dynamic view. · **Effort L · ~3 days · Track A/D · Depends on: E5, E6 · Covers AC7, AC8, AC9**
+**Outcome:** Silver tables provide useful investigation data while treating sensitive fields according to policy.
 
-| ID | Task | Objective | Acceptance (verifiable) | Story Points | Assignee | Status |
-|----|------|-----------|-------------------------|--------------|----------|--------|
-| E7-S1 | Build the Silver AI context aggregator, one record per investigation case, excluding legal-hold cases and legal-hold notes. | Combine the cleaned Silver tables into the single case-level context an internal AI consumer would read. | Arrays populated; legal_hold cases excluded; legal_hold notes excluded. | 5 | M1 | To Do |
-| E7-S2 | Add final context metadata fields: `quality_status`, `masking_status`, `warning_flags`, `source_references`, `context_version`, `last_refreshed_at`, and `usage_restrictions`. | Help AI users and auditors understand data quality, masking, sources, freshness, and usage limits for each case. | Final Silver context columns present and correct; records below quality threshold are excluded or flagged by a documented rule. | 3 | M1 | To Do |
-| E7-S3 | Create the dynamic view `silver.investigation_context_ai` for `ai_consumer`, exposing only AI-allowed columns and excluding legal-hold records. | Enforce the final Zero Trust boundary before any AI tool can read the data. | `ai_consumer` cannot select forbidden columns or legal_hold rows. | 3 | M1 | To Do |
-| E7-S4 | Add an AI-safety assertion that fails the run if unsafe values appear in the AI view. | Catch privacy or legal-hold leaks even if an upstream transform or policy is misconfigured. | Run fails if any full PAN / raw email / raw phone / legal_hold case_id appears in the AI view. | 3 | M5 | To Do |
-| E7-S5 | Write `docs/ai-prompts.md` with examples of prompts the AI can answer and prompts it must refuse. | Show reviewers how the AI-safe data surface should and should not be used. | Lists prompts AI can answer vs must refuse. | 2 | M5 | To Do |
-| E7-S6 | Check the data-contract documentation for completeness across every source table. | Make sure another engineer can understand table purpose, fields, relationships, sensitive data, and DQ rules. | `docs/data-model.md` or generated contract docs cover purpose, keys, fields, required/optional status, accepted values, examples, DQ rules, sensitive classification, and relationships for every source table. | 3 | M5 | To Do |
+| ID | Backlog item | Objective | Deliverable / completion evidence | Size | Assignee | Status |
+|---|---|---|---|---|---|---|
+| E4-I1 | Build the first Silver table or small table group that proves the raw-to-clean pattern. | Learn the transformation, typing, DQ, lineage, and privacy pattern on a small slice. | One useful Silver output exists, matches its contract, and has basic validation evidence. | M | M3 | To Do |
+| E4-I2 | Build Silver outputs for customer, employee, account, and card data. | Provide clean people and account entities while protecting direct identifiers and card data. | Silver outputs exist; sensitive fields are masked, tokenized, hashed, reduced, or removed as appropriate. | M | M3 | To Do |
+| E4-I3 | Build Silver outputs for transactions, authorization activity, and device data. | Provide clean transaction activity for investigations and AI context. | Silver outputs exist with typed amounts/timestamps and protected device-related fields. | M | M4 | To Do |
+| E4-I4 | Build Silver outputs for disputes, chargebacks, fraud alerts, cases, notes, links, parties, contact logs, and reference tables. | Provide the investigation story around each transaction or case. | Silver outputs exist and match the documented purpose, keys, and accepted values. | L | M5 | To Do |
+| E4-I5 | Standardize values that should use a controlled set, while preserving evidence of invalid raw values. | Make Silver easier to query without hiding that the source contained defects. | Controlled fields are conformed or flagged; original defect evidence remains available. | S | M5 | To Do |
+| E4-I6 | Redact sensitive values from free-text notes and logs. | Prevent emails, phone numbers, card numbers, or other unsafe text from leaking into Silver or AI context. | Redacted text is available; rows with remaining leaks are flagged or quarantined. | M | M5 | To Do |
+| E4-I7 | Handle duplicate and broken-relationship records in a documented way. | Keep investigation evidence without letting duplicates or broken joins mislead downstream users. | Duplicates and orphan relationships are flagged, quarantined, excluded, or retained according to documented handling. | M | M4 | To Do |
 
-### Epic 8 — Tests, stress, runbook, demo polish
-**Goal:** every rubric item provable by an executable command; prove the 2M stress target; deliver runbook + demo. · **Effort M · ~3 days · Track D · Depends on: E7 (tests start in E4) · Covers AC2, AC4, AC6, AC7, AC9, AC10, AC11**
+### Epic 5 - Governance, Access, Lineage, and Run Evidence
 
-| ID | Task | Objective | Acceptance (verifiable) | Story Points | Assignee | Status |
-|----|------|-----------|-------------------------|--------------|----------|--------|
-| E8-S1 | Build the master manifest-vs-quarantine reconciliation test for all rules. | Prove that every intentionally bad record is caught and no unexpected records are incorrectly quarantined. | Per rule: precision = recall = 1.0 (modulo intentional ai_exclusion). | 5 | M5 | To Do |
-| E8-S2 | Build schema-contract tests for Bronze, Silver, and final Silver context. | Prove that implemented tables match the documented contracts. | Silver types match contracts; Bronze has 8 metadata cols; final Silver context has the required context columns. | 3 | M5 | To Do |
-| E8-S3 | Build masking-effectiveness tests for unprivileged users and the AI view. | Prove that sensitive values cannot be read by the wrong role and that tokenization is consistent. | No raw PII in unprivileged/Silver AI-view; tokenize deterministic; mask behaves per role. | 5 | M5 | To Do |
-| E8-S4 | Build AI-safety and legal-hold tests. | Prove the AI surface excludes legally restricted records and raw card data. | Zero legal_hold case_id in AI-view; legal_hold notes absent; raw PAN absent past Bronze. | 3 | M5 | To Do |
-| E8-S5 | Build a lineage completeness test for the final Silver AI context. | Prove every AI-facing field can be traced back to source data for audit and explanation. | Every final Silver AI-context field traces to a Bronze field. | 3 | M5 | To Do |
-| E8-S6 | Build reconciliation/count tests across Bronze, Silver, quarantine, and AI context. | Prove row movement through the pipeline is explainable and no stage silently drops records. | bronze = CSV lines; conformed Silver = bronze - quarantined - rejected (+warned); Silver AI context = non-legal_hold cases above/within quality threshold. | 5 | M5 | To Do |
-| E8-S7 | Run the stress dataset with about 2M transactions and record performance details. | Prove the solution works beyond the small demo dataset and document its runtime limits. | `--stress` → full pipeline completes; correctness holds; wall-clock + cluster size recorded. | 5 | M4 | To Do |
-| E8-S8 | Complete `docs/runbook.md` with prerequisites, setup, commands, output locations, validation steps, quarantine inspection, limitations, and troubleshooting. | Let another team member reproduce the whole demo without needing private knowledge. | Covers prerequisites, setup, run commands, validation commands, output locations, quarantine inspection, known limitations, troubleshooting; another team can reproduce the demo cold. | 3 | M5 | To Do |
-| E8-S9 | Prepare the demo script, committed masked sample outputs in `data/sample/`, and a DQ-evidence summary. | Package the final proof for grading and Confluence submission. | Deliverables attached/linked from Confluence. | 3 | M5 | To Do |
+**Premise:** Trustworthy data needs evidence about rules, access, masking, lineage, and pipeline runs.
+
+**Outcome:** Governance outputs explain what happened in each run, what data is protected, and where AI-facing fields came from.
+
+| ID | Backlog item | Objective | Deliverable / completion evidence | Size | Assignee | Status |
+|---|---|---|---|---|---|---|
+| E5-I1 | Capture one run record for each pipeline execution. | Make every demo or test run traceable. | Run tracking includes run ID, start/end time, status, and key row counts. | S | M1 | To Do |
+| E5-I2 | Publish DQ summary results for each run. | Let reviewers see rule outcomes without reading every quarantined row. | DQ summary includes rule-level totals and sample failed keys. | S | M2 | To Do |
+| E5-I3 | Maintain masking-policy metadata for sensitive fields. | Document how sensitive fields are protected and who can see what. | Masking policy table or document lists field, classification, method, and owner. | S | M3 | To Do |
+| E5-I4 | Maintain access-policy metadata for internal, masked, auditor, and AI-consumer use. | Make allowed data use explicit instead of relying on assumptions. | Access policy table or document identifies fields allowed or blocked for each role. | M | M2 | To Do |
+| E5-I5 | Implement the access controls needed for the demo environment. | Prove that sensitive data is not available to roles that should not see it. | Role-based query checks show allowed and blocked access behavior. | M | M1 | To Do |
+| E5-I6 | Emit lineage for important Silver and AI-facing fields. | Let reviewers trace final values back to source fields. | Lineage evidence covers AI-facing fields and masked sensitive fields. | M | M3 | To Do |
+| E5-I7 | Keep governance outputs aligned with actual pipeline behavior. | Avoid stale governance tables that describe rules or policies differently from implementation. | Spot checks show rule, policy, lineage, and run evidence match current outputs. | S | M2 | To Do |
+
+### Epic 6 - AI-Ready Investigation Context
+
+**Premise:** AI should read only a curated, policy-safe view of the investigation data, not the full raw or unrestricted Silver layer.
+
+**Outcome:** The project provides an AI-ready Silver context surface with safe fields, source references, quality signals, and legal-hold exclusion.
+
+| ID | Backlog item | Objective | Deliverable / completion evidence | Size | Assignee | Status |
+|---|---|---|---|---|---|---|
+| E6-I1 | Define the AI-ready context contract. | Agree what one AI-readable investigation record should contain before building it broadly. | Contract lists grain, allowed fields, required metadata, exclusions, and source references. | S | M1 | To Do |
+| E6-I2 | Build an initial AI-ready context from the first useful slice. | Prove the AI surface early and expose gaps before all tables are complete. | Sample context records exist and can be inspected safely. | M | M1 | To Do |
+| E6-I3 | Expand the AI-ready context to include relevant transactions, merchants, disputes, alerts, parties, and redacted notes. | Give AI enough context to help with investigation questions while staying within policy. | Final context includes the expected investigation sections and source references. | L | M1 | To Do |
+| E6-I4 | Exclude legal-hold, unsafe, unsupported, or below-threshold records from the AI-facing surface. | Prevent AI use of data that should not be used or cannot be trusted. | Query checks show excluded records do not appear in the AI surface. | M | M1 | To Do |
+| E6-I5 | Add final context metadata such as quality status, masking status, warning flags, version, refresh time, and usage restrictions. | Help AI consumers and reviewers understand what the context can and cannot support. | Metadata fields are present and populated for context records. | M | M1 | To Do |
+| E6-I6 | Add safety checks against raw PII, raw card numbers, and legal-hold leakage in the AI surface. | Catch unsafe exposure even if an upstream transformation changes. | Automated or repeatable checks fail when unsafe values appear. | M | M5 | To Do |
+
+### Epic 7 - Validation, Evidence, and Scale Confidence
+
+**Premise:** The assignment needs proof, not only implementation. Validation should grow with the features rather than wait until the final week.
+
+**Outcome:** Tests and evidence show that ingestion, contracts, DQ, masking, AI safety, lineage, and scale behave as expected.
+
+| ID | Backlog item | Objective | Deliverable / completion evidence | Size | Assignee | Status |
+|---|---|---|---|---|---|---|
+| E7-I1 | Validate source-to-raw loading. | Prove that all expected source rows landed in the platform. | Row-count evidence compares source files with raw tables. | S | M5 | To Do |
+| E7-I2 | Validate schema and contract alignment. | Prove that implemented outputs match documented structures and types. | Test or checklist covers raw metadata, Silver types, and final AI context fields. | M | M5 | To Do |
+| E7-I3 | Validate data-quality and quarantine behavior. | Prove failed records are detected and recorded with useful reasons. | Manifest-vs-quarantine evidence is produced per rule. | M | M5 | To Do |
+| E7-I4 | Validate masking, redaction, and access behavior. | Prove sensitive data is protected for unprivileged and AI users. | Checks show no unsafe raw PII or full card values in restricted outputs. | M | M5 | To Do |
+| E7-I5 | Validate AI-safety and legal-hold exclusion. | Prove the AI surface contains only allowed records and fields. | Checks show zero legal-hold records and no forbidden columns or unsafe values. | M | M5 | To Do |
+| E7-I6 | Validate lineage and source traceability. | Prove final context fields can be explained from source data. | Lineage check covers AI-facing fields. | S | M5 | To Do |
+| E7-I7 | Run and record the larger-volume transaction test. | Show the pipeline can handle the expected stress-size dataset and record practical limits. | Stress run result includes command, row volume, runtime, compute size, and correctness outcome. | M | M4 | To Do |
+| E7-I8 | Create a concise evidence summary for grading. | Make it easy for reviewers to see which acceptance criteria passed and where the proof is. | Evidence summary links tests, queries, outputs, screenshots, or run logs. | S | M5 | To Do |
+
+### Epic 8 - Runbook, Demo, and Final Handoff
+
+**Premise:** The work is only useful if another person can reproduce it and understand the controls without relying on the builders.
+
+**Outcome:** The final handoff explains how to run, validate, inspect, and demo the pipeline.
+
+| ID | Backlog item | Objective | Deliverable / completion evidence | Size | Assignee | Status |
+|---|---|---|---|---|---|---|
+| E8-I1 | Write the runbook for setup, execution, validation, and troubleshooting. | Let another engineer reproduce the project from a clean state. | Runbook includes prerequisites, commands, expected outputs, validation checks, and common issues. | M | M5 | To Do |
+| E8-I2 | Prepare masked sample outputs for review. | Show representative data without exposing raw sensitive values. | Sample files or screenshots are stored in the agreed location and contain no unsafe raw PII. | S | M5 | To Do |
+| E8-I3 | Prepare a short demo script. | Keep the presentation focused on the required outcomes and evidence. | Demo script covers mock generation, ingestion, Silver outputs, DQ/quarantine, masking, AI context, and tests. | S | M5 | To Do |
+| E8-I4 | Perform a cold-run rehearsal by someone other than the main builder. | Prove the runbook works for a reader who does not already know the project. | Rehearsal notes show success, corrections, or remaining gaps. | M | M5 | To Do |
+| E8-I5 | Finalize the submission links and evidence package. | Make grading materials easy to find. | Confluence or submission page links repo, runbook, evidence summary, sample outputs, and known limitations. | S | M5 | To Do |
 
 ---
 
-## 6. The 36 DQ rules — by failure-query shape (drives Epic 3)
+## 6. The 36 DQ Rules - by Failure-Query Shape
 
-| Shape | Rules | Implementation |
+Use this section as a guide for implementation planning. The exact SQL can adapt, but each rule should produce reviewable results and, where appropriate, quarantine evidence.
+
+| Shape | Rules | Implementation guidance |
 |---|---|---|
-| **(a) Single-row predicate** | `DQ-TXN-AMT-POS`, `DQ-TXN-MERCH-REQ`, `DQ-TXN-TS-FUTURE`, `DQ-ACC-OPENDATE-FUTURE`, `DQ-CUST-EMAIL-FMT`, `DQ-CARD-EXPIRED-ACTIVE`, `DQ-MERCH-RISK-CASING`, `DQ-DISP-STATUS-ENUM`, `DQ-DISP-REASON-REQ`, `DQ-CASE-STATUS-ENUM`, `DQ-ALT-SCORE-RANGE`, `DQ-DEV-TYPE-REQ`, `DQ-NOTE-PII-LEAK`, `DQ-CTL-NOTE-PII`, uniqueness `DQ-CUST-ID-DUP`/`DQ-TXN-ID-DUP`/`DQ-CARD-DUP`/`DQ-EMP-EMAIL-UNIQ` | `WHERE NOT <predicate>` (also expressible as DLT `EXPECT` if DLT Bronze chosen) |
-| **(b) Cross-record / join / window** | FK anti-joins `DQ-ACC-CUST-FK`, `DQ-TXN-ACCT-FK`, `DQ-AUTH-TXN-FK`, `DQ-DISP-TXN-FK`, `DQ-CBK-DISP-FK`, `DQ-DEV-TXN-FK`, `DQ-CASETXN-TXN-FK`; `DQ-TXN-CARD-ACTIVE`, `DQ-AUTH-TS-ORDER`, `DQ-CASE-STALE`, `DQ-CUST-NEAR-DUP`, `DQ-EMP-NAME-NEAR-DUP`, `DQ-CASEPARTY-RESOLVE`, `DQ-CASEPARTY-TYPE-ENUM`, `DQ-CTL-DNC-VIOLATION` | failure query with JOIN / anti-join / window — **NOT** EXPECT |
-| **(c) AI-exclusion** | `DQ-CASE-LEGALHOLD`, `DQ-NOTE-LEGALHOLD` | writes an evidence row; **primary effect** = Silver AI-context / AI-view exclusion |
+| **Single-record checks** | `DQ-TXN-AMT-POS`, `DQ-TXN-MERCH-REQ`, `DQ-TXN-TS-FUTURE`, `DQ-ACC-OPENDATE-FUTURE`, `DQ-CUST-EMAIL-FMT`, `DQ-CARD-EXPIRED-ACTIVE`, `DQ-MERCH-RISK-CASING`, `DQ-DISP-STATUS-ENUM`, `DQ-DISP-REASON-REQ`, `DQ-CASE-STATUS-ENUM`, `DQ-ALT-SCORE-RANGE`, `DQ-DEV-TYPE-REQ`, `DQ-NOTE-PII-LEAK`, `DQ-CTL-NOTE-PII`, uniqueness checks such as `DQ-CUST-ID-DUP`, `DQ-TXN-ID-DUP`, `DQ-CARD-DUP`, `DQ-EMP-EMAIL-UNIQ` | Usually implemented as a predicate, duplicate grouping, or text scan against one table. |
+| **Relationship, join, or window checks** | FK checks such as `DQ-ACC-CUST-FK`, `DQ-TXN-ACCT-FK`, `DQ-AUTH-TXN-FK`, `DQ-DISP-TXN-FK`, `DQ-CBK-DISP-FK`, `DQ-DEV-TXN-FK`, `DQ-CASETXN-TXN-FK`; plus `DQ-TXN-CARD-ACTIVE`, `DQ-AUTH-TS-ORDER`, `DQ-CASE-STALE`, `DQ-CUST-NEAR-DUP`, `DQ-EMP-NAME-NEAR-DUP`, `DQ-CASEPARTY-RESOLVE`, `DQ-CASEPARTY-TYPE-ENUM`, `DQ-CTL-DNC-VIOLATION` | Needs joins, anti-joins, grouping, or window logic. Do not reduce these to row-only checks. |
+| **AI-exclusion checks** | `DQ-CASE-LEGALHOLD`, `DQ-NOTE-LEGALHOLD` | Produces evidence and prevents affected case or note content from reaching the AI-facing surface. |
 
-> Manifest expected counts (default seed 42, top): `DQ-TXN-AMT-POS`=150, `DQ-TXN-TS-FUTURE`=120, `DQ-TXN-MERCH-REQ`=120, `DQ-TXN-ID-DUP`=120, `DQ-TXN-ACCT-FK`=120; customers `EMAIL-FMT`=11, `ID-DUP`=7, `NEAR-DUP`=7. **Derive expected sets from the manifest table at runtime — never hardcode counts** (they drift if the seed changes).
+Expected counts can change when the seed or generator changes. Tests should read expected records from the manifest instead of hardcoding counts.
 
 ---
 
-## 7. Governance tables — populated by which stage
+## 7. Governance Outputs
 
-| Table | Populated by | When |
+The implementation can use tables, views, files, or documented query outputs, but the final evidence should cover these governance needs.
+
+| Governance output | Purpose | Minimum evidence |
 |---|---|---|
-| `dq_rules` | E3 seed | once (immutable) |
-| `dq_results` | E3 failure-extractor | each run |
-| `quarantine_records` | E3 failure-extractor | each run (append, partitioned by `run_id`) |
-| `pipeline_runs` | orchestrator | open at Job start, close at end |
-| `metadata_lineage` | each Silver transform and final Silver AI-context build | each run (append) |
-| `masking_policies` | E5 (seed from §6 matrix) | once + on change |
-| `access_policies` | E6 (drives Silver AI-view `ai_allowed` + UC grants) | once + on change |
+| Rule inventory | Shows what DQ checks exist and how they should behave. | Rule ID, target data, severity, category, and handling. |
+| DQ results | Summarizes pass/fail outcomes for each run. | Run ID, rule ID, totals, failed count, and sample keys. |
+| Quarantine records | Stores detailed evidence for failed records. | Run ID, rule ID, table, record key, reason, severity, and raw-record reference or snapshot. |
+| Pipeline run tracking | Shows what happened in each execution. | Start/end, status, row counts, and output locations. |
+| Lineage evidence | Explains where important final fields came from. | Source-to-target mapping for AI-facing and sensitive fields. |
+| Masking policy | Explains how sensitive fields are protected. | Field, classification, protection method, and allowed role. |
+| Access policy | Explains who can read what. | Role or use case mapped to allowed, masked, or blocked fields. |
 
 ---
 
-## 8. Test strategy (test → rubric)
+## 8. Test Strategy
 
-| Executable test | ACs |
+| Test area | What it proves |
 |---|---|
-| Bronze row-count == CSV line count (all 25) | AC2, AC4, AC10 |
-| Schema-contract match (Bronze metadata, Silver types, final Silver context columns) | AC4, AC10 |
-| Manifest-vs-quarantine reconciliation (precision/recall per rule) | AC5, AC6, AC10 |
-| `dq_results` non-empty, counts consistent with quarantine | AC5, AC10 |
-| Masking-effectiveness (no raw PII in unprivileged/Silver AI-view; tokenize determinism; mask-per-role) | AC7, AC9 |
-| `legal_hold` exclusion (no legal_hold case_id in AI-view; legal_hold notes absent) | AC9 |
-| Raw PAN absent from Silver AI output | AC7, AC9 |
-| Lineage completeness (every final Silver AI-context field traces to Bronze) | AC8 |
-| Final Silver context metadata fields present | AC8 |
-| Reconciliation silver = bronze − quarantined − rejected (+warned) | AC6, AC10 |
-| Stress correctness + wall-clock evidence | AC2, AC10 |
-| Clean-state rerun reproduces identical quarantine | AC11 |
+| Source-to-raw counts | All generated source rows landed in raw/Bronze storage. |
+| Contract checks | Raw, Silver, and AI-facing outputs match documented structures. |
+| Manifest-vs-quarantine | Intended defects are detected and recorded correctly. |
+| DQ summary consistency | DQ result totals match quarantine evidence. |
+| Masking and redaction | Restricted outputs do not expose unsafe raw sensitive values. |
+| Access behavior | Roles can read only what policy allows. |
+| AI-safety checks | Legal-hold and unsupported data do not appear in the AI surface. |
+| Lineage completeness | AI-facing fields can be traced to source data. |
+| Run reproducibility | A clean rerun produces explainable and consistent outputs. |
+| Stress run | The larger-volume dataset completes with correctness evidence. |
 
 ---
 
-## 9. Risks & dependencies
+## 9. Risks and Adaptation Points
 
-1. **UC column-mask / dynamic-view support** in the tenant — load-bearing for AC7/AC9. **Verify first (E1-S6)**; fall back to view-level masking + document if unsupported.
-2. **Compute quotas / concurrency** for 5 engineers — parallel dev runs collide. Mitigate: serverless SQL warehouses for governance queries; one shared `pipeline_runner` principal; per-engineer dev catalog/schema clone (`tx_inv_<user>`).
-3. **2M-row cross-record DQ** (self-join near-dup, FK anti-joins) on a small cluster. Mitigate: Z-ORDER/cluster on `transaction_id`/`account_id`/`card_id`; broadcast small dims; failure-extractor is per-rule so each is independently optimizable.
-4. **Column-mask bugs** silently expose or over-mask. Mitigate: E8-S3 masking-effectiveness tests are a mandatory gate; review mask SQL.
-5. **EXPECT misuse** — never rely on EXPECT for cross-record rules (silently passes). Failure-query registry is the source of truth.
-6. **Oracle drift** — regenerating with a different seed changes expected counts. Pin seed 42 in the runbook; tests read the manifest table at runtime.
-7. **Pinned date 2026-07-06** — staleness/future defects are measured against it; re-baseline tests if generation changes.
-8. **E3 is the critical-path bottleneck** — start it the instant E2 lands; don't wait for the slice.
-9. **Bronze-as-truth vs Silver-cleans** — conformed Silver keeps RI-orphan rows (marked) for completeness; the final Silver AI context excludes unsafe/unjoinable rows.
+1. **Unity Catalog feature support may be limited.** Check early and document fallback controls that preserve the same privacy outcome.
+2. **The team may overbuild setup before learning what is needed.** Keep setup tied to a visible deliverable or validation need.
+3. **Cross-record DQ checks may be slower at larger volume.** Implement them in a way that can be measured and optimized individually.
+4. **Masking may protect too little or too much.** Pair implementation with role-based query checks.
+5. **Expected defect counts may drift.** Use the manifest as the oracle instead of fixed counts.
+6. **Free-text notes can leak sensitive data.** Treat redaction and leak tests as required for AI safety.
+7. **A polished final demo can hide weak evidence.** Keep evidence linked to runnable checks, not only screenshots.
 
 ---
 
-## 10. Sequencing & parallelization (5 people)
+## 10. Collaboration Model
 
-**Critical path:** E1 → E2 → E3 → E4 → E7 → E8.
+This backlog should be used as a pull-based workboard:
 
-| Track | Owns | Members | Sequence |
-|---|---|---|---|
-| **A — Foundation / final Silver context** | E1, E2, E7 | M1 | E1 → E2 → E7 Silver AI context aggregator |
-| **B — DQ / governance** | E3, E6 | M2 | E3 (starts when E2 lands) → E6 |
-| **C — Silver core entities** | E4, E5 | M3, M4 | E4 slice → E5 split by table group (M3 customers/employees/accounts/cards · M4 transactions/devices/auth + RI/stress) |
-| **D — Investigation Silver + verification** | E5, E8 | M5 | E5 dims/disputes/cases/notes/bridges; tests drafted alongside E4, finalised after E7 |
+- Start with a thin useful slice, then expand by table group, rule group, or evidence gap.
+- Work can happen in parallel when outputs and contracts are clear.
+- If an item becomes too large, split it by source table group, rule group, or validation type.
+- If a setup item has no clear consumer, pause it until the consumer is known.
+- If a later epic exposes missing platform or governance work, add that work to the most suitable epic instead of treating the backlog order as fixed.
 
-Effort totals: E1 **M**, E2 **M**, E3 **L**, E4 **M**, E5 **L**, E6 **M**, E7 **M/L**, E8 **M**. Max ~4 parallel streams after E2 for a 5-person team.
+Suggested ownership lanes:
 
----
-
-## 11. Demo / acceptance checklist (release gate)
-
-From a clean state:
-- [ ] `make mock` (seed 42) → `make upload` → `make ingest` → `make build` → `make test` — all green
-- [ ] `make test` produces a DQ-evidence report; manifest-vs-quarantine shows precision = recall = 1.0 per rule
-- [ ] `SELECT * FROM silver.investigation_context_ai` as `ai_consumer` → only `ai_allowed` columns, zero `legal_hold` cases; AI-safety assertion passes
-- [ ] All 7 governance tables populated; `metadata_lineage` traces every final Silver AI-context field to Bronze; `pipeline_runs` shows one clean run with counts
-- [ ] `python -m mock.generate --stress` → full pipeline on ~2M txns completes; correctness holds; wall-clock recorded
-- [ ] A second engineer follows `docs/runbook.md` cold and reproduces identical quarantine counts
-- [ ] Confluence page links repo + outputs + runbook
+| Lane | Typical owner | Pulls work from |
+|---|---|---|
+| Platform and flow | M1 | E1, E2, E5, E6 |
+| DQ and governance | M2 | E3, E5 |
+| People/account Silver and privacy | M3 | E4, E5 |
+| Transaction activity and scale | M4 | E4, E7 |
+| Investigation data, tests, and demo | M5 | E4, E7, E8 |
 
 ---
 
-## 12. Source-of-truth files (spec the build is generated from)
+## 11. Release Checklist
 
-- `docs/data-model.md` — contracts, enums, PII matrix §6, quarantine schema §7, final AI context grain §8
-- `docs/bronze-layer.md` — Bronze DDL + metadata columns + COPY INTO / DLT templates §5
-- `mock/config.py` — `TABLE_SCHEMAS`, enums, `GENERATION_ORDER`, `RUN_DATE`, `ORPHAN_CUSTOMER_ID`
-- `mock/generators.py` — the 36 `man.add(...)` rule IDs (authoritative rule list + `rule_name` / `failure_reason` / `severity`)
-- `data/raw/_defects_manifest.csv` — validation oracle (expected quarantine set per `rule_id`)
+- [ ] Source data can be generated and loaded into raw/Bronze storage.
+- [ ] Silver outputs exist for the required source domains.
+- [ ] DQ checks run and produce rule-level summaries.
+- [ ] Failed records are quarantined with useful reasons.
+- [ ] Sensitive fields are masked, redacted, tokenized, hashed, removed, or access-controlled before AI use.
+- [ ] The AI-facing Silver surface contains only allowed fields and excludes legal-hold or unsupported records.
+- [ ] Governance evidence exists for runs, DQ, quarantine, masking, access, and lineage.
+- [ ] Automated or repeatable validation proves the main controls.
+- [ ] Larger-volume stress evidence is recorded.
+- [ ] A second engineer can follow the runbook and reproduce the demo.
+
+---
+
+## 12. Source-of-Truth Files
+
+- `docs/data-model.md` - contracts, enums, sensitive-data guidance, quarantine schema, and final AI-context expectations.
+- `docs/bronze-layer.md` - raw/Bronze metadata requirements and ingestion guidance.
+- `mock/config.py` - source table schemas, generation order, enums, and configured run values.
+- `mock/generators.py` - generated source data and injected defect rules.
+- `data/raw/_defects_manifest.csv` - validation oracle for expected bad records after mock data generation.
