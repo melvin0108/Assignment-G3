@@ -74,7 +74,7 @@ Derived fact and child-table counts follow the generator ratios in
 
 - All raw fields are landed as strings in Bronze; Silver performs type coercion,
   validation, masking, and quarantine routing.
-- `_defects_manifest.csv` is generated beside the source CSVs for validation
+- `defects_manifest.csv` is generated beside the source CSVs for validation
   evidence, but it is not a source domain table.
 - Pipeline-emitted tables such as `dq_rules`, `dq_results`,
   `quarantine_records`, `pipeline_runs`, `metadata_lineage`,

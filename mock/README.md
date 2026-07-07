@@ -51,7 +51,7 @@ python -m mock.generate --seed 42 --out data/raw
 
 ## Output
 - `<table>.csv` for each of the 25 tables (column order matches the contracts).
-- `_defects_manifest.csv` — **every intentionally-injected bad record** with
+- `defects_manifest.csv` — **every intentionally-injected bad record** with
   `source_table, record_key, rule_id, rule_name, failure_reason, severity`. Use
   it to validate the Silver `quarantine_records` output (expected vs actual).
 
@@ -72,7 +72,7 @@ the brief's DQ requirements and `docs/data-model.md` §7).
 mock/
   config.py     # enums, ID prefixes, table schemas, generation order, volumes
   helpers.py    # Faker/RNG setup + value helpers (full_pan, tax_id, ts, ...)
-  defects.py    # DefectManifest (writes _defects_manifest.csv)
+  defects.py    # DefectManifest (writes defects_manifest.csv)
   generators.py # one generator per table + the GENERATORS registry
   generate.py   # CLI: argparse, count derivation, CSV streaming, summary
 ```

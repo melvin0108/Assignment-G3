@@ -6,8 +6,8 @@
 | **Scenario** | Transaction investigation using transactions, disputes, chargebacks, merchants, fraud alerts, cases, notes, and related reference data |
 | **Goal** | Turn generated banking data into trusted, governed, Silver-layer context that is safe for an internal AI consumer to read |
 | **Platform assumption** | Databricks Free Edition + Unity Catalog — workspace catalog is `g3_catalog` (verified); schemas `bronze` ✓ and `silver` ✓ created, `gov` ⬜ planned but not yet created |
-| **Status** | Mock data generation complete; backlog created; Databricks workspace linked with GitHub; catalog and layer schemas created; source data uploaded to Databricks Volume; Bronze ingestion under review; Silver, governance, tests, and demo evidence still to build |
-| **Last updated** | 2026-07-07 |
+| **Status** | Mock data generation complete; backlog created; Databricks workspace linked with GitHub; catalog and layer schemas created; source data uploaded to Databricks Volume; Bronze ingestion complete (E2-I2/I3/I4 done; E2-I5 raw-load validation still to do); Silver, governance, tests, and demo evidence still to build |
+| **Last updated** | 2026-07-08 |
 
 ### Team & Status Key
 
@@ -29,7 +29,7 @@
 
 ## 1. Context
 
-The repository already has a mock data generator (`mock/`) that creates source CSV files and a `_defects_manifest.csv`. The manifest is the known list of intentionally injected data problems and should be used as evidence when validating data-quality work.
+The repository already has a mock data generator (`mock/`) that creates source CSV files and a `defects_manifest.csv`. The manifest is the known list of intentionally injected data problems and should be used as evidence when validating data-quality work.
 
 Current completed work reported by the team:
 
@@ -148,9 +148,9 @@ These are current implementation assumptions. They can change if the team learns
 | ID | Backlog item | Objective | Deliverable / completion evidence | Size | Assignee | Status |
 |---|---|---|---|---|---|---|
 | E2-I1 | Prepare and smoke-test the raw-data storage locations for generated source files. | Give each source table a predictable place to land before ingestion. | Landing locations exist or are documented for all generated tables, and a small upload demo to Databricks Volume has succeeded. | S | M1 | Done |
-| E2-I2 | Create raw/Bronze tables for all source files using source-like columns plus standard metadata. | Preserve the original data while adding fields needed for audit, rerun, and lineage. | All expected raw tables exist and include required metadata columns. | M | M1 | Review |
-| E2-I3 | Load generated source files into the raw/Bronze tables in a repeatable way. | Prove the team can move data from local mock output into the platform without duplicating rows. | Re-running the same load does not duplicate records; source file metadata is available. | M | M1 | Review |
-| E2-I4 | Load the defects manifest as a reference table for validation. | Bring the known expected data problems into the platform for later reconciliation. | Manifest table exists and contains the generated defect rows. | S | M2 | To Do |
+| E2-I2 | Create raw/Bronze tables for all source files using source-like columns plus standard metadata. | Preserve the original data while adding fields needed for audit, rerun, and lineage. | All expected raw tables exist and include required metadata columns. | M | M1 | Done |
+| E2-I3 | Load generated source files into the raw/Bronze tables in a repeatable way. | Prove the team can move data from local mock output into the platform without duplicating rows. | Re-running the same load does not duplicate records; source file metadata is available. | M | M1 | Done |
+| E2-I4 | Load the defects manifest as a reference table for validation. | Bring the known expected data problems into the platform for later reconciliation. | Manifest table exists and contains the generated defect rows. | S | M2 | Done |
 | E2-I5 | Add a simple raw-load validation check. | Catch missing files, missing rows, or broken ingestion early. | Row counts match source files, and the check result is saved or printed for review. | S | M5 | To Do |
 
 ### Epic 3 - Data-Quality Rules and Issue Handling
@@ -352,4 +352,4 @@ Suggested ownership lanes:
 - `docs/bronze-layer.md` - raw/Bronze metadata requirements and ingestion guidance.
 - `mock/config.py` - source table schemas, generation order, enums, and configured run values.
 - `mock/generators.py` - generated source data and injected defect rules.
-- `data/raw/_defects_manifest.csv` - validation oracle for expected bad records after mock data generation.
+- `data/raw/defects_manifest.csv` - validation oracle for expected bad records after mock data generation.

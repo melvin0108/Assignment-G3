@@ -17,7 +17,7 @@ pip install -r requirements.txt   # only dependency: Faker
 
 The generator is seeded (default seed `42`), so the same command reproduces
 identical data and defects. Output lands in `data/raw/` — one CSV per table plus
-`_defects_manifest.csv` listing every intentionally-injected bad record.
+`defects_manifest.csv` listing every intentionally-injected bad record.
 
 > Run all commands from `D:\NAB\Assignment-G3` (the `mock` package lives here).
 
@@ -59,14 +59,14 @@ python -m mock.generate --defect-rate 0.15 --seed 42 --out data/raw
 | `--out` | `data/raw` | output directory |
 | `--tables` | all | comma-separated subset to generate |
 | `--stress` | off | shortcut for `--transactions 2000000` |
-| `--no-manifest` | off | skip `_defects_manifest.csv` |
+| `--no-manifest` | off | skip `defects_manifest.csv` |
 | `--quiet` | off | suppress per-table console output |
 
 ### Output
 
 - `<table>.csv` for each of the 25 source tables (column order matches
   `docs/data-dictionary.md`).
-- `_defects_manifest.csv` — every injected bad record with
+- `defects_manifest.csv` — every injected bad record with
   `source_table, record_key, rule_id, rule_name, failure_reason, severity`. Use
   it to validate the Silver `quarantine_records` output (expected vs actual).
 

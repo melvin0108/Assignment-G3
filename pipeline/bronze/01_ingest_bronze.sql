@@ -18,8 +18,10 @@
 --     _ingest_ts, _run_id, _batch_id, _source_record_id, _record_hash, _rescued_data.
 --   * Append-only: never UPDATE/DELETE/OVERWRITE these tables.
 --
--- NOTE: _defects_manifest.csv is intentionally NOT loaded here — it is the DQ
--- oracle and lands later in g3_catalog.gov._defects_manifest_staging (epic E3).
+-- NOTE: defects_manifest.csv is intentionally NOT loaded here — it is the DQ
+-- oracle and is loaded separately by 02_ingest_defects_manifest.sql into
+-- g3_catalog.bronze.defects_manifest (to move to gov._defects_manifest_staging
+-- when the gov schema lands in E3).
 -- ============================================================================
 
 CREATE CATALOG IF NOT EXISTS g3_catalog;
