@@ -34,10 +34,12 @@ The repository already has a mock data generator (`mock/`) that creates source C
 Current completed work reported by the team:
 
 - Mock data generation is complete.
+- Mock data generation script exists.
 - Backlog list is created.
 - Databricks workspace is set up and linked with the GitHub repository.
 - Catalog and layer schemas are created.
 - Generated source data has been uploaded to Databricks Volume.
+- A small upload demo to Databricks Volume has been tested.
 - Data ingestion into the Bronze layer has been written and is under review.
 
 The backlog below is not a strict step-by-step waterfall plan. It is a work-and-adapt list. Each epic states a premise and the outcomes it should produce. The team can pull items in the order that creates the fastest learning, as long as the final release still proves the required controls: ingestion, Silver data, data quality, quarantine, masking, access control, lineage, AI-safe output, tests, stress evidence, and runbook.
@@ -134,10 +136,8 @@ These are current implementation assumptions. They can change if the team learns
 | ID | Backlog item | Objective | Deliverable / completion evidence | Size | Assignee | Status |
 |---|---|---|---|---|---|---|
 | E1-I1 | Define the minimum local and Databricks setup needed for the first working demo. | Avoid setting up tools or permissions that do not yet serve a visible outcome. | Databricks workspace exists, GitHub repo is linked, catalog/layer schemas exist, and the setup assumptions are noted for the team. | S | M1 | Done |
-| E1-I2 | Create or refine simple project commands for common actions such as generating mock data, uploading data, running the pipeline, testing, and cleaning local outputs. | Give the team shared entrypoints so work is repeatable. | `make` targets or equivalent scripts exist and each has a short description. | M | M5 | To Do |
-| E1-I3 | Agree the first demonstrable slice of the pipeline. | Let the team learn from a small end-to-end outcome before expanding scope. | Runbook section names the first slice, the tables involved, and what it should prove. | S | M1 | To Do |
-| E1-I4 | Record the team ownership model and how work moves between `To Do`, `In Progress`, `Review`, and `Done`. | Make responsibilities visible without forcing a fixed delivery sequence. | This backlog and/or runbook shows owner, status meaning, and review expectations. | S | M5 | Done |
-| E1-I5 | Check which Unity Catalog security features are available in the Databricks tenant. | Learn early whether column masks and dynamic views can support the intended privacy controls. | Short note records supported features and fallback approach if needed. | S | M1 | To Do |
+| E1-I2 | Keep the mock-data generation script documented as the first shared project command. | Let every team member regenerate the same source data without guessing the command. | Mock generation script exists and is documented; upload, ingestion, test, and clean commands can be added later when those workflows are stable. | S | M5 | Done |
+| E1-I3 | Record the team ownership model and how work moves between `To Do`, `In Progress`, `Review`, and `Done`. | Make responsibilities visible without forcing a fixed delivery sequence. | This backlog and/or runbook shows owner, status meaning, and review expectations. | S | M5 | Done |
 
 ### Epic 2 - Source Data Landing and Raw Data Capture
 
@@ -147,7 +147,7 @@ These are current implementation assumptions. They can change if the team learns
 
 | ID | Backlog item | Objective | Deliverable / completion evidence | Size | Assignee | Status |
 |---|---|---|---|---|---|---|
-| E2-I1 | Prepare the raw-data storage locations for generated source files. | Give each source table a predictable place to land before ingestion. | Landing locations exist or are documented for all generated tables. | S | M1 | Done |
+| E2-I1 | Prepare and smoke-test the raw-data storage locations for generated source files. | Give each source table a predictable place to land before ingestion. | Landing locations exist or are documented for all generated tables, and a small upload demo to Databricks Volume has succeeded. | S | M1 | Done |
 | E2-I2 | Create raw/Bronze tables for all source files using source-like columns plus standard metadata. | Preserve the original data while adding fields needed for audit, rerun, and lineage. | All expected raw tables exist and include required metadata columns. | M | M1 | Review |
 | E2-I3 | Load generated source files into the raw/Bronze tables in a repeatable way. | Prove the team can move data from local mock output into the platform without duplicating rows. | Re-running the same load does not duplicate records; source file metadata is available. | M | M1 | Review |
 | E2-I4 | Load the defects manifest as a reference table for validation. | Bring the known expected data problems into the platform for later reconciliation. | Manifest table exists and contains the generated defect rows. | S | M2 | To Do |
@@ -190,13 +190,15 @@ These are current implementation assumptions. They can change if the team learns
 
 **Outcome:** Governance outputs explain what happened in each run, what data is protected, and where AI-facing fields came from.
 
+Before implementing access controls or AI-facing views, confirm which Unity Catalog security features are supported in the workspace and document the fallback if a preferred feature is unavailable.
+
 | ID | Backlog item | Objective | Deliverable / completion evidence | Size | Assignee | Status |
 |---|---|---|---|---|---|---|
 | E5-I1 | Capture one run record for each pipeline execution. | Make every demo or test run traceable. | Run tracking includes run ID, start/end time, status, and key row counts. | S | M1 | To Do |
 | E5-I2 | Publish DQ summary results for each run. | Let reviewers see rule outcomes without reading every quarantined row. | DQ summary includes rule-level totals and sample failed keys. | S | M2 | To Do |
 | E5-I3 | Maintain masking-policy metadata for sensitive fields. | Document how sensitive fields are protected and who can see what. | Masking policy table or document lists field, classification, method, and owner. | S | M3 | To Do |
 | E5-I4 | Maintain access-policy metadata for internal, masked, auditor, and AI-consumer use. | Make allowed data use explicit instead of relying on assumptions. | Access policy table or document identifies fields allowed or blocked for each role. | M | M2 | To Do |
-| E5-I5 | Implement the access controls needed for the demo environment. | Prove that sensitive data is not available to roles that should not see it. | Role-based query checks show allowed and blocked access behavior. | M | M1 | To Do |
+| E5-I5 | Implement the access controls needed for the demo environment. | Prove that sensitive data is not available to roles that should not see it. | Supported Unity Catalog controls are confirmed, fallback is documented if needed, and role-based query checks show allowed and blocked access behavior. | M | M1 | To Do |
 | E5-I6 | Emit lineage for important Silver and AI-facing fields. | Let reviewers trace final values back to source fields. | Lineage evidence covers AI-facing fields and masked sensitive fields. | M | M3 | To Do |
 | E5-I7 | Keep governance outputs aligned with actual pipeline behavior. | Avoid stale governance tables that describe rules or policies differently from implementation. | Spot checks show rule, policy, lineage, and run evidence match current outputs. | S | M2 | To Do |
 
@@ -297,7 +299,7 @@ The implementation can use tables, views, files, or documented query outputs, bu
 
 ## 9. Risks and Adaptation Points
 
-1. **Unity Catalog feature support may be limited.** Check early and document fallback controls that preserve the same privacy outcome.
+1. **Unity Catalog feature support may be limited.** Confirm supported controls before implementing access or AI-facing views, then document fallback controls that preserve the same privacy outcome.
 2. **The team may overbuild setup before learning what is needed.** Keep setup tied to a visible deliverable or validation need.
 3. **Cross-record DQ checks may be slower at larger volume.** Implement them in a way that can be measured and optimized individually.
 4. **Masking may protect too little or too much.** Pair implementation with role-based query checks.
