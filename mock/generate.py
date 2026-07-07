@@ -20,7 +20,7 @@ python -m mock.generate --tables customers,accounts,transactions
 # heavier defect density
 python -m mock.generate --defect-rate 0.15
 
-Outputs one CSV per table under --out, plus _defects_manifest.csv listing every
+Outputs one CSV per table under --out, plus defects_manifest.csv listing every
 intentionally-injected bad record (use it to validate the Silver quarantine).
 """
 import argparse
@@ -94,7 +94,7 @@ def main(argv=None):
                     help="shortcut: transactions=2,000,000 for explicit stress testing")
     ap.add_argument("--tables", default=None,
                     help="comma-separated subset of tables to generate (default: all)")
-    ap.add_argument("--no-manifest", action="store_true", help="skip writing _defects_manifest.csv")
+    ap.add_argument("--no-manifest", action="store_true", help="skip writing defects_manifest.csv")
     ap.add_argument("--quiet", action="store_true", help="suppress per-table console output")
     args = ap.parse_args(argv)
 
@@ -139,7 +139,7 @@ def main(argv=None):
             sys.stderr.write(f"  {table:<24} {written:>10,} rows   defects={defects:<5} ({dt:.1f}s)\n")
 
     if not args.no_manifest:
-        manifest_path = os.path.join(args.out, "_defects_manifest.csv")
+        manifest_path = os.path.join(args.out, "defects_manifest.csv")
         ctx.manifest.write(manifest_path)
 
     # ---- summary ----
@@ -157,7 +157,7 @@ def main(argv=None):
 
 
 def _defects_filename(out):
-    return os.path.join(out, "_defects_manifest.csv")
+    return os.path.join(out, "defects_manifest.csv")
 
 
 if __name__ == "__main__":
