@@ -382,9 +382,9 @@ erDiagram
 
 | Table | Rows (base) | Stress target |
 |---|---|---|
-| `transactions` | 500k | ~2M / hr |
+| `transactions` | 2M | assignment baseline / stress target |
 | `auth_attempts` | ~1.2× transactions | proportional |
-| `transaction_devices` | 1:1 with transactions | proportional |
+| `transaction_devices` | ~0.8× transactions | proportional |
 | `disputes` | ~2% of transactions | — |
 | `investigation_cases` | ~0.1% of transactions | — |
 | `investigation_notes` | ~5 per case | — |
