@@ -633,7 +633,7 @@ def gen_investigation_notes(ctx, n):
         ck = rng.choice(cust_keys) if cust_keys else None
         leaked = []
         if ck:
-            leaked += [f'name "{cust_names[ck]}"', cust_emails[ck], cust_phones[ck]]
+            leaked += [f"name '{cust_names[ck]}'", cust_emails[ck], cust_phones[ck]]
         leaked.append(f"card {full_pan(rng)}")
         rows[idx]["note_text"] = (f"Spoke to customer ({', '.join(leaked)}). Card compromised, "
                                   "reissue requested.")
