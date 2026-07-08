@@ -510,14 +510,14 @@ def gen_chargebacks(ctx, n):
     for i in range(1, n + 1):
         rows.append({
             "chargeback_id": seq_id(C.PFX["chargeback"], i),
-            "dispute_id": rng.choice(disp_ids) if disp_ids else "DSP-9999",
+            "dispute_id": rng.choice(disp_ids) if disp_ids else C.ORPHAN_DISPUTE_ID,
             "scheme": rng.choice(C.SCHEME),
             "amount": amount(rng),
             "stage": rng.choice(C.CHARGEBACK_STAGE),
             "processed_at": iso(past_ts(rng, run_now(), 20)),
         })
     for idx in ctx.sample_indices(n, ctx.defect_count(n, 0.4)):
-        rows[idx]["dispute_id"] = "DSP-9999"
+        rows[idx]["dispute_id"] = C.ORPHAN_DISPUTE_ID
         man.add("chargebacks", rows[idx]["chargeback_id"], "DQ-CBK-DISP-FK",
                 "dispute_id must exist in disputes", "orphan dispute_id")
     return rows

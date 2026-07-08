@@ -76,6 +76,7 @@ INVALID = {
     "risk_casing_variants": ["HIGH", "High", "H", "Low", "M"],
 }
 ORPHAN_CUSTOMER_ID = "CUST-9999"  # guaranteed not to exist
+ORPHAN_DISPUTE_ID = "DSP-999999"  # guaranteed not to exist (dispute ids are seq_id DSP-<i>; never reach 999999)
 
 # --------------------------------------------------------------------------
 # Reference / lookup data (small, mostly clean)

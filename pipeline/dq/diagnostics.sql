@@ -63,3 +63,24 @@ JOIN g3_catalog.bronze.case_parties cp
  AND cp.party_type = SPLIT(m.record_key,'\\|')[1]
 WHERE cp.party_type <> 'customer';
 -- EXPECTED ~4 rows with party_type = 'suspect'.
+
+
+-- (4) DQ-NOTE-PII-LEAK (caught 0/750) — the identical regex works for
+--     DQ-CTL-NOTE-PII (120/120), so the regex is fine; the data differs.
+--     Hypothesis: the PII note_text embeds double-quotes (name "Jane Smith")
+--     which break COPY INTO's CSV field parsing, so those rows' note_text is
+--     mangled/NULL and the RLIKE matches nothing.
+
+-- (a) Are the PII-leak notes present, and what does note_text actually look like?
+SELECT m.record_key AS note_id, n.note_text, LENGTH(n.note_text) AS txt_len
+FROM (SELECT DISTINCT record_key FROM g3_catalog.bronze.defects_manifest WHERE rule_id='DQ-NOTE-PII-LEAK' LIMIT 5) m
+LEFT JOIN g3_catalog.bronze.investigation_notes n ON m.record_key = n.note_id;
+-- If note_text is NULL / truncated / starts mid-quote → CSV quoting broke the row.
+
+-- (b) How many notes still carry the PII prefix at all?
+SELECT
+  COUNT(*)                                                              AS total_notes,
+  SUM(CASE WHEN note_text IS NULL                THEN 1 ELSE 0 END)     AS null_text,
+  SUM(CASE WHEN note_text LIKE 'Spoke to customer%' THEN 1 ELSE 0 END)  AS pii_prefix
+FROM g3_catalog.bronze.investigation_notes;
+-- If quoting is fine: pii_prefix ≈ 750. If pii_prefix = 0 → the PII text was mangled away.
