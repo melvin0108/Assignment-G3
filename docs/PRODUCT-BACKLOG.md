@@ -6,7 +6,7 @@
 | **Scenario** | Transaction investigation using transactions, disputes, chargebacks, merchants, fraud alerts, cases, notes, and related reference data |
 | **Goal** | Turn generated banking data into trusted, governed, Silver-layer context that is safe for an internal AI consumer to read |
 | **Platform assumption** | Databricks Free Edition + Unity Catalog — workspace catalog is `g3_catalog` (verified); schemas `bronze` ✓ and `silver` ✓ created, `gov` ⬜ planned but not yet created |
-| **Status** | Mock data generation complete; backlog created; Databricks workspace linked with GitHub; catalog and layer schemas created; source data uploaded to Databricks Volume; Bronze ingestion complete (E2-I2/I3/I4 done; E2-I5 raw-load validation still to do); Silver, governance, tests, and demo evidence still to build |
+| **Status** | Mock data generation complete; backlog created; Databricks workspace linked with GitHub; catalog and layer schemas created; source data uploaded to Databricks Volume; Bronze ingestion complete (E2-I2/I3/I4 done; E2-I5 raw-load validation still to do); DQ engine + quarantine complete (E3-I1–I5 done — ~99.8% recall vs the defects manifest; E3-I6 reconciliation next); Silver, governance, tests, and demo evidence still to build |
 | **Last updated** | 2026-07-08 |
 
 ### Team & Status Key
@@ -161,11 +161,11 @@ These are current implementation assumptions. They can change if the team learns
 
 | ID | Backlog item | Objective | Deliverable / completion evidence | Size | Assignee | Status |
 |---|---|---|---|---|---|---|
-| E3-I1 | Create a data-quality rule inventory from the generator, manifest, and data-model documents. | Make the expected rule set visible before implementing individual checks. | Rule inventory includes rule ID, target data, short description, severity, and expected handling. | M | M2 | To Do |
-| E3-I2 | Group rules by implementation pattern, such as single-record checks, relationship checks, duplicate checks, text checks, or AI-exclusion checks. | Help the team implement rules with the right level of logic instead of forcing one pattern onto all checks. | Each rule has an implementation pattern and owner. | S | M2 | To Do |
-| E3-I3 | Build the common quarantine output for failed records. | Keep a consistent record of what failed, why it failed, and which run found it. | Quarantine output contains run ID, rule ID, source table, record key, reason, severity, and raw-record reference or snapshot. | M | M2 | To Do |
-| E3-I4 | Implement executable checks for the highest-value or first-slice rules. | Prove the rule approach on a small useful set before implementing all rules. | Selected rules produce pass/fail results and quarantine rows that can be reviewed. | M | M2 | To Do |
-| E3-I5 | Expand rule execution until all injected rules are covered. | Satisfy the assignment requirement that all intended defects are checked. | All expected rule IDs have runnable checks and result records. | L | M2 | To Do |
+| E3-I1 | Create a data-quality rule inventory from the generator, manifest, and data-model documents. | Make the expected rule set visible before implementing individual checks. | Rule inventory includes rule ID, target data, short description, severity, and expected handling. | M | M2 | Done |
+| E3-I2 | Group rules by implementation pattern, such as single-record checks, relationship checks, duplicate checks, text checks, or AI-exclusion checks. | Help the team implement rules with the right level of logic instead of forcing one pattern onto all checks. | Each rule has an implementation pattern and owner. | S | M2 | Done |
+| E3-I3 | Build the common quarantine output for failed records. | Keep a consistent record of what failed, why it failed, and which run found it. | Quarantine output contains run ID, rule ID, source table, record key, reason, severity, and raw-record reference or snapshot. | M | M2 | Done |
+| E3-I4 | Implement executable checks for the highest-value or first-slice rules. | Prove the rule approach on a small useful set before implementing all rules. | Selected rules produce pass/fail results and quarantine rows that can be reviewed. | M | M2 | Done |
+| E3-I5 | Expand rule execution until all injected rules are covered. | Satisfy the assignment requirement that all intended defects are checked. | All expected rule IDs have runnable checks and result records. | L | M2 | Done |
 | E3-I6 | Compare actual quarantined records with the defects manifest. | Prove that the DQ implementation catches the intended bad records and avoids unexpected false positives. | Reconciliation report shows match quality per rule, with exceptions explained. | M | M5 | To Do |
 
 ### Epic 4 - Silver Data Products and Sensitive-Data Treatment
