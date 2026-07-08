@@ -81,14 +81,18 @@ FROM g3_catalog.bronze.accounts
 WHERE try_to_date(open_date) > DATE '2026-07-06';
 
 -- DQ-CUST-EMAIL-FMT — email must match pattern if present (catches empty/malformed)
+-- NOTE: COPY INTO stores the generator's empty email ("") as NULL, so the
+-- predicate must INCLUDE NULL (the original `email IS NOT NULL` guard excluded
+-- exactly the 375 injected defect rows → caught 0). All non-defect customers
+-- carry a valid email, so catching NULL/invalid does not over-fire.
 INSERT INTO g3_catalog.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
 SELECT 'RUN-20260708-DQ1','customers',_source_record_id,customer_id,
        'DQ-CUST-EMAIL-FMT','email must match pattern if present','email is empty','quarantine','quarantined',
        to_json(named_struct('customer_id',customer_id,'email',email)), current_timestamp()
 FROM g3_catalog.bronze.customers
-WHERE email IS NOT NULL
-  AND email NOT RLIKE '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$';
+WHERE email IS NULL
+   OR email NOT RLIKE '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$';
 
 -- DQ-CARD-EXPIRED-ACTIVE — active card must not have a past expiry
 INSERT INTO g3_catalog.silver.quarantine_records
@@ -327,15 +331,22 @@ JOIN g3_catalog.bronze.cards c ON t.card_id = c.card_id
 WHERE c.status = 'closed';
 
 -- DQ-AUTH-TS-ORDER — auth_ts must not be later than txn_ts  (cross-table)
+-- NOTE: LEFT JOIN (not inner) so auths whose transaction_id is an orphan
+-- (TXN-999999, also flagged DQ-AUTH-TXN-FK) are NOT dropped — they are in the
+-- AUTH-TS-ORDER manifest because their auth_ts is in the future. COALESCE falls
+-- back to RUN_DATE midnight for orphan auths. This is clean because the
+-- generator's future_ts is always >= now+1day while past_ts is always <= now
+-- (run_now() = 2026-07-06 00:00:00), so no false positives.
 INSERT INTO g3_catalog.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
 SELECT 'RUN-20260708-DQ1','auth_attempts',a._source_record_id,a.attempt_id,
        'DQ-AUTH-TS-ORDER','auth_ts must not be later than txn_ts','auth after transaction','quarantine','quarantined',
        to_json(named_struct('attempt_id',a.attempt_id,'transaction_id',a.transaction_id,'auth_ts',a.auth_ts,'txn_ts',t.txn_ts)), current_timestamp()
 FROM g3_catalog.bronze.auth_attempts a
-JOIN g3_catalog.bronze.transactions t ON a.transaction_id = t.transaction_id
+LEFT JOIN g3_catalog.bronze.transactions t ON a.transaction_id = t.transaction_id
 WHERE try_to_timestamp(replace(replace(a.auth_ts,'T',' '),'Z',''))
-    > try_to_timestamp(replace(replace(t.txn_ts,'T',' '),'Z',''));
+    > COALESCE(try_to_timestamp(replace(replace(t.txn_ts,'T',' '),'Z','')),
+               TIMESTAMP '2026-07-06 00:00:00');
 
 -- DQ-CASEPARTY-RESOLVE — party_id must resolve per party_type  (conditional FK; composite record_key)
 INSERT INTO g3_catalog.silver.quarantine_records
