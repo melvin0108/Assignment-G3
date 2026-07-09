@@ -55,7 +55,7 @@ df_joined = df.join(
 # DQ conditions
 is_future_date = (F.col("open_date").isNotNull()) & (F.col("open_date") != "") & (
             F.col("open_date").cast("date") > F.lit("2026-07-06").cast("date"))
-is_missing_fk = F.col("cust_exists").isNull()
+is_missing_fk = F.col("customer_id").isNotNull() & F.col("cust_exists").isNull()
 
 # DQ failure expressions aligning with gov.dq_rules
 rule_id_expr = F.when(is_future_date, "DQ-ACC-OPENDATE-FUTURE") \
