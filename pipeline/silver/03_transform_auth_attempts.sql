@@ -1,12 +1,12 @@
 -- ============================================================================
--- SILVER AUTH ATTEMPTS (M4) - g3_catalog.silver.auth_attempts
+-- SILVER AUTH ATTEMPTS (M4) - g3_dev.silver.auth_attempts
 -- ============================================================================
 --
 -- Purpose:
 --   Transform bronze.auth_attempts into typed Silver authorization activity.
 --
 -- Prerequisites:
---   1. pipeline/bronze/01_ingest_bronze.sql has loaded g3_catalog.bronze.*
+--   1. pipeline/bronze/01_ingest_bronze.sql has loaded g3_dev.bronze.*
 --   2. pipeline/silver/02_transform_transactions.sql has created
 --      silver.transactions
 --
@@ -16,10 +16,10 @@
 --   * Rows failing either condition are quarantined and excluded.
 -- ============================================================================
 
-CREATE SCHEMA IF NOT EXISTS g3_catalog.silver;
-CREATE SCHEMA IF NOT EXISTS g3_catalog.gov;
+CREATE SCHEMA IF NOT EXISTS g3_dev.silver;
+CREATE SCHEMA IF NOT EXISTS g3_dev.gov;
 
-CREATE TABLE IF NOT EXISTS g3_catalog.silver.quarantine_records (
+CREATE TABLE IF NOT EXISTS g3_dev.silver.quarantine_records (
   run_id           STRING,
   source_table     STRING,
   source_record_id STRING,
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS g3_catalog.silver.quarantine_records (
   detected_at      TIMESTAMP
 ) USING DELTA;
 
-CREATE TABLE IF NOT EXISTS g3_catalog.silver.auth_attempts (
+CREATE TABLE IF NOT EXISTS g3_dev.silver.auth_attempts (
   attempt_id            STRING,
   transaction_id        STRING,
   decision              STRING,
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS g3_catalog.silver.auth_attempts (
   _record_hash          STRING
 ) USING DELTA;
 
-CREATE TABLE IF NOT EXISTS g3_catalog.gov.metadata_lineage (
+CREATE TABLE IF NOT EXISTS g3_dev.gov.metadata_lineage (
   source_catalog       STRING,
   source_schema        STRING,
   source_table         STRING,
@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS g3_catalog.gov.metadata_lineage (
   transformation_logic STRING
 ) USING DELTA;
 
-DELETE FROM g3_catalog.silver.quarantine_records
+DELETE FROM g3_dev.silver.quarantine_records
 WHERE run_id = 'RUN-20260706-1'
   AND source_table = 'auth_attempts';
 
@@ -70,11 +70,11 @@ WITH checked AS (
     try_to_timestamp(replace(replace(a.auth_ts, 'T', ' '), 'Z', '')) AS auth_ts_typed,
     t.transaction_id AS silver_transaction_id,
     t.txn_ts AS silver_txn_ts
-  FROM g3_catalog.bronze.auth_attempts a
-  LEFT JOIN g3_catalog.silver.transactions t
+  FROM g3_dev.bronze.auth_attempts a
+  LEFT JOIN g3_dev.silver.transactions t
     ON a.transaction_id = t.transaction_id
 )
-INSERT INTO g3_catalog.silver.quarantine_records
+INSERT INTO g3_dev.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
 SELECT
   'RUN-20260706-1',
@@ -106,15 +106,15 @@ FROM (
      OR (silver_transaction_id IS NOT NULL AND auth_ts_typed > silver_txn_ts)
 );
 
-INSERT OVERWRITE g3_catalog.silver.auth_attempts
+INSERT OVERWRITE g3_dev.silver.auth_attempts
 WITH checked AS (
   SELECT
     a.*,
     try_to_timestamp(replace(replace(a.auth_ts, 'T', ' '), 'Z', '')) AS auth_ts_typed,
     t.transaction_id AS silver_transaction_id,
     t.txn_ts AS silver_txn_ts
-  FROM g3_catalog.bronze.auth_attempts a
-  LEFT JOIN g3_catalog.silver.transactions t
+  FROM g3_dev.bronze.auth_attempts a
+  LEFT JOIN g3_dev.silver.transactions t
     ON a.transaction_id = t.transaction_id
 )
 SELECT
@@ -135,25 +135,25 @@ WHERE silver_transaction_id IS NOT NULL
   AND auth_ts_typed IS NOT NULL
   AND auth_ts_typed <= silver_txn_ts;
 
-DELETE FROM g3_catalog.gov.metadata_lineage
+DELETE FROM g3_dev.gov.metadata_lineage
 WHERE target_schema = 'silver'
   AND target_table = 'auth_attempts';
 
-INSERT INTO g3_catalog.gov.metadata_lineage VALUES
-  ('g3_catalog', 'bronze', 'auth_attempts', 'attempt_id', 'g3_catalog', 'silver', 'auth_attempts', 'attempt_id', 'Direct copy'),
-  ('g3_catalog', 'bronze', 'auth_attempts', 'transaction_id', 'g3_catalog', 'silver', 'auth_attempts', 'transaction_id', 'Direct copy after Silver transaction relationship check'),
-  ('g3_catalog', 'bronze', 'auth_attempts', 'decision', 'g3_catalog', 'silver', 'auth_attempts', 'decision', 'Lowercased and trimmed'),
-  ('g3_catalog', 'bronze', 'auth_attempts', 'decline_reason', 'g3_catalog', 'silver', 'auth_attempts', 'decline_reason', 'Trimmed; empty string converted to NULL'),
-  ('g3_catalog', 'bronze', 'auth_attempts', 'auth_ts', 'g3_catalog', 'silver', 'auth_attempts', 'auth_ts', 'Parsed to TIMESTAMP; invalid or after transaction timestamp quarantined');
+INSERT INTO g3_dev.gov.metadata_lineage VALUES
+  ('g3_dev', 'bronze', 'auth_attempts', 'attempt_id', 'g3_dev', 'silver', 'auth_attempts', 'attempt_id', 'Direct copy'),
+  ('g3_dev', 'bronze', 'auth_attempts', 'transaction_id', 'g3_dev', 'silver', 'auth_attempts', 'transaction_id', 'Direct copy after Silver transaction relationship check'),
+  ('g3_dev', 'bronze', 'auth_attempts', 'decision', 'g3_dev', 'silver', 'auth_attempts', 'decision', 'Lowercased and trimmed'),
+  ('g3_dev', 'bronze', 'auth_attempts', 'decline_reason', 'g3_dev', 'silver', 'auth_attempts', 'decline_reason', 'Trimmed; empty string converted to NULL'),
+  ('g3_dev', 'bronze', 'auth_attempts', 'auth_ts', 'g3_dev', 'silver', 'auth_attempts', 'auth_ts', 'Parsed to TIMESTAMP; invalid or after transaction timestamp quarantined');
 
 SELECT
   'silver.auth_attempts' AS table_name,
   COUNT(*) AS silver_rows
-FROM g3_catalog.silver.auth_attempts
+FROM g3_dev.silver.auth_attempts
 UNION ALL
 SELECT
   'auth_attempts quarantine rows',
   COUNT(*)
-FROM g3_catalog.silver.quarantine_records
+FROM g3_dev.silver.quarantine_records
 WHERE run_id = 'RUN-20260706-1'
   AND source_table = 'auth_attempts';
