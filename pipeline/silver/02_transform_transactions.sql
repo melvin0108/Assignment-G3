@@ -1,12 +1,12 @@
 -- ============================================================================
--- SILVER TRANSACTIONS (M4) - g3_dev.silver.transactions
+-- SILVER TRANSACTIONS (M4) - g3_test.silver.transactions
 -- ============================================================================
 --
 -- Purpose:
 --   Transform bronze.transactions into a typed Silver fact table.
 --
 -- Prerequisites:
---   1. pipeline/bronze/01_ingest_bronze.sql has loaded g3_dev.bronze.*
+--   1. pipeline/bronze/01_ingest_bronze.sql has loaded g3_test.bronze.*
 --   2. pipeline/dq/01_setup.sql has created silver.quarantine_records
 --   3. pipeline/silver/01_transform_pii_tables.sql has created
 --      silver.accounts and silver.cards
@@ -18,10 +18,10 @@
 --   * The Silver table contains only rows that pass this table's checks.
 -- ============================================================================
 
-CREATE SCHEMA IF NOT EXISTS g3_dev.silver;
-CREATE SCHEMA IF NOT EXISTS g3_dev.gov;
+CREATE SCHEMA IF NOT EXISTS g3_test.silver;
+CREATE SCHEMA IF NOT EXISTS g3_test.gov;
 
-CREATE TABLE IF NOT EXISTS g3_dev.silver.quarantine_records (
+CREATE TABLE IF NOT EXISTS g3_test.silver.quarantine_records (
   run_id           STRING,
   source_table     STRING,
   source_record_id STRING,
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS g3_dev.silver.quarantine_records (
   detected_at      TIMESTAMP
 ) USING DELTA;
 
-CREATE TABLE IF NOT EXISTS g3_dev.silver.transactions (
+CREATE TABLE IF NOT EXISTS g3_test.silver.transactions (
   transaction_id        STRING,
   account_id            STRING,
   card_id               STRING,
@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS g3_dev.silver.transactions (
   _record_hash          STRING
 ) USING DELTA;
 
-CREATE TABLE IF NOT EXISTS g3_dev.gov.metadata_lineage (
+CREATE TABLE IF NOT EXISTS g3_test.gov.metadata_lineage (
   source_catalog       STRING,
   source_schema        STRING,
   source_table         STRING,
@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS g3_dev.gov.metadata_lineage (
   transformation_logic STRING
 ) USING DELTA;
 
-DELETE FROM g3_dev.silver.quarantine_records
+DELETE FROM g3_test.silver.quarantine_records
 WHERE run_id = 'RUN-20260706-1'
   AND source_table = 'transactions';
 
@@ -82,13 +82,13 @@ WITH checked AS (
     a.account_id AS silver_account_id,
     c.card_id AS silver_card_id,
     c.status AS silver_card_status
-  FROM g3_dev.bronze.transactions t
-  LEFT JOIN g3_dev.silver.accounts a
+  FROM g3_test.bronze.transactions t
+  LEFT JOIN g3_test.silver.accounts a
     ON t.account_id = a.account_id
-  LEFT JOIN g3_dev.silver.cards c
+  LEFT JOIN g3_test.silver.cards c
     ON t.card_id = c.card_id
 )
-INSERT INTO g3_dev.silver.quarantine_records
+INSERT INTO g3_test.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
 SELECT
   'RUN-20260706-1',
@@ -145,7 +145,7 @@ FROM (
   WHERE silver_card_status = 'closed'
 );
 
-INSERT OVERWRITE g3_dev.silver.transactions
+INSERT OVERWRITE g3_test.silver.transactions
 WITH checked AS (
   SELECT
     t.*,
@@ -158,10 +158,10 @@ WITH checked AS (
     a.account_id AS silver_account_id,
     c.card_id AS silver_card_id,
     c.status AS silver_card_status
-  FROM g3_dev.bronze.transactions t
-  LEFT JOIN g3_dev.silver.accounts a
+  FROM g3_test.bronze.transactions t
+  LEFT JOIN g3_test.silver.accounts a
     ON t.account_id = a.account_id
-  LEFT JOIN g3_dev.silver.cards c
+  LEFT JOIN g3_test.silver.cards c
     ON t.card_id = c.card_id
 )
 SELECT
@@ -191,29 +191,29 @@ WHERE amount_typed > 0
   AND (card_id IS NULL OR trim(card_id) = '' OR silver_card_id IS NOT NULL)
   AND COALESCE(silver_card_status, '') != 'closed';
 
-DELETE FROM g3_dev.gov.metadata_lineage
+DELETE FROM g3_test.gov.metadata_lineage
 WHERE target_schema = 'silver'
   AND target_table = 'transactions';
 
-INSERT INTO g3_dev.gov.metadata_lineage VALUES
-  ('g3_dev', 'bronze', 'transactions', 'transaction_id', 'g3_dev', 'silver', 'transactions', 'transaction_id', 'Direct copy after duplicate filtering'),
-  ('g3_dev', 'bronze', 'transactions', 'account_id', 'g3_dev', 'silver', 'transactions', 'account_id', 'Direct copy after Silver account relationship check'),
-  ('g3_dev', 'bronze', 'transactions', 'card_id', 'g3_dev', 'silver', 'transactions', 'card_id', 'Direct copy after Silver card relationship and active-card check'),
-  ('g3_dev', 'bronze', 'transactions', 'merchant_id', 'g3_dev', 'silver', 'transactions', 'merchant_id', 'Direct copy when present'),
-  ('g3_dev', 'bronze', 'transactions', 'channel', 'g3_dev', 'silver', 'transactions', 'channel', 'Lowercased and trimmed'),
-  ('g3_dev', 'bronze', 'transactions', 'amount', 'g3_dev', 'silver', 'transactions', 'amount', 'TRY_CAST to DECIMAL(12,2); non-positive or invalid values quarantined'),
-  ('g3_dev', 'bronze', 'transactions', 'currency', 'g3_dev', 'silver', 'transactions', 'currency', 'Uppercased and trimmed'),
-  ('g3_dev', 'bronze', 'transactions', 'txn_ts', 'g3_dev', 'silver', 'transactions', 'txn_ts', 'Parsed to TIMESTAMP; future or invalid timestamps quarantined'),
-  ('g3_dev', 'bronze', 'transactions', 'status', 'g3_dev', 'silver', 'transactions', 'status', 'Lowercased and trimmed');
+INSERT INTO g3_test.gov.metadata_lineage VALUES
+  ('g3_test', 'bronze', 'transactions', 'transaction_id', 'g3_test', 'silver', 'transactions', 'transaction_id', 'Direct copy after duplicate filtering'),
+  ('g3_test', 'bronze', 'transactions', 'account_id', 'g3_test', 'silver', 'transactions', 'account_id', 'Direct copy after Silver account relationship check'),
+  ('g3_test', 'bronze', 'transactions', 'card_id', 'g3_test', 'silver', 'transactions', 'card_id', 'Direct copy after Silver card relationship and active-card check'),
+  ('g3_test', 'bronze', 'transactions', 'merchant_id', 'g3_test', 'silver', 'transactions', 'merchant_id', 'Direct copy when present'),
+  ('g3_test', 'bronze', 'transactions', 'channel', 'g3_test', 'silver', 'transactions', 'channel', 'Lowercased and trimmed'),
+  ('g3_test', 'bronze', 'transactions', 'amount', 'g3_test', 'silver', 'transactions', 'amount', 'TRY_CAST to DECIMAL(12,2); non-positive or invalid values quarantined'),
+  ('g3_test', 'bronze', 'transactions', 'currency', 'g3_test', 'silver', 'transactions', 'currency', 'Uppercased and trimmed'),
+  ('g3_test', 'bronze', 'transactions', 'txn_ts', 'g3_test', 'silver', 'transactions', 'txn_ts', 'Parsed to TIMESTAMP; future or invalid timestamps quarantined'),
+  ('g3_test', 'bronze', 'transactions', 'status', 'g3_test', 'silver', 'transactions', 'status', 'Lowercased and trimmed');
 
 SELECT
   'silver.transactions' AS table_name,
   COUNT(*) AS silver_rows
-FROM g3_dev.silver.transactions
+FROM g3_test.silver.transactions
 UNION ALL
 SELECT
   'transactions quarantine rows',
   COUNT(*)
-FROM g3_dev.silver.quarantine_records
+FROM g3_test.silver.quarantine_records
 WHERE run_id = 'RUN-20260706-1'
   AND source_table = 'transactions';

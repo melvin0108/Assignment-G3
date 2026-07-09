@@ -1,12 +1,12 @@
 -- ============================================================================
--- SILVER TRANSACTION DEVICES (M4) - g3_dev.silver.transaction_devices
+-- SILVER TRANSACTION DEVICES (M4) - g3_test.silver.transaction_devices
 -- ============================================================================
 --
 -- Purpose:
 --   Transform bronze.transaction_devices into protected Silver device activity.
 --
 -- Prerequisites:
---   1. pipeline/bronze/01_ingest_bronze.sql has loaded g3_dev.bronze.*
+--   1. pipeline/bronze/01_ingest_bronze.sql has loaded g3_test.bronze.*
 --   2. pipeline/silver/02_transform_transactions.sql has created
 --      silver.transactions
 --
@@ -16,10 +16,10 @@
 --   * device_id is tokenized and ip is reduced to an IPv4 /24-style network.
 -- ============================================================================
 
-CREATE SCHEMA IF NOT EXISTS g3_dev.silver;
-CREATE SCHEMA IF NOT EXISTS g3_dev.gov;
+CREATE SCHEMA IF NOT EXISTS g3_test.silver;
+CREATE SCHEMA IF NOT EXISTS g3_test.gov;
 
-CREATE TABLE IF NOT EXISTS g3_dev.silver.quarantine_records (
+CREATE TABLE IF NOT EXISTS g3_test.silver.quarantine_records (
   run_id           STRING,
   source_table     STRING,
   source_record_id STRING,
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS g3_dev.silver.quarantine_records (
   detected_at      TIMESTAMP
 ) USING DELTA;
 
-CREATE TABLE IF NOT EXISTS g3_dev.silver.transaction_devices (
+CREATE TABLE IF NOT EXISTS g3_test.silver.transaction_devices (
   device_id             STRING,
   transaction_id        STRING,
   device_type           STRING,
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS g3_dev.silver.transaction_devices (
   _record_hash          STRING
 ) USING DELTA;
 
-CREATE TABLE IF NOT EXISTS g3_dev.gov.masking_policies (
+CREATE TABLE IF NOT EXISTS g3_test.gov.masking_policies (
   table_name        STRING,
   field_name        STRING,
   classification    STRING,
@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS g3_dev.gov.masking_policies (
   owner             STRING
 ) USING DELTA;
 
-CREATE TABLE IF NOT EXISTS g3_dev.gov.metadata_lineage (
+CREATE TABLE IF NOT EXISTS g3_test.gov.metadata_lineage (
   source_catalog       STRING,
   source_schema        STRING,
   source_table         STRING,
@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS g3_dev.gov.metadata_lineage (
   transformation_logic STRING
 ) USING DELTA;
 
-DELETE FROM g3_dev.silver.quarantine_records
+DELETE FROM g3_test.silver.quarantine_records
 WHERE run_id = 'RUN-20260706-1'
   AND source_table = 'transaction_devices';
 
@@ -77,11 +77,11 @@ WITH checked AS (
   SELECT
     d.*,
     t.transaction_id AS silver_transaction_id
-  FROM g3_dev.bronze.transaction_devices d
-  LEFT JOIN g3_dev.silver.transactions t
+  FROM g3_test.bronze.transaction_devices d
+  LEFT JOIN g3_test.silver.transactions t
     ON d.transaction_id = t.transaction_id
 )
-INSERT INTO g3_dev.silver.quarantine_records
+INSERT INTO g3_test.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
 SELECT
   'RUN-20260706-1',
@@ -112,13 +112,13 @@ FROM (
   WHERE device_type IS NULL OR trim(device_type) = ''
 );
 
-INSERT OVERWRITE g3_dev.silver.transaction_devices
+INSERT OVERWRITE g3_test.silver.transaction_devices
 WITH checked AS (
   SELECT
     d.*,
     t.transaction_id AS silver_transaction_id
-  FROM g3_dev.bronze.transaction_devices d
-  LEFT JOIN g3_dev.silver.transactions t
+  FROM g3_test.bronze.transaction_devices d
+  LEFT JOIN g3_test.silver.transactions t
     ON d.transaction_id = t.transaction_id
 )
 SELECT
@@ -145,32 +145,32 @@ WHERE silver_transaction_id IS NOT NULL
   AND device_type IS NOT NULL
   AND trim(device_type) != '';
 
-DELETE FROM g3_dev.gov.masking_policies
+DELETE FROM g3_test.gov.masking_policies
 WHERE table_name = 'transaction_devices';
 
-INSERT INTO g3_dev.gov.masking_policies VALUES
+INSERT INTO g3_test.gov.masking_policies VALUES
   ('transaction_devices', 'device_id', 'device/session identifier', 'tokenize with salted SHA256 prefix', 'unprivileged', 'M4'),
   ('transaction_devices', 'ip', 'network identifier', 'truncate IPv4 to /24 or hash non-IPv4 value', 'unprivileged', 'M4');
 
-DELETE FROM g3_dev.gov.metadata_lineage
+DELETE FROM g3_test.gov.metadata_lineage
 WHERE target_schema = 'silver'
   AND target_table = 'transaction_devices';
 
-INSERT INTO g3_dev.gov.metadata_lineage VALUES
-  ('g3_dev', 'bronze', 'transaction_devices', 'device_id', 'g3_dev', 'silver', 'transaction_devices', 'device_id', 'Tokenized with salted SHA256 prefix'),
-  ('g3_dev', 'bronze', 'transaction_devices', 'transaction_id', 'g3_dev', 'silver', 'transaction_devices', 'transaction_id', 'Direct copy after Silver transaction relationship check'),
-  ('g3_dev', 'bronze', 'transaction_devices', 'device_type', 'g3_dev', 'silver', 'transaction_devices', 'device_type', 'Lowercased and trimmed; missing values quarantined'),
-  ('g3_dev', 'bronze', 'transaction_devices', 'ip', 'g3_dev', 'silver', 'transaction_devices', 'ip', 'IPv4 reduced to /24-style network; non-IPv4 hashed'),
-  ('g3_dev', 'bronze', 'transaction_devices', 'geo_country', 'g3_dev', 'silver', 'transaction_devices', 'geo_country', 'Uppercased and trimmed');
+INSERT INTO g3_test.gov.metadata_lineage VALUES
+  ('g3_test', 'bronze', 'transaction_devices', 'device_id', 'g3_test', 'silver', 'transaction_devices', 'device_id', 'Tokenized with salted SHA256 prefix'),
+  ('g3_test', 'bronze', 'transaction_devices', 'transaction_id', 'g3_test', 'silver', 'transaction_devices', 'transaction_id', 'Direct copy after Silver transaction relationship check'),
+  ('g3_test', 'bronze', 'transaction_devices', 'device_type', 'g3_test', 'silver', 'transaction_devices', 'device_type', 'Lowercased and trimmed; missing values quarantined'),
+  ('g3_test', 'bronze', 'transaction_devices', 'ip', 'g3_test', 'silver', 'transaction_devices', 'ip', 'IPv4 reduced to /24-style network; non-IPv4 hashed'),
+  ('g3_test', 'bronze', 'transaction_devices', 'geo_country', 'g3_test', 'silver', 'transaction_devices', 'geo_country', 'Uppercased and trimmed');
 
 SELECT
   'silver.transaction_devices' AS table_name,
   COUNT(*) AS silver_rows
-FROM g3_dev.silver.transaction_devices
+FROM g3_test.silver.transaction_devices
 UNION ALL
 SELECT
   'transaction_devices quarantine rows',
   COUNT(*)
-FROM g3_dev.silver.quarantine_records
+FROM g3_test.silver.quarantine_records
 WHERE run_id = 'RUN-20260706-1'
   AND source_table = 'transaction_devices';
