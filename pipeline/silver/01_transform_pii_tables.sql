@@ -1,19 +1,19 @@
 -- ============================================================================
--- SILVER INGESTION & DATA PRIVACY (M3) — g3_catalog.silver.*
+-- SILVER INGESTION & DATA PRIVACY (M3) — g3_dev.silver.*
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
 -- 1. SETUP SCHEMAS
 -- ----------------------------------------------------------------------------
-CREATE SCHEMA IF NOT EXISTS g3_catalog.silver;
-CREATE SCHEMA IF NOT EXISTS g3_catalog.gov;
+CREATE SCHEMA IF NOT EXISTS g3_dev.silver;
+CREATE SCHEMA IF NOT EXISTS g3_dev.gov;
 
 -- ----------------------------------------------------------------------------
 -- 2. CREATE SILVER TABLES
 -- ----------------------------------------------------------------------------
 
 -- customers
-CREATE TABLE IF NOT EXISTS g3_catalog.silver.customers (
+CREATE TABLE IF NOT EXISTS g3_dev.silver.customers (
   customer_id           STRING,
   first_name            STRING,
   last_name             STRING,
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS g3_catalog.silver.customers (
 ) USING DELTA;
 
 -- employees
-CREATE TABLE IF NOT EXISTS g3_catalog.silver.employees (
+CREATE TABLE IF NOT EXISTS g3_dev.silver.employees (
   employee_id           STRING,
   full_name             STRING,  -- hashed
   email                 STRING,  -- hashed
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS g3_catalog.silver.employees (
 ) USING DELTA;
 
 -- accounts
-CREATE TABLE IF NOT EXISTS g3_catalog.silver.accounts (
+CREATE TABLE IF NOT EXISTS g3_dev.silver.accounts (
   account_id            STRING,
   customer_id           STRING,
   product_type          STRING,
@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS g3_catalog.silver.accounts (
 ) USING DELTA;
 
 -- cards
-CREATE TABLE IF NOT EXISTS g3_catalog.silver.cards (
+CREATE TABLE IF NOT EXISTS g3_dev.silver.cards (
   card_id               STRING,
   account_id            STRING,
   card_type             STRING,
@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS g3_catalog.silver.cards (
 -- ----------------------------------------------------------------------------
 -- 3. GOVERNANCE SCHEMAS
 -- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS g3_catalog.gov.masking_policies (
+CREATE TABLE IF NOT EXISTS g3_dev.gov.masking_policies (
   table_name        STRING,
   field_name        STRING,
   classification    STRING,
@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS g3_catalog.gov.masking_policies (
   owner             STRING
 ) USING DELTA;
 
-CREATE TABLE IF NOT EXISTS g3_catalog.gov.metadata_lineage (
+CREATE TABLE IF NOT EXISTS g3_dev.gov.metadata_lineage (
   source_catalog       STRING,
   source_schema        STRING,
   source_table         STRING,
@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS g3_catalog.gov.metadata_lineage (
 -- 4. CLEAN & REPOPULATE METADATA FOR RUN
 -- ----------------------------------------------------------------------------
 -- Ensure idempotency by dropping quarantine entries for the current run first
-DELETE FROM g3_catalog.silver.quarantine_records 
+DELETE FROM g3_dev.silver.quarantine_records 
 WHERE source_table IN ('customers', 'employees', 'accounts', 'cards') 
   AND run_id = 'RUN-20260706-1';
 
@@ -122,7 +122,7 @@ WITH cust_ranked AS (
     *,
     row_number() OVER (PARTITION BY customer_id ORDER BY created_at ASC, _ingest_ts ASC) AS rn_pk,
     row_number() OVER (PARTITION BY first_name, last_name, dob, address, tax_id ORDER BY customer_id ASC, _ingest_ts ASC) AS rn_near
-  FROM g3_catalog.bronze.customers
+  FROM g3_dev.bronze.customers
 ),
 cust_failed AS (
   SELECT
@@ -154,16 +154,16 @@ cust_failed AS (
      OR (email IS NOT NULL AND email != '' AND email NOT RLIKE '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z0-9.-]+$')
      OR rn_near > 1
 )
-INSERT INTO g3_catalog.silver.quarantine_records
+INSERT INTO g3_dev.silver.quarantine_records
 SELECT * FROM cust_failed;
 
-INSERT OVERWRITE g3_catalog.silver.customers
+INSERT OVERWRITE g3_dev.silver.customers
 WITH cust_ranked AS (
   SELECT
     *,
     row_number() OVER (PARTITION BY customer_id ORDER BY created_at ASC, _ingest_ts ASC) AS rn_pk,
     row_number() OVER (PARTITION BY first_name, last_name, dob, address, tax_id ORDER BY customer_id ASC, _ingest_ts ASC) AS rn_near
-  FROM g3_catalog.bronze.customers
+  FROM g3_dev.bronze.customers
 )
 SELECT
   c.customer_id,
@@ -212,7 +212,7 @@ SELECT
   c._source_record_id,
   c._record_hash
 FROM cust_ranked c
-LEFT ANTI JOIN g3_catalog.silver.quarantine_records q
+LEFT ANTI JOIN g3_dev.silver.quarantine_records q
   ON c._source_record_id = q.source_record_id
  AND q.source_table = 'customers';
 
@@ -224,7 +224,7 @@ WITH emp_ranked AS (
     *,
     row_number() OVER (PARTITION BY email ORDER BY employee_id ASC, _ingest_ts ASC) AS rn_email,
     row_number() OVER (PARTITION BY full_name ORDER BY employee_id ASC, _ingest_ts ASC) AS rn_name
-  FROM g3_catalog.bronze.employees
+  FROM g3_dev.bronze.employees
 ),
 emp_failed AS (
   SELECT
@@ -251,16 +251,16 @@ emp_failed AS (
   FROM emp_ranked
   WHERE rn_email > 1 OR rn_name > 1
 )
-INSERT INTO g3_catalog.silver.quarantine_records
+INSERT INTO g3_dev.silver.quarantine_records
 SELECT * FROM emp_failed;
 
-INSERT OVERWRITE g3_catalog.silver.employees
+INSERT OVERWRITE g3_dev.silver.employees
 WITH emp_ranked AS (
   SELECT
     *,
     row_number() OVER (PARTITION BY email ORDER BY employee_id ASC, _ingest_ts ASC) AS rn_email,
     row_number() OVER (PARTITION BY full_name ORDER BY employee_id ASC, _ingest_ts ASC) AS rn_name
-  FROM g3_catalog.bronze.employees
+  FROM g3_dev.bronze.employees
 )
 SELECT
   e.employee_id,
@@ -276,7 +276,7 @@ SELECT
   e._source_record_id,
   e._record_hash
 FROM emp_ranked e
-LEFT ANTI JOIN g3_catalog.silver.quarantine_records q
+LEFT ANTI JOIN g3_dev.silver.quarantine_records q
   ON e._source_record_id = q.source_record_id
  AND q.source_table = 'employees';
 
@@ -288,10 +288,10 @@ WITH acc_checked AS (
     *,
     CASE
       WHEN open_date IS NOT NULL AND open_date != '' AND CAST(open_date AS DATE) > CAST('2026-07-06' AS DATE) THEN 'DQ-ACC-OPENDATE-FUTURE'
-      WHEN customer_id NOT IN (SELECT customer_id FROM g3_catalog.silver.customers) THEN 'DQ-ACC-CUST-FK'
+      WHEN customer_id NOT IN (SELECT customer_id FROM g3_dev.silver.customers) THEN 'DQ-ACC-CUST-FK'
       ELSE NULL
     END AS failed_rule_id
-  FROM g3_catalog.bronze.accounts
+  FROM g3_dev.bronze.accounts
 ),
 acc_failed AS (
   SELECT
@@ -315,19 +315,19 @@ acc_failed AS (
   FROM acc_checked
   WHERE failed_rule_id IS NOT NULL
 )
-INSERT INTO g3_catalog.silver.quarantine_records
+INSERT INTO g3_dev.silver.quarantine_records
 SELECT * FROM acc_failed;
 
-INSERT OVERWRITE g3_catalog.silver.accounts
+INSERT OVERWRITE g3_dev.silver.accounts
 WITH acc_checked AS (
   SELECT
     *,
     CASE
       WHEN open_date IS NOT NULL AND open_date != '' AND CAST(open_date AS DATE) > CAST('2026-07-06' AS DATE) THEN 'DQ-ACC-OPENDATE-FUTURE'
-      WHEN customer_id NOT IN (SELECT customer_id FROM g3_catalog.silver.customers) THEN 'DQ-ACC-CUST-FK'
+      WHEN customer_id NOT IN (SELECT customer_id FROM g3_dev.silver.customers) THEN 'DQ-ACC-CUST-FK'
       ELSE NULL
     END AS failed_rule_id
-  FROM g3_catalog.bronze.accounts
+  FROM g3_dev.bronze.accounts
 )
 SELECT
   a.account_id,
@@ -344,7 +344,7 @@ SELECT
   a._source_record_id,
   a._record_hash
 FROM acc_checked a
-LEFT ANTI JOIN g3_catalog.silver.quarantine_records q
+LEFT ANTI JOIN g3_dev.silver.quarantine_records q
   ON a._source_record_id = q.source_record_id
  AND q.source_table = 'accounts';
 
@@ -355,7 +355,7 @@ WITH card_ranked AS (
   SELECT
     *,
     row_number() OVER (PARTITION BY card_id ORDER BY _ingest_ts ASC) AS rn_pk
-  FROM g3_catalog.bronze.cards
+  FROM g3_dev.bronze.cards
 ),
 card_failed AS (
   SELECT
@@ -383,15 +383,15 @@ card_failed AS (
   WHERE rn_pk > 1
      OR (status = 'active' AND to_date(concat(expiry, '-01'), 'yyyy-MM-dd') < to_date('2026-07-01', 'yyyy-MM-dd'))
 )
-INSERT INTO g3_catalog.silver.quarantine_records
+INSERT INTO g3_dev.silver.quarantine_records
 SELECT * FROM card_failed;
 
-INSERT OVERWRITE g3_catalog.silver.cards
+INSERT OVERWRITE g3_dev.silver.cards
 WITH card_ranked AS (
   SELECT
     *,
     row_number() OVER (PARTITION BY card_id ORDER BY _ingest_ts ASC) AS rn_pk
-  FROM g3_catalog.bronze.cards
+  FROM g3_dev.bronze.cards
 )
 SELECT
   c.card_id,
@@ -408,14 +408,14 @@ SELECT
   c._source_record_id,
   c._record_hash
 FROM card_ranked c
-LEFT ANTI JOIN g3_catalog.silver.quarantine_records q
+LEFT ANTI JOIN g3_dev.silver.quarantine_records q
   ON c._source_record_id = q.source_record_id
  AND q.source_table = 'cards';
 
 -- ============================================================================
 -- 9. POPULATE MASKING POLICY REGISTRY
 -- ============================================================================
-INSERT OVERWRITE g3_catalog.gov.masking_policies VALUES
+INSERT OVERWRITE g3_dev.gov.masking_policies VALUES
   ('customers', 'first_name', 'direct id', 'tokenize (FPE)', 'unprivileged', 'M3'),
   ('customers', 'last_name', 'direct id', 'tokenize (FPE)', 'unprivileged', 'M3'),
   ('customers', 'email', 'contact', 'mask (j***@***.com)', 'unprivileged', 'M3'),
@@ -430,15 +430,15 @@ INSERT OVERWRITE g3_catalog.gov.masking_policies VALUES
 -- ============================================================================
 -- 10. POPULATE METADATA LINEAGE
 -- ============================================================================
-INSERT OVERWRITE g3_catalog.gov.metadata_lineage VALUES
-  ('g3_catalog', 'bronze', 'customers', 'customer_id', 'g3_catalog', 'silver', 'customers', 'customer_id', 'Direct copy'),
-  ('g3_catalog', 'bronze', 'customers', 'first_name', 'g3_catalog', 'silver', 'customers', 'first_name', 'Tokenized with SHA256 and salt'),
-  ('g3_catalog', 'bronze', 'customers', 'last_name', 'g3_catalog', 'silver', 'customers', 'last_name', 'Tokenized with SHA256 and salt'),
-  ('g3_catalog', 'bronze', 'customers', 'dob', 'g3_catalog', 'silver', 'customers', 'dob', 'Generalized into age bands based on RUN_DATE'),
-  ('g3_catalog', 'bronze', 'customers', 'email', 'g3_catalog', 'silver', 'customers', 'email', 'Masked first character + domain replace'),
-  ('g3_catalog', 'bronze', 'customers', 'phone', 'g3_catalog', 'silver', 'customers', 'phone', 'Masked keeping last 4 digits only'),
-  ('g3_catalog', 'bronze', 'customers', 'address', 'g3_catalog', 'silver', 'customers', 'address', 'Hashed with SHA256 and salt'),
-  ('g3_catalog', 'bronze', 'customers', 'tax_id', 'g3_catalog', 'silver', 'customers', 'tax_id', 'Hashed with SHA256 and salt'),
-  ('g3_catalog', 'bronze', 'cards', 'pan', 'g3_catalog', 'silver', 'cards', 'pan', 'Masked showing last 4 digits only'),
-  ('g3_catalog', 'bronze', 'employees', 'full_name', 'g3_catalog', 'silver', 'employees', 'full_name', 'Hashed with SHA256 and salt'),
-  ('g3_catalog', 'bronze', 'employees', 'email', 'g3_catalog', 'silver', 'employees', 'email', 'Hashed with SHA256 and salt');
+INSERT OVERWRITE g3_dev.gov.metadata_lineage VALUES
+  ('g3_dev', 'bronze', 'customers', 'customer_id', 'g3_dev', 'silver', 'customers', 'customer_id', 'Direct copy'),
+  ('g3_dev', 'bronze', 'customers', 'first_name', 'g3_dev', 'silver', 'customers', 'first_name', 'Tokenized with SHA256 and salt'),
+  ('g3_dev', 'bronze', 'customers', 'last_name', 'g3_dev', 'silver', 'customers', 'last_name', 'Tokenized with SHA256 and salt'),
+  ('g3_dev', 'bronze', 'customers', 'dob', 'g3_dev', 'silver', 'customers', 'dob', 'Generalized into age bands based on RUN_DATE'),
+  ('g3_dev', 'bronze', 'customers', 'email', 'g3_dev', 'silver', 'customers', 'email', 'Masked first character + domain replace'),
+  ('g3_dev', 'bronze', 'customers', 'phone', 'g3_dev', 'silver', 'customers', 'phone', 'Masked keeping last 4 digits only'),
+  ('g3_dev', 'bronze', 'customers', 'address', 'g3_dev', 'silver', 'customers', 'address', 'Hashed with SHA256 and salt'),
+  ('g3_dev', 'bronze', 'customers', 'tax_id', 'g3_dev', 'silver', 'customers', 'tax_id', 'Hashed with SHA256 and salt'),
+  ('g3_dev', 'bronze', 'cards', 'pan', 'g3_dev', 'silver', 'cards', 'pan', 'Masked showing last 4 digits only'),
+  ('g3_dev', 'bronze', 'employees', 'full_name', 'g3_dev', 'silver', 'employees', 'full_name', 'Hashed with SHA256 and salt'),
+  ('g3_dev', 'bronze', 'employees', 'email', 'g3_dev', 'silver', 'employees', 'email', 'Hashed with SHA256 and salt');
