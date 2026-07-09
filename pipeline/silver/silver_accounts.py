@@ -29,7 +29,7 @@ TABLE_NAME = "accounts"
 FULL_TABLE_NAME = f"{CATALOG}.{SCHEMA}.{TABLE_NAME}"
 BRONZE_TABLE_NAME = f"{CATALOG}.bronze.{TABLE_NAME}"
 QUARANTINE_TABLE_NAME = f"{CATALOG}.{SCHEMA}.quarantine_records"
-RUN_ID = "RUN-20260706-1"           # Run ID used to track this execution batch
+RUN_ID = "RUN-20260706-1"  # Run ID used to track this execution batch
 
 # ---------------------------------------------------------------------------
 # 1. LOAD BRONZE DATA
@@ -53,18 +53,20 @@ df_joined = df.join(
 )
 
 # DQ conditions
-is_future_date = (F.col("open_date").isNotNull()) & (F.col("open_date") != "") & (F.col("open_date").cast("date") > F.lit("2026-07-06").cast("date"))
+is_future_date = (F.col("open_date").isNotNull()) & (F.col("open_date") != "") & (
+            F.col("open_date").cast("date") > F.lit("2026-07-06").cast("date"))
 is_missing_fk = F.col("cust_exists").isNull()
 
 # DQ failure expressions aligning with gov.dq_rules
 rule_id_expr = F.when(is_future_date, "DQ-ACC-OPENDATE-FUTURE") \
-                .when(is_missing_fk, "DQ-ACC-CUST-FK")
+    .when(is_missing_fk, "DQ-ACC-CUST-FK")
 
 rule_name_expr = F.when(is_future_date, "open_date must not be in the future") \
-                  .when(is_missing_fk, "customer_id must exist in customers")
+    .when(is_missing_fk, "customer_id must exist in customers")
 
 failure_reason_expr = F.when(is_future_date, F.concat(F.lit("open_date in the future: "), F.col("open_date"))) \
-                       .when(is_missing_fk, F.concat(F.lit("Referential integrity break: customer_id "), F.col("customer_id"), F.lit(" not found in silver.customers")))
+    .when(is_missing_fk, F.concat(F.lit("Referential integrity break: customer_id "), F.col("customer_id"),
+                                  F.lit(" not found in silver.customers")))
 
 # Filter out failed records for quarantine
 failed_df = df_joined.filter(is_future_date | is_missing_fk)
@@ -73,7 +75,7 @@ failed_df = df_joined.filter(is_future_date | is_missing_fk)
 quarantine_df = failed_df.select(
     F.lit(RUN_ID).alias("run_id"),
     F.lit("accounts").alias("source_table"),
-    F.col("_source_record_id"),
+    F.col("_source_record_id").alias("source_record_id"),
     F.col("account_id").alias("record_key"),
     rule_id_expr.alias("rule_id"),
     rule_name_expr.alias("rule_name"),

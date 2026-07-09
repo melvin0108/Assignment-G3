@@ -30,7 +30,7 @@ TABLE_NAME = "cards"
 FULL_TABLE_NAME = f"{CATALOG}.{SCHEMA}.{TABLE_NAME}"
 BRONZE_TABLE_NAME = f"{CATALOG}.bronze.{TABLE_NAME}"
 QUARANTINE_TABLE_NAME = f"{CATALOG}.{SCHEMA}.quarantine_records"
-RUN_ID = "RUN-20260706-1"           # Run ID used to track this execution batch
+RUN_ID = "RUN-20260706-1"  # Run ID used to track this execution batch
 
 # ---------------------------------------------------------------------------
 # 1. LOAD BRONZE DATA
@@ -51,25 +51,26 @@ df_ranked = df.withColumn("rn_pk", F.row_number().over(pk_window))
 
 # Expired but active check
 is_expired_active = (
-    (F.col("status") == "active") &
-    (F.col("expiry").isNotNull()) &
-    (F.col("expiry") != "") &
-    (F.to_date(F.concat(F.col("expiry"), F.lit("-01")), "yyyy-MM-dd") < F.to_date(F.lit("2026-07-01"), "yyyy-MM-dd"))
+        (F.col("status") == "active") &
+        (F.col("expiry").isNotNull()) &
+        (F.col("expiry") != "") &
+        (F.to_date(F.concat(F.col("expiry"), F.lit("-01")), "yyyy-MM-dd") < F.to_date(F.lit("2026-07-01"),
+                                                                                      "yyyy-MM-dd"))
 )
 
 # DQ failure expressions aligning with gov.dq_rules
 rule_id_expr = F.when(F.col("rn_pk") > 1, "DQ-CARD-DUP") \
-                .when(is_expired_active, "DQ-CARD-EXPIRED-ACTIVE")
+    .when(is_expired_active, "DQ-CARD-EXPIRED-ACTIVE")
 
 rule_name_expr = F.when(F.col("rn_pk") > 1, "card_id must be unique") \
-                  .when(is_expired_active, "active card must not have a past expiry")
+    .when(is_expired_active, "active card must not have a past expiry")
 
 failure_reason_expr = F.when(F.col("rn_pk") > 1, F.concat(F.lit("Duplicate card_id found: "), F.col("card_id"))) \
-                       .when(is_expired_active, F.concat(F.lit("Card active but expired. expiry: "), F.col("expiry")))
+    .when(is_expired_active, F.concat(F.lit("Card active but expired. expiry: "), F.col("expiry")))
 
 # Filter out failed records for quarantine
 failed_df = df_ranked.filter(
-    (F.col("rn_pk") > 1) | 
+    (F.col("rn_pk") > 1) |
     is_expired_active
 )
 
@@ -77,7 +78,7 @@ failed_df = df_ranked.filter(
 quarantine_df = failed_df.select(
     F.lit(RUN_ID).alias("run_id"),
     F.lit("cards").alias("source_table"),
-    F.col("_source_record_id"),
+    F.col("_source_record_id").alias("source_record_id"),
     F.col("card_id").alias("record_key"),
     rule_id_expr.alias("rule_id"),
     rule_name_expr.alias("rule_name"),

@@ -30,7 +30,7 @@ TABLE_NAME = "employees"
 FULL_TABLE_NAME = f"{CATALOG}.{SCHEMA}.{TABLE_NAME}"
 BRONZE_TABLE_NAME = f"{CATALOG}.bronze.{TABLE_NAME}"
 QUARANTINE_TABLE_NAME = f"{CATALOG}.{SCHEMA}.quarantine_records"
-RUN_ID = "RUN-20260706-1"           # Run ID used to track this execution batch
+RUN_ID = "RUN-20260706-1"  # Run ID used to track this execution batch
 
 # ---------------------------------------------------------------------------
 # 1. LOAD BRONZE DATA
@@ -56,17 +56,17 @@ df_ranked = df \
 
 # DQ failure expressions aligning with gov.dq_rules
 rule_id_expr = F.when(F.col("rn_email") > 1, "DQ-EMP-EMAIL-UNIQ") \
-                .when(F.col("rn_name") > 1, "DQ-EMP-NAME-NEAR-DUP")
+    .when(F.col("rn_name") > 1, "DQ-EMP-NAME-NEAR-DUP")
 
 rule_name_expr = F.when(F.col("rn_email") > 1, "email must be unique") \
-                  .when(F.col("rn_name") > 1, "flag near-duplicate employee names")
+    .when(F.col("rn_name") > 1, "flag near-duplicate employee names")
 
 failure_reason_expr = F.when(F.col("rn_email") > 1, F.concat(F.lit("Duplicate email found: "), F.col("email"))) \
-                       .when(F.col("rn_name") > 1, F.concat(F.lit("Duplicate employee name found: "), F.col("full_name")))
+    .when(F.col("rn_name") > 1, F.concat(F.lit("Duplicate employee name found: "), F.col("full_name")))
 
 # Filter out failed records for quarantine
 failed_df = df_ranked.filter(
-    (F.col("rn_email") > 1) | 
+    (F.col("rn_email") > 1) |
     (F.col("rn_name") > 1)
 )
 
@@ -74,7 +74,7 @@ failed_df = df_ranked.filter(
 quarantine_df = failed_df.select(
     F.lit(RUN_ID).alias("run_id"),
     F.lit("employees").alias("source_table"),
-    F.col("_source_record_id"),
+    F.col("_source_record_id").alias("source_record_id"),
     F.col("employee_id").alias("record_key"),
     rule_id_expr.alias("rule_id"),
     rule_name_expr.alias("rule_name"),

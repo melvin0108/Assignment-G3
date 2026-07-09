@@ -30,7 +30,7 @@ TABLE_NAME = "customers"
 FULL_TABLE_NAME = f"{CATALOG}.{SCHEMA}.{TABLE_NAME}"
 BRONZE_TABLE_NAME = f"{CATALOG}.bronze.{TABLE_NAME}"
 QUARANTINE_TABLE_NAME = f"{CATALOG}.{SCHEMA}.quarantine_records"
-RUN_ID = "RUN-20260706-1"           # Run ID used to track this execution batch
+RUN_ID = "RUN-20260706-1"  # Run ID used to track this execution batch
 
 # ---------------------------------------------------------------------------
 # 1. LOAD BRONZE DATA
@@ -61,21 +61,22 @@ is_invalid_email = (F.col("email").isNotNull()) & (F.col("email") != "") & (~F.c
 
 # DQ failure expressions aligning with gov.dq_rules
 rule_id_expr = F.when(F.col("rn_pk") > 1, "DQ-CUST-ID-DUP") \
-                .when(is_invalid_email, "DQ-CUST-EMAIL-FMT") \
-                .when(F.col("rn_near") > 1, "DQ-CUST-NEAR-DUP")
+    .when(is_invalid_email, "DQ-CUST-EMAIL-FMT") \
+    .when(F.col("rn_near") > 1, "DQ-CUST-NEAR-DUP")
 
 rule_name_expr = F.when(F.col("rn_pk") > 1, "customer_id must be unique") \
-                  .when(is_invalid_email, "email must match pattern if present") \
-                  .when(F.col("rn_near") > 1, "no two customers share name+dob+address+tax_id")
+    .when(is_invalid_email, "email must match pattern if present") \
+    .when(F.col("rn_near") > 1, "no two customers share name+dob+address+tax_id")
 
 failure_reason_expr = F.when(F.col("rn_pk") > 1, F.concat(F.lit("Duplicate customer_id found: "), F.col("customer_id"))) \
-                       .when(is_invalid_email, F.concat(F.lit("Invalid email format: "), F.col("email"))) \
-                       .when(F.col("rn_near") > 1, F.concat(F.lit("Near duplicate customer found with same details. tax_id: "), F.col("tax_id")))
+    .when(is_invalid_email, F.concat(F.lit("Invalid email format: "), F.col("email"))) \
+    .when(F.col("rn_near") > 1,
+          F.concat(F.lit("Near duplicate customer found with same details. tax_id: "), F.col("tax_id")))
 
 # Filter out failed records for quarantine
 failed_df = df_ranked.filter(
-    (F.col("rn_pk") > 1) | 
-    is_invalid_email | 
+    (F.col("rn_pk") > 1) |
+    is_invalid_email |
     (F.col("rn_near") > 1)
 )
 
@@ -83,7 +84,7 @@ failed_df = df_ranked.filter(
 quarantine_df = failed_df.select(
     F.lit(RUN_ID).alias("run_id"),
     F.lit("customers").alias("source_table"),
-    F.col("_source_record_id"),
+    F.col("_source_record_id").alias("source_record_id"),
     F.col("customer_id").alias("record_key"),
     rule_id_expr.alias("rule_id"),
     rule_name_expr.alias("rule_name"),
@@ -134,20 +135,20 @@ clean_df = df_ranked.join(
 
 # PII Masking/Hashing parameters
 salt = "NAB_SALT_2026"
-run_date_lit = F.lit("2026-07-06").cast("date") # Pinned run date for age bands
+run_date_lit = F.lit("2026-07-06").cast("date")  # Pinned run date for age bands
 
 # DOB Age-banding expression
 age_expr = F.floor(F.months_between(run_date_lit, F.col("dob").cast("date")) / 12)
 dob_masked = F.when(F.col("dob").isNull() | (F.col("dob") == ""), "UNKNOWN") \
-              .otherwise(
-                  F.when(age_expr < 18, "Under 18") \
-                   .when(age_expr.between(18, 25), "18-25") \
-                   .when(age_expr.between(26, 35), "26-35") \
-                   .when(age_expr.between(36, 45), "36-45") \
-                   .when(age_expr.between(46, 55), "46-55") \
-                   .when(age_expr.between(56, 65), "56-65") \
-                   .otherwise("66+")
-              )
+    .otherwise(
+    F.when(age_expr < 18, "Under 18") \
+        .when(age_expr.between(18, 25), "18-25") \
+        .when(age_expr.between(26, 35), "26-35") \
+        .when(age_expr.between(36, 45), "36-45") \
+        .when(age_expr.between(46, 55), "46-55") \
+        .when(age_expr.between(56, 65), "56-65") \
+        .otherwise("66+")
+)
 
 # Email masking logic: show first char + mask user + mask domain name (j***@***.com)
 email_split = F.split(F.col("email"), "@")
@@ -156,18 +157,18 @@ email_domain = email_split.getItem(1)
 masked_domain = F.regexp_replace(email_domain, "^[^.]+", "***")
 
 email_masked = F.when(F.col("email").isNull() | (F.col("email") == ""), F.lit(None).cast("string")) \
-                .when(~F.col("email").contains("@"), "invalid_masked_email") \
-                .otherwise(
-                    F.concat(
-                        F.substring(email_user, 1, 1),
-                        F.lit("***@"),
-                        masked_domain
-                    )
-                )
+    .when(~F.col("email").contains("@"), "invalid_masked_email") \
+    .otherwise(
+    F.concat(
+        F.substring(email_user, 1, 1),
+        F.lit("***@"),
+        masked_domain
+    )
+)
 
 # Phone masking logic: ******1234
 phone_masked = F.when(F.col("phone").isNull() | (F.col("phone") == ""), F.lit(None).cast("string")) \
-                .otherwise(F.concat(F.lit("******"), F.substring(F.col("phone"), -4, 4)))
+    .otherwise(F.concat(F.lit("******"), F.substring(F.col("phone"), -4, 4)))
 
 # Construct Silver DataFrame
 silver_customers_df = clean_df.select(
@@ -184,9 +185,9 @@ silver_customers_df = clean_df.select(
     email_masked.alias("email"),
     phone_masked.alias("phone"),
     F.when(F.col("address").isNull() | (F.col("address") == ""), F.lit(None).cast("string")) \
-     .otherwise(F.sha2(F.concat(F.lower(F.trim(F.col("address"))), F.lit(salt)), 256)).alias("address"),
+        .otherwise(F.sha2(F.concat(F.lower(F.trim(F.col("address"))), F.lit(salt)), 256)).alias("address"),
     F.when(F.col("tax_id").isNull() | (F.col("tax_id") == ""), F.lit(None).cast("string")) \
-     .otherwise(F.sha2(F.concat(F.lower(F.trim(F.col("tax_id"))), F.lit(salt)), 256)).alias("tax_id"),
+        .otherwise(F.sha2(F.concat(F.lower(F.trim(F.col("tax_id"))), F.lit(salt)), 256)).alias("tax_id"),
     F.col("created_at").cast("timestamp").alias("created_at"),
     F.col("_source_file"),
     F.col("_source_file_mod_time").cast("timestamp").alias("_source_file_mod_time"),
