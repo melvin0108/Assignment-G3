@@ -24,7 +24,7 @@ spark = SparkSession.builder.getOrCreate()
 # ---------------------------------------------------------------------------
 # CONFIGURATION
 # ---------------------------------------------------------------------------
-CATALOG = "g3_dev"                  # Unity Catalog name (change to g3_catalog if needed)
+CATALOG = "g3_dev"
 SCHEMA = "silver"
 TABLE_NAME = "customers"
 FULL_TABLE_NAME = f"{CATALOG}.{SCHEMA}.{TABLE_NAME}"
