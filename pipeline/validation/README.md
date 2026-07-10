@@ -1,6 +1,7 @@
 # Validation Checks
 
 These checks are lightweight Databricks validation scripts for completed backlog work.
+They validate the recreated tables in the `g3_test` catalog.
 
 Run order after Bronze and DQ notebooks:
 

@@ -12,7 +12,7 @@ from pyspark.sql import SparkSession
 
 spark = SparkSession.builder.getOrCreate()
 
-CATALOG = "g3_dev"
+CATALOG = "g3_test"
 
 BRONZE_TABLES = [
     "accounts",

@@ -16,7 +16,7 @@ from pyspark.sql import SparkSession
 
 spark = SparkSession.builder.getOrCreate()
 
-CATALOG = "g3_dev"
+CATALOG = "g3_test"
 DQ_RUN_ID = "RUN-20260708-DQ1"
 
 
