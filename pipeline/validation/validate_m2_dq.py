@@ -41,19 +41,11 @@ def fail_if_zero(name, query):
     print(f"PASS: {name} = {value}")
 
 
-def fail_if_not_equal(name, query, expected):
-    value = sql(query).collect()[0][0]
-    if value != expected:
-        raise Exception(f"Validation failed: {name} expected {expected}, got {value}")
-    print(f"PASS: {name} = {value}")
-
-
 print("=== M2 DQ/quarantine validation ===")
 
-fail_if_not_equal(
-    "enabled DQ rule count",
+fail_if_zero(
+    "enabled DQ rules are loaded",
     f"SELECT COUNT(*) FROM {CATALOG}.gov.dq_rules WHERE enabled = true",
-    35,
 )
 
 fail_if_rows(

@@ -20,7 +20,7 @@ Run order after Bronze and DQ notebooks:
 
 `validate_m2_dq.py` checks:
 
-- M2 DQ rule registry has the expected rule count.
+- M2 DQ rule registry has enabled rules loaded.
 - DQ rules match the manifest rule IDs.
 - `silver.quarantine_records` has required fields populated.
 - Quarantine catches manifest defects and reports recall/precision gaps.
