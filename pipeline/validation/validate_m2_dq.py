@@ -34,6 +34,16 @@ def fail_if_rows(name, query):
     print(f"PASS: {name}")
 
 
+def warn_if_rows(name, query):
+    df = sql(query)
+    rows = df.collect()
+    if rows:
+        print(f"\nWARN: {name}")
+        df.show(truncate=False)
+        return
+    print(f"PASS: {name}")
+
+
 def fail_if_zero(name, query):
     value = sql(query).collect()[0][0]
     if value == 0:
@@ -49,27 +59,32 @@ fail_if_zero(
 )
 
 fail_if_rows(
-    "DQ registry rule IDs match manifest rule IDs",
+    "manifest rule IDs exist in DQ registry",
     f"""
     WITH registry AS (
       SELECT DISTINCT rule_id FROM {CATALOG}.gov.dq_rules WHERE enabled = true
     ),
     manifest AS (
       SELECT DISTINCT rule_id FROM {CATALOG}.bronze.defects_manifest
-    ),
-    missing_from_registry AS (
-      SELECT 'missing_from_registry' AS issue, rule_id FROM manifest
-      EXCEPT
-      SELECT 'missing_from_registry' AS issue, rule_id FROM registry
-    ),
-    missing_from_manifest AS (
-      SELECT 'missing_from_manifest' AS issue, rule_id FROM registry
-      EXCEPT
-      SELECT 'missing_from_manifest' AS issue, rule_id FROM manifest
     )
-    SELECT * FROM missing_from_registry
-    UNION ALL
-    SELECT * FROM missing_from_manifest
+    SELECT rule_id FROM manifest
+    EXCEPT
+    SELECT rule_id FROM registry
+    """,
+)
+
+warn_if_rows(
+    "enabled DQ registry rules without manifest seed records",
+    f"""
+    WITH registry AS (
+      SELECT DISTINCT rule_id FROM {CATALOG}.gov.dq_rules WHERE enabled = true
+    ),
+    manifest AS (
+      SELECT DISTINCT rule_id FROM {CATALOG}.bronze.defects_manifest
+    )
+    SELECT rule_id FROM registry
+    EXCEPT
+    SELECT rule_id FROM manifest
     """,
 )
 

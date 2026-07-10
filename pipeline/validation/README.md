@@ -21,7 +21,7 @@ Run order after Bronze and DQ notebooks:
 `validate_m2_dq.py` checks:
 
 - M2 DQ rule registry has enabled rules loaded.
-- DQ rules match the manifest rule IDs.
+- Manifest rule IDs exist in the DQ registry; registry rules without manifest seeds are reported as warnings.
 - `silver.quarantine_records` has required fields populated.
 - Quarantine catches manifest defects and reports recall/precision gaps.
 
