@@ -37,8 +37,8 @@ schema = StructType([
     StructField("enabled", BooleanType(), nullable=True),
 ])
 
-# The 35 DQ rules (single_row=13, duplicate=6, fk_anti_join=12, text_pii=2,
-# ai_exclusion=2). severity is 'quarantine' for all (matches defects_manifest).
+# The 36 DQ rules (single_row=13, duplicate=6, fk_anti_join=13, text_pii=2,
+# ai_exclusion=2). severity is 'quarantine' for all runtime DQ outputs.
 data = [
     ("DQ-TXN-AMT-POS", "amount must be > 0", "bronze", "transactions", "transaction_id", "single_row", "quarantine", "CAST(amount AS DOUBLE) <= 0", True),
     ("DQ-TXN-MERCH-REQ", "merchant_id is required", "bronze", "transactions", "transaction_id", "single_row", "quarantine", "merchant_id IS NULL OR merchant_id = ''", True),
@@ -61,6 +61,7 @@ data = [
     ("DQ-EMP-NAME-NEAR-DUP", "flag near-duplicate employee names", "bronze", "employees", "employee_id", "duplicate", "quarantine", "row_number() OVER (PARTITION BY full_name) > 1  (exact first pass; fuzzy TODO)", True),
     ("DQ-ACC-CUST-FK", "customer_id must exist in customers", "bronze", "accounts", "account_id", "fk_anti_join", "quarantine", "accounts.customer_id NOT IN customers.customer_id", True),
     ("DQ-TXN-ACCT-FK", "account_id must exist in accounts", "bronze", "transactions", "transaction_id", "fk_anti_join", "quarantine", "transactions.account_id NOT IN accounts.account_id", True),
+    ("DQ-TXN-CARD-FK", "card_id must exist in cards", "bronze", "transactions", "transaction_id", "fk_anti_join", "quarantine", "transactions.card_id NOT IN cards.card_id", True),
     ("DQ-AUTH-TXN-FK", "transaction_id must exist in transactions", "bronze", "auth_attempts", "attempt_id", "fk_anti_join", "quarantine", "auth_attempts.transaction_id NOT IN transactions.transaction_id", True),
     ("DQ-DISP-TXN-FK", "transaction_id must exist in transactions", "bronze", "disputes", "dispute_id", "fk_anti_join", "quarantine", "disputes.transaction_id NOT IN transactions.transaction_id", True),
     ("DQ-CBK-DISP-FK", "dispute_id must exist in disputes", "bronze", "chargebacks", "chargeback_id", "fk_anti_join", "quarantine", "chargebacks.dispute_id NOT IN disputes.dispute_id", True),
