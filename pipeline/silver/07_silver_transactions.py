@@ -4,7 +4,7 @@
 # ============================================================================
 # Implements Bronze -> Silver transformation for the transactions dataset:
 #   1. Reads from bronze.transactions
-#   2. Checks duplicate transaction IDs, required fields, typing, and FK rules
+#   2. Checks duplicate transaction IDs, required fields, typing, and source FK rules
 #   3. Quarantines failed records to silver.quarantine_records
 #   4. Writes clean records to silver.transactions
 #   5. Appends lineage rows to gov.metadata_lineage
@@ -38,9 +38,19 @@ RUN_TS_LIMIT = "2026-07-06 23:59:59"
 print(f"Reading from Bronze table: {BRONZE_TABLE_NAME}")
 transactions_df = spark.read.table(BRONZE_TABLE_NAME).alias("t")
 
-print("Reading Silver accounts and cards for FK validation...")
-accounts_df = spark.read.table(f"{CATALOG}.{SCHEMA}.accounts").select("account_id").distinct().alias("a")
-cards_df = spark.read.table(f"{CATALOG}.{SCHEMA}.cards").select("card_id", "status").distinct().alias("c")
+print("Reading Bronze accounts and cards for source FK validation...")
+accounts_df = spark.read.table(f"{CATALOG}.bronze.accounts").select("account_id").distinct().alias("a")
+cards_df = (
+    spark.read.table(f"{CATALOG}.bronze.cards")
+    .groupBy("card_id")
+    .agg(
+        F.max(
+            F.when(F.lower(F.trim(F.col("status"))) == "closed", F.lit(1))
+            .otherwise(F.lit(0))
+        ).alias("bronze_card_is_closed")
+    )
+    .alias("c")
+)
 
 # ---------------------------------------------------------------------------
 # 2. RUN DQ RULES & IDENTIFY FAILURES (QUARANTINE)
@@ -59,9 +69,9 @@ checked_df = (
         "amount_typed",
         "txn_ts_typed",
         "rn_txn",
-        F.col("a.account_id").alias("silver_account_id"),
-        F.col("c.card_id").alias("silver_card_id"),
-        F.col("c.status").alias("silver_card_status"),
+        F.col("a.account_id").alias("bronze_account_id"),
+        F.col("c.card_id").alias("bronze_card_id"),
+        F.col("c.bronze_card_is_closed"),
     )
 )
 
@@ -71,12 +81,13 @@ txn_ts_invalid = F.col("txn_ts_typed").isNull() | (
     F.col("txn_ts_typed") > F.lit(RUN_TS_LIMIT).cast("timestamp")
 )
 txn_duplicate = F.col("rn_txn") > 1
-fk_missing = F.col("silver_account_id").isNull() | (
+account_fk_missing = F.col("bronze_account_id").isNull()
+card_fk_missing = (
     F.col("card_id").isNotNull() &
     (F.trim(F.col("card_id")) != "") &
-    F.col("silver_card_id").isNull()
+    F.col("bronze_card_id").isNull()
 )
-closed_card = F.col("silver_card_status") == "closed"
+closed_card = F.col("bronze_card_is_closed") == 1
 
 
 def quarantine_rows(condition, rule_id, rule_name, failure_reason):
@@ -103,7 +114,8 @@ quarantine_df = (
     .unionByName(quarantine_rows(merchant_missing, "DQ-TXN-MERCH-REQ", "merchant_id is required", "missing merchant_id"))
     .unionByName(quarantine_rows(txn_ts_invalid, "DQ-TXN-TS-FUTURE", "txn_ts must not be in the future", "txn_ts is missing, invalid, or after RUN_DATE"))
     .unionByName(quarantine_rows(txn_duplicate, "DQ-TXN-ID-DUP", "transaction_id must be unique", "duplicate transaction_id"))
-    .unionByName(quarantine_rows(fk_missing, "DQ-TXN-ACCT-FK", "account_id must exist in accounts", "account_id or card_id does not resolve to Silver account/card"))
+    .unionByName(quarantine_rows(account_fk_missing, "DQ-TXN-ACCT-FK", "account_id must exist in accounts", "account_id does not resolve to Bronze accounts"))
+    .unionByName(quarantine_rows(card_fk_missing, "DQ-TXN-CARD-FK", "card_id must exist in cards", "card_id does not resolve to Bronze cards"))
     .unionByName(quarantine_rows(closed_card, "DQ-TXN-CARD-ACTIVE", "transaction must use an active card", "transaction uses a closed card"))
 )
 
@@ -136,7 +148,10 @@ spark.sql(f"""
 
 failed_count = quarantine_df.count()
 if failed_count > 0:
-    print(f"Writing {failed_count} failed records to quarantine...")
+    distinct_failed_count = quarantine_df.select("source_record_id").distinct().count()
+    print(f"Writing {failed_count} quarantine rule rows for {distinct_failed_count} distinct failed transactions...")
+    print("Transaction quarantine counts by rule:")
+    quarantine_df.groupBy("rule_id").count().orderBy("rule_id").show(truncate=False)
     quarantine_df.write.format("delta").mode("append").saveAsTable(QUARANTINE_TABLE_NAME)
 else:
     print("No failed records found to quarantine.")
@@ -150,13 +165,13 @@ silver_transactions_df = checked_df.filter(
     (F.trim(F.col("merchant_id")) != "") &
     (F.col("txn_ts_typed") <= F.lit(RUN_TS_LIMIT).cast("timestamp")) &
     (F.col("rn_txn") == 1) &
-    F.col("silver_account_id").isNotNull() &
+    F.col("bronze_account_id").isNotNull() &
     (
         F.col("card_id").isNull() |
         (F.trim(F.col("card_id")) == "") |
-        F.col("silver_card_id").isNotNull()
+        F.col("bronze_card_id").isNotNull()
     ) &
-    (F.coalesce(F.col("silver_card_status"), F.lit("")) != "closed")
+    (F.coalesce(F.col("bronze_card_is_closed"), F.lit(0)) != 1)
 ).select(
     F.col("transaction_id"),
     F.col("account_id"),
@@ -207,8 +222,8 @@ lineage_schema = StructType([
 
 lineage_rows = [
     (CATALOG, "bronze", TABLE_NAME, "transaction_id", CATALOG, SCHEMA, TABLE_NAME, "transaction_id", "Direct copy after duplicate filtering"),
-    (CATALOG, "bronze", TABLE_NAME, "account_id", CATALOG, SCHEMA, TABLE_NAME, "account_id", "Direct copy after Silver account relationship check"),
-    (CATALOG, "bronze", TABLE_NAME, "card_id", CATALOG, SCHEMA, TABLE_NAME, "card_id", "Direct copy after Silver card relationship and active-card check"),
+    (CATALOG, "bronze", TABLE_NAME, "account_id", CATALOG, SCHEMA, TABLE_NAME, "account_id", "Direct copy after Bronze account existence check"),
+    (CATALOG, "bronze", TABLE_NAME, "card_id", CATALOG, SCHEMA, TABLE_NAME, "card_id", "Direct copy after Bronze card existence and active-card checks"),
     (CATALOG, "bronze", TABLE_NAME, "merchant_id", CATALOG, SCHEMA, TABLE_NAME, "merchant_id", "Direct copy when present"),
     (CATALOG, "bronze", TABLE_NAME, "channel", CATALOG, SCHEMA, TABLE_NAME, "channel", "Lowercased and trimmed"),
     (CATALOG, "bronze", TABLE_NAME, "amount", CATALOG, SCHEMA, TABLE_NAME, "amount", "TRY_CAST to DECIMAL(12,2); non-positive or invalid values quarantined"),
