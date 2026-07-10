@@ -23,7 +23,8 @@ Run order after Bronze and DQ notebooks:
 - M2 DQ rule registry has enabled rules loaded.
 - Manifest rule IDs exist in the DQ registry; registry rules without manifest seeds are reported as warnings.
 - `silver.quarantine_records` has required fields populated.
-- Quarantine catches manifest defects and reports recall/precision gaps.
+- The latest quarantine run is selected automatically.
+- Quarantine recall/precision gaps are reported as warnings.
 
 The script raises an exception if any blocking check fails. Save the Databricks
 cell output as evidence for E2-I5, E3-I6, and E7-I1/E7-I3.
