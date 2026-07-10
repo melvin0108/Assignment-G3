@@ -110,6 +110,7 @@ def gen_customers(ctx, n):
     for i in range(1, n + 1):
         cid = seq_id(C.PFX["customer"], i)
         first, last = f.first_name(), f.last_name()
+        created = iso(past_ts(rng, now, 1000))
         rows.append({
             "customer_id": cid,
             "first_name": first, "last_name": last,
@@ -118,7 +119,8 @@ def gen_customers(ctx, n):
             "phone": phone_au(rng),
             "address": f"{f.street_address()}, {f.city()}",
             "tax_id": tax_id(rng),
-            "created_at": iso(past_ts(rng, now, 1000)),
+            "created_at": created,
+            "effective_at": created,
         })
     ctx.ids["customers"] = [r["customer_id"] for r in rows]
     ctx.pools["cust_email"] = {r["customer_id"]: r["email"] for r in rows}
@@ -228,6 +230,7 @@ def gen_accounts(ctx, n):
 def gen_cards(ctx, n):
     rng, man = ctx.rng, ctx.manifest
     acct_ids = ctx.ids["accounts"]
+    now = run_now()
     rows = []
     for i in range(1, n + 1):
         rows.append({
@@ -237,6 +240,7 @@ def gen_cards(ctx, n):
             "pan": full_pan(rng),
             "expiry": f"{rng.randint(2024, 2030)}-{rng.randint(1, 12):02d}",
             "status": rng.choices(C.CARD_STATUS, weights=[80, 5, 5, 10])[0],
+            "effective_at": iso(past_ts(rng, now, 1000)),
         })
     ctx.ids["cards"] = [r["card_id"] for r in rows]
     # ensure at least one closed card exists (precondition for transactions defect)
@@ -266,6 +270,7 @@ def gen_cards(ctx, n):
 def gen_merchants(ctx, n):
     f, rng, man = ctx.f, ctx.rng, ctx.manifest
     mccs = [m[0] for m in C.MERCHANT_CATEGORIES]
+    now = run_now()
     rows = []
     for i in range(1, n + 1):
         rows.append({
@@ -275,6 +280,7 @@ def gen_merchants(ctx, n):
             "country": rng.choice([c[0] for c in C.COUNTRIES]),
             "risk_rating": rng.choice(C.RISK_RATING),
             "status": rng.choices(C.MERCHANT_STATUS, weights=[85, 8, 7])[0],
+            "effective_at": iso(past_ts(rng, now, 1000)),
         })
     ctx.ids["merchants"] = [r["merchant_id"] for r in rows]
     # ensure at least one closed merchant exists (referenced by transactions defect)

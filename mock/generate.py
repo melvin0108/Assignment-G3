@@ -20,16 +20,24 @@ python -m mock.generate --tables customers,accounts,transactions
 # heavier defect density
 python -m mock.generate --defect-rate 0.15
 
+# SCD Type 2: emit two snapshots (snapshot_T0/, snapshot_T1/) with dimension history
+python -m mock.generate --snapshots 2 --transactions 2000 --customers 150
+
 Outputs one CSV per table under --out, plus defects_manifest.csv listing every
 intentionally-injected bad record (use it to validate the Silver quarantine).
+With --snapshots N>=2 the T0 baseline lands under snapshot_T0/ and each later
+snapshot_T{k}/ is derived from it with SCD2 dimension changes, accompanied by a
+top-level scd_changes_manifest.csv oracle.
 """
 import argparse
 import csv
 import os
 import sys
 import time
+from datetime import timedelta
 
 from . import config as C
+from . import scd
 from .helpers import make_faker, make_rng
 from .defects import DefectManifest
 from .generators import Ctx, GENERATORS
@@ -90,6 +98,11 @@ def main(argv=None):
     ap.add_argument("--scale", type=float, default=1.0, help="multiplier on base volumes (default 1.0)")
     ap.add_argument("--defect-rate", type=float, default=0.05,
                     help="fraction of eligible rows that get a defect (default 0.05)")
+    ap.add_argument("--snapshots", type=int, default=1,
+                    help="number of dataset snapshots to emit (default 1 = flat, no SCD2). "
+                         ">=2 writes snapshot_T0/..snapshot_T{n-1}/ with SCD2 dimension history")
+    ap.add_argument("--scd-rate", type=float, default=C.SCD2_RATE_DEFAULT,
+                    help="fraction of dim keys that change per snapshot (default %(default)s)")
     ap.add_argument("--stress", action="store_true",
                     help="shortcut: transactions=2,000,000 for explicit stress testing")
     ap.add_argument("--tables", default=None,
@@ -100,6 +113,10 @@ def main(argv=None):
 
     if args.defect_rate < 0 or args.defect_rate > 1:
         ap.error("--defect-rate must be between 0 and 1")
+    if args.snapshots < 1:
+        ap.error("--snapshots must be >= 1")
+    if args.scd_rate < 0 or args.scd_rate > 1:
+        ap.error("--scd-rate must be between 0 and 1")
     if args.stress and args.transactions is None:
         args.transactions = 2_000_000
 
@@ -115,6 +132,10 @@ def main(argv=None):
     )
 
     os.makedirs(args.out, exist_ok=True)
+    # N=1 stays flat (backward compatible); N>=2 nests T0 under snapshot_T0/.
+    t0_sub = "snapshot_T0" if args.snapshots >= 2 else ""
+    t0_dir = os.path.join(args.out, t0_sub) if t0_sub else args.out
+    os.makedirs(t0_dir, exist_ok=True)
     summary = []
     grand_total = 0
     t_start = time.time()
@@ -129,7 +150,7 @@ def main(argv=None):
         t0 = time.time()
         # reference tables ignore n; pass n for everything else
         rows = gen(ctx) if n is None else gen(ctx, n)
-        path = os.path.join(args.out, f"{table}.csv")
+        path = os.path.join(t0_dir, f"{table}.csv")
         written = write_csv(path, C.TABLE_SCHEMAS[table], rows)
         dt = time.time() - t0
         defects = ctx.manifest.count_for(table)
@@ -139,8 +160,23 @@ def main(argv=None):
             sys.stderr.write(f"  {table:<24} {written:>10,} rows   defects={defects:<5} ({dt:.1f}s)\n")
 
     if not args.no_manifest:
-        manifest_path = os.path.join(args.out, "defects_manifest.csv")
+        manifest_path = os.path.join(t0_dir, "defects_manifest.csv")
         ctx.manifest.write(manifest_path)
+
+    # ---- SCD Type 2: derive later snapshots from snapshot_T0 ----
+    scd_man = None
+    if args.snapshots >= 2:
+        scd_man = scd.ScdManifest()
+        prev_dir = t0_dir   # each snapshot derives from the previous one so changes accumulate (SCD2)
+        for s in range(1, args.snapshots):
+            snap_dir = os.path.join(args.out, f"snapshot_T{s}")
+            as_of = C.SNAPSHOT_BASE_DATE + timedelta(days=s * C.SNAPSHOT_INTERVAL_DAYS)
+            n_mut = scd.derive_snapshot(prev_dir, snap_dir, s, as_of, args.scd_rate, args.seed, scd_man)
+            prev_dir = snap_dir
+            if not args.quiet:
+                sys.stderr.write(f"  snapshot_T{s:<9} +{n_mut:>6,} SCD2 mutations   (as-of {as_of.isoformat()})\n")
+        if not args.no_manifest:
+            scd_man.write(os.path.join(args.out, "scd_changes_manifest.csv"))
 
     # ---- summary ----
     total_defects = len(ctx.manifest)
@@ -151,8 +187,14 @@ def main(argv=None):
     sys.stderr.write(f"Seed       : {args.seed}   Defect rate: {args.defect_rate}\n")
     sys.stderr.write(f"Total injected defects: {total_defects:,}")
     if not args.no_manifest:
-        sys.stderr.write(f"  -> {_defects_filename(args.out)}")
+        sys.stderr.write(f"  -> {_defects_filename(t0_dir)}")
     sys.stderr.write("\n")
+    if scd_man is not None:
+        sys.stderr.write(f"Snapshots  : {args.snapshots} (snapshot_T0..snapshot_T{args.snapshots - 1})  "
+                         f"SCD2 rate: {args.scd_rate}\n")
+        if not args.no_manifest:
+            sys.stderr.write(f"SCD oracle : {os.path.join(args.out, 'scd_changes_manifest.csv')}  "
+                             f"({len(scd_man):,} version changes)\n")
     return 0
 
 

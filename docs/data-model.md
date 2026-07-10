@@ -102,8 +102,9 @@ Contract columns: `field | type | req/opt | accepted values or pattern | example
 | address | string | opt | free text | 12 King St Melbourne | — | sensitive | — |
 | tax_id | string | opt | synthetic mock `^\d{9}$` | 111222333 | — | sensitive | synthetic only; masked/hashed from Silver |
 | created_at | timestamp | req | ISO-8601 UTC; not future | 2023-01-15T00:00:00Z | — | — | not future |
+| effective_at | timestamp | req | ISO-8601 UTC; SCD2 valid_from | 2023-01-15T00:00:00Z | — | — | defaults to created_at (§9b) |
 
-Defects: missing email; exact-dup `customer_id`; near-dup name+dob+address+**tax_id**.
+Defects: missing email; exact-dup `customer_id`; near-dup name+dob+address+**tax_id**. SCD2: `address` re-extracted across snapshots (`--snapshots`, §9b).
 
 ### 4.2 `accounts` — grain: one row per account
 | field | type | req/opt | accepted / pattern | example | key | PII | quality rule |
@@ -126,8 +127,9 @@ Defects: orphan `customer_id` (CUST-9999); future `open_date`.
 | pan | string | req | synthetic PAN `^\d{4}-\d{4}-\d{4}-\d{4}$` | 4532-1111-2222-3333 | — | payment | raw in Bronze; must be masked/tokenized from Silver onward |
 | expiry | string | req | `^\d{4}-(0[1-9]\|1[0-2])$` | 2027-08 | — | — | format; past+active → business-rule fail |
 | status | string | req | {active,blocked,expired,closed} | active | — | — | in enum (§5) |
+| effective_at | timestamp | req | ISO-8601 UTC; SCD2 valid_from | 2024-05-01T00:00:00Z | — | — | synthesized past ts (§9b) |
 
-Defects: expired-but-active; closed card. Raw synthetic PAN is expected in Bronze so masking can be implemented and tested in the pipeline.
+Defects: expired-but-active; closed card. Raw synthetic PAN is expected in Bronze so masking can be implemented and tested in the pipeline. SCD2: `status` re-extracted across snapshots (`--snapshots`, §9b).
 
 ### 4.4 `merchants` — grain: one row per merchant
 | field | type | req/opt | accepted / pattern | example | key | PII | quality rule |
@@ -138,8 +140,9 @@ Defects: expired-but-active; closed card. Raw synthetic PAN is expected in Bronz
 | country | string | req | exists in countries | AU | FK→countries | — | RI |
 | risk_rating | string | req | {low,medium,high} | low | — | — | in enum (Silver lowercases) |
 | status | string | req | {active,suspended,closed} | active | — | — | in enum (§5) |
+| effective_at | timestamp | req | ISO-8601 UTC; SCD2 valid_from | 2024-05-01T00:00:00Z | — | — | synthesized past ts (§9b) |
 
-Defects: inconsistent casing (low/HIGH/Medium); closed merchant referenced.
+Defects: inconsistent casing (low/HIGH/Medium); closed merchant referenced. SCD2: `risk_rating` re-extracted across snapshots (`--snapshots`, §9b).
 
 ### 4.5 `merchant_categories` — grain: one row per MCC
 | field | type | req/opt | accepted / pattern | example | key | PII | quality rule |
@@ -356,6 +359,53 @@ Physically populated in Silver, but **defined here** so invalid records are gene
 - [x] Referential-integrity breaks — `accounts`, `disputes`, `chargebacks`, bridges, conditional `case_parties`
 - [x] Sensitive fields needing masking — `customers`, `cards.pan`, `employees`, `investigation_notes`
 - [x] Must-not-expose-to-AI — `legal_hold` cases/notes, raw PAN past Silver, DNC contact logs
+- [x] Dimension history (SCD2) — `customers`/`cards`/`merchants` re-extracted with one changed attribute across snapshots (`--snapshots N≥2`); tracked in `scd_changes_manifest.csv` — see §9b
+
+## 9b. SCD Type 2 — multi-snapshot dimension history (mock-only)
+
+The pipeline has no native change-history feed, so SCD2 is exercised by mocking
+**dimension attribute changes across separate snapshots** (Approach B). A single
+generator run emits N snapshots; `snapshot_T0` is the baseline and each later
+`snapshot_T{k}` re-presents a subset of dimension keys with one attribute changed
+and `effective_at` bumped to that snapshot's as-of date.
+
+| dimension | natural key | attribute that changes | example |
+|---|---|---|---|
+| `customers` | `customer_id` | `address` (customer moves) | 12 King St → 88 Pitt St |
+| `cards` | `card_id` | `status` (card lifecycle) | active → closed |
+| `merchants` | `merchant_id` | `risk_rating` (risk re-assessment) | low → high |
+
+`effective_at` is the SCD2 `valid_from`, appended to all three dims (`customers`
+defaults to `created_at`; `cards`/`merchants` get a synthesized past timestamp —
+they previously had no native timestamp). T1's `effective_at` (`RUN_DATE` + 30d)
+is strictly later than every T0 value.
+
+**Output layout** (`python -m mock.generate --snapshots 2 …`):
+
+```
+data/raw/
+  snapshot_T0/                # baseline — every table + defects_manifest.csv
+  snapshot_T1/                # = T0 copied verbatim, then 3 dim CSVs mutated in place
+  scd_changes_manifest.csv    # top-level SCD2 oracle (cumulative across snapshots)
+```
+
+Non-dimension tables are byte-identical between snapshots; only the 3 dims carry
+version changes. Version changes are legitimate history, **not** DQ defects, so
+defective dim rows are excluded from mutation and the two oracles
+(`defects_manifest.csv` vs `scd_changes_manifest.csv`) never overlap.
+
+**`scd_changes_manifest.csv` schema** (oracle for the future Silver SCD2 step):
+`source_table, natural_key, snapshot, changed_attribute, old_value, new_value, prior_effective_at, effective_at`
+
+**Zero bronze change:** bronze append + dedup by `_record_hash` keeps both
+versions of a mutated key (different content → different hash) and collapses
+every unchanged row (identical content → identical hash → deduped).
+
+⚠️ **Mock-only gap (deferred):** Silver `silver_customers`/`silver_cards`/
+`silver_merchants` still dedup→quarantine (`rn_pk>1`). Until a follow-up PR
+replaces that with `valid_from`/`valid_to`/`is_current` + surrogate `*_sk`
+windowing, ingesting `snapshot_T1` quarantines the mutated dim rows as
+duplicates. The mock + oracle are delivered here; Silver windowing is the next step.
 
 ## 10. Key relationships
 

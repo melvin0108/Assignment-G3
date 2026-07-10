@@ -102,10 +102,10 @@ DATE_DIM_RANGE = (date(2023, 1, 1), RUN_DATE)  # inclusive daily calendar
 # Table CSV schemas — column order is the on-disk order (bronze-layer.md)
 # --------------------------------------------------------------------------
 TABLE_SCHEMAS = {
-    "customers": ["customer_id", "first_name", "last_name", "dob", "email", "phone", "address", "tax_id", "created_at"],
+    "customers": ["customer_id", "first_name", "last_name", "dob", "email", "phone", "address", "tax_id", "created_at", "effective_at"],
     "accounts": ["account_id", "customer_id", "product_type", "open_date", "status", "currency"],
-    "cards": ["card_id", "account_id", "card_type", "pan", "expiry", "status"],
-    "merchants": ["merchant_id", "name", "mcc", "country", "risk_rating", "status"],
+    "cards": ["card_id", "account_id", "card_type", "pan", "expiry", "status", "effective_at"],
+    "merchants": ["merchant_id", "name", "mcc", "country", "risk_rating", "status", "effective_at"],
     "merchant_categories": ["mcc", "category_name", "category_group"],
     "channels": ["channel_code", "channel_name"],
     "case_status_types": ["status_code", "description"],
@@ -147,3 +147,25 @@ BASE_VOLUMES = {
     "merchants": 2000,
     "transactions": 2000000,
 }
+
+# --------------------------------------------------------------------------
+# SCD Type 2 — multi-snapshot dimension history (Approach B, mock-only)
+# --------------------------------------------------------------------------
+# Dimensions whose attribute changes between snapshots drive SCD2. Each entry
+# names the single attribute that mutates when a key is "re-extracted" in a
+# later snapshot (the rest of the row stays identical). These version changes
+# are legitimate history, NOT DQ defects — they are logged to a separate
+# scd_changes_manifest.csv (see mock/scd.py), never to DefectManifest.
+SCD2_DIMENSIONS = ["customers", "cards", "merchants"]
+SCD2_MUTATIONS = {
+    "customers": "address",     # customer moves -> address re-extracted
+    "cards": "status",          # card lifecycle (active -> blocked/closed)
+    "merchants": "risk_rating", # merchant risk re-assessment (low -> high)
+}
+SCD2_RATE_DEFAULT = 0.02        # fraction of dim keys that change per snapshot
+
+# Snapshot as-of dates. T0 = RUN_DATE (unchanged from the single-run baseline);
+# each later snapshot steps forward by SNAPSHOT_INTERVAL_DAYS, so a mutated row's
+# new effective_at is strictly later than every T0 value (clean SCD2 ordering).
+SNAPSHOT_BASE_DATE = RUN_DATE       # T0 as-of
+SNAPSHOT_INTERVAL_DAYS = 30         # T1 as-of = RUN_DATE + 30d, T2 + 60d, ...
