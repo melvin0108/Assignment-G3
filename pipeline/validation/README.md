@@ -13,7 +13,7 @@ Run order after Bronze and DQ notebooks:
 `validate_m1_bronze.py` checks:
 
 - M1 Bronze tables exist.
-- Required Bronze metadata columns exist.
+- Required Bronze metadata columns exist on ingested Bronze source tables.
 - Important Bronze tables have rows.
 - Bronze `_record_hash` values are not duplicated.
 - `bronze.defects_manifest` is loaded cleanly.

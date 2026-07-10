@@ -43,6 +43,8 @@ BRONZE_TABLES = [
     "transactions",
 ]
 
+INGESTED_BRONZE_TABLES = [t for t in BRONZE_TABLES if t != "defects_manifest"]
+
 BRONZE_METADATA_COLS = [
     "_source_file",
     "_source_file_mod_time",
@@ -77,6 +79,7 @@ def fail_if_zero(name, query):
 
 
 expected_bronze_values = ",".join([f"('{t}')" for t in BRONZE_TABLES])
+expected_ingested_bronze_values = ",".join([f"('{t}')" for t in INGESTED_BRONZE_TABLES])
 expected_meta_values = ",".join([f"('{c}')" for c in BRONZE_METADATA_COLS])
 
 print("=== M1 Bronze validation ===")
@@ -95,9 +98,9 @@ fail_if_rows(
 )
 
 fail_if_rows(
-    "all Bronze tables have required metadata columns",
+    "all ingested Bronze tables have required metadata columns",
     f"""
-    WITH expected_tables(table_name) AS (VALUES {expected_bronze_values}),
+    WITH expected_tables(table_name) AS (VALUES {expected_ingested_bronze_values}),
          expected_cols(column_name) AS (VALUES {expected_meta_values})
     SELECT t.table_name, c.column_name AS missing_column
     FROM expected_tables t
@@ -117,7 +120,7 @@ for table_name in ["transactions", "customers", "accounts", "cards", "defects_ma
         f"SELECT COUNT(*) FROM {CATALOG}.bronze.{table_name}",
     )
 
-for table_name in ["transactions", "customers", "accounts", "cards", "defects_manifest"]:
+for table_name in ["transactions", "customers", "accounts", "cards"]:
     fail_if_rows(
         f"bronze.{table_name} has no duplicate _record_hash",
         f"""
