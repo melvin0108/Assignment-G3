@@ -15,7 +15,7 @@ Run order after Bronze and DQ notebooks:
 - M1 Bronze tables exist.
 - Required Bronze metadata columns exist on ingested Bronze source tables.
 - Important Bronze tables have rows.
-- Bronze `_record_hash` values are not duplicated.
+- Bronze `_record_hash` duplicate samples are reported as warnings.
 - `bronze.defects_manifest` is loaded cleanly.
 
 `validate_m2_dq.py` checks:
