@@ -7,7 +7,7 @@
 # Mirrors silver_masking_policies.py / silver_metadata_lineage.py: build a
 # DataFrame from an explicit schema + a Python list, then saveAsTable(overwrite).
 # The 35 rows below are parsed verbatim from pipeline/dq/02_load_dq_rules.sql;
-# only the catalog token differs (g3_dev here vs g3_catalog in the .sql).
+# The target catalog is selected through the shared catalog widget.
 # ============================================================================
 
 from pyspark.sql import SparkSession
@@ -19,10 +19,11 @@ spark = SparkSession.builder.getOrCreate()
 # ---------------------------------------------------------------------------
 # CONFIGURATION
 # ---------------------------------------------------------------------------
-CATALOG = "g3_dev"
+dbutils.widgets.dropdown("catalog", "g3_dev", ["g3_dev", "g3_test", "g3_catalog"])
+catalog = dbutils.widgets.get("catalog")
 SCHEMA = "gov"
 TABLE_NAME = "dq_rules"
-FULL_TABLE_NAME = f"{CATALOG}.{SCHEMA}.{TABLE_NAME}"
+FULL_TABLE_NAME = f"{catalog}.{SCHEMA}.{TABLE_NAME}"
 
 # Schema matches gov.dq_rules DDL in 01_setup.sql (rule_id .. enabled).
 schema = StructType([
@@ -82,7 +83,7 @@ data = [
 # ---------------------------------------------------------------------------
 df = spark.createDataFrame(data, schema=schema)
 
-spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SCHEMA}")
+spark.sql(f"CREATE SCHEMA IF NOT EXISTS {catalog}.{SCHEMA}")
 
 print(f"Writing DQ rule registry to {FULL_TABLE_NAME}")
 (
@@ -109,7 +110,7 @@ spark.sql(
 print("Registry drift vs defects_manifest (expected 0 rows):")
 spark.sql(
     f"SELECT r.rule_id FROM {FULL_TABLE_NAME} r "
-    f"LEFT JOIN (SELECT DISTINCT rule_id FROM {CATALOG}.bronze.defects_manifest) m "
+    f"LEFT JOIN (SELECT DISTINCT rule_id FROM {catalog}.bronze.defects_manifest) m "
     f"ON r.rule_id = m.rule_id WHERE m.rule_id IS NULL"
 ).show()
 

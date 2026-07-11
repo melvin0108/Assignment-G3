@@ -16,7 +16,8 @@ from pyspark.sql import SparkSession
 
 spark = SparkSession.builder.getOrCreate()
 
-CATALOG = "g3_test"
+dbutils.widgets.dropdown("catalog", "g3_dev", ["g3_dev", "g3_test", "g3_catalog"])
+catalog = dbutils.widgets.get("catalog")
 DQ_RUN_ID = None
 
 
@@ -58,7 +59,7 @@ def get_dq_run_id():
     rows = sql(
         f"""
         SELECT run_id
-        FROM {CATALOG}.silver.quarantine_records
+        FROM {catalog}.silver.quarantine_records
         GROUP BY run_id
         ORDER BY MAX(detected_at) DESC, COUNT(*) DESC, run_id DESC
         LIMIT 1
@@ -76,17 +77,17 @@ print("=== M2 DQ/quarantine validation ===")
 
 fail_if_zero(
     "enabled DQ rules are loaded",
-    f"SELECT COUNT(*) FROM {CATALOG}.gov.dq_rules WHERE enabled = true",
+    f"SELECT COUNT(*) FROM {catalog}.gov.dq_rules WHERE enabled = true",
 )
 
 fail_if_rows(
     "manifest rule IDs exist in DQ registry",
     f"""
     WITH registry AS (
-      SELECT DISTINCT rule_id FROM {CATALOG}.gov.dq_rules WHERE enabled = true
+      SELECT DISTINCT rule_id FROM {catalog}.gov.dq_rules WHERE enabled = true
     ),
     manifest AS (
-      SELECT DISTINCT rule_id FROM {CATALOG}.bronze.defects_manifest
+      SELECT DISTINCT rule_id FROM {catalog}.bronze.defects_manifest
     )
     SELECT rule_id FROM manifest
     EXCEPT
@@ -98,10 +99,10 @@ warn_if_rows(
     "enabled DQ registry rules without manifest seed records",
     f"""
     WITH registry AS (
-      SELECT DISTINCT rule_id FROM {CATALOG}.gov.dq_rules WHERE enabled = true
+      SELECT DISTINCT rule_id FROM {catalog}.gov.dq_rules WHERE enabled = true
     ),
     manifest AS (
-      SELECT DISTINCT rule_id FROM {CATALOG}.bronze.defects_manifest
+      SELECT DISTINCT rule_id FROM {catalog}.bronze.defects_manifest
     )
     SELECT rule_id FROM registry
     EXCEPT
@@ -115,7 +116,7 @@ fail_if_zero(
     "quarantine rows for DQ run",
     f"""
     SELECT COUNT(*)
-    FROM {CATALOG}.silver.quarantine_records
+    FROM {catalog}.silver.quarantine_records
     WHERE run_id = '{dq_run_id}'
     """,
 )
@@ -124,7 +125,7 @@ fail_if_rows(
     "quarantine rows have required fields populated",
     f"""
     SELECT *
-    FROM {CATALOG}.silver.quarantine_records
+    FROM {catalog}.silver.quarantine_records
     WHERE run_id = '{dq_run_id}'
       AND (
         source_table IS NULL OR source_table = ''
@@ -142,11 +143,11 @@ summary = sql(
     f"""
     WITH manifest AS (
       SELECT rule_id, record_key
-      FROM {CATALOG}.bronze.defects_manifest
+      FROM {catalog}.bronze.defects_manifest
     ),
     quarantine AS (
       SELECT rule_id, record_key
-      FROM {CATALOG}.silver.quarantine_records
+      FROM {catalog}.silver.quarantine_records
       WHERE run_id = '{dq_run_id}'
     ),
     expected AS (

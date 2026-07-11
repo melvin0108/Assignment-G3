@@ -12,7 +12,8 @@ from pyspark.sql import SparkSession
 
 spark = SparkSession.builder.getOrCreate()
 
-CATALOG = "g3_test"
+dbutils.widgets.dropdown("catalog", "g3_dev", ["g3_dev", "g3_test", "g3_catalog"])
+catalog = dbutils.widgets.get("catalog")
 
 BRONZE_TABLES = [
     "accounts",
@@ -101,7 +102,7 @@ fail_if_rows(
     WITH expected(table_name) AS (VALUES {expected_bronze_values})
     SELECT e.table_name
     FROM expected e
-    LEFT JOIN {CATALOG}.information_schema.tables t
+    LEFT JOIN {catalog}.information_schema.tables t
       ON t.table_schema = 'bronze'
      AND t.table_name = e.table_name
     WHERE t.table_name IS NULL
@@ -116,7 +117,7 @@ fail_if_rows(
     SELECT t.table_name, c.column_name AS missing_column
     FROM expected_tables t
     CROSS JOIN expected_cols c
-    LEFT JOIN {CATALOG}.information_schema.columns actual
+    LEFT JOIN {catalog}.information_schema.columns actual
       ON actual.table_schema = 'bronze'
      AND actual.table_name = t.table_name
      AND actual.column_name = c.column_name
@@ -128,7 +129,7 @@ fail_if_rows(
 for table_name in ["transactions", "customers", "accounts", "cards", "defects_manifest"]:
     fail_if_zero(
         f"bronze.{table_name} has rows",
-        f"SELECT COUNT(*) FROM {CATALOG}.bronze.{table_name}",
+        f"SELECT COUNT(*) FROM {catalog}.bronze.{table_name}",
     )
 
 for table_name in INGESTED_BRONZE_TABLES:
@@ -136,7 +137,7 @@ for table_name in INGESTED_BRONZE_TABLES:
         f"bronze.{table_name} has valid file/batch lineage",
         f"""
         SELECT _source_file, _batch_id, _run_id
-        FROM {CATALOG}.bronze.{table_name}
+        FROM {catalog}.bronze.{table_name}
         WHERE _source_file IS NULL
            OR _batch_id IS NULL
            OR _run_id <> CONCAT('RUN-', LPAD(CAST(_batch_id AS STRING), 2, '0'))
@@ -149,7 +150,7 @@ for table_name in ["transactions", "customers", "accounts", "cards"]:
         f"bronze.{table_name} duplicate _record_hash sample",
         f"""
         SELECT _record_hash, COUNT(*) AS n
-        FROM {CATALOG}.bronze.{table_name}
+        FROM {catalog}.bronze.{table_name}
         GROUP BY _record_hash
         HAVING COUNT(*) > 1
         LIMIT 20
@@ -160,7 +161,7 @@ fail_if_rows(
     "defects manifest has no null/blank rule_id or record_key",
     f"""
     SELECT *
-    FROM {CATALOG}.bronze.defects_manifest
+    FROM {catalog}.bronze.defects_manifest
     WHERE rule_id IS NULL OR rule_id = ''
        OR record_key IS NULL OR record_key = ''
     LIMIT 20

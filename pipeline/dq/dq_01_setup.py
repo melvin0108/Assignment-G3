@@ -3,7 +3,7 @@
 # DQ scaffolding: create gov schema + gov.dq_rules + silver.quarantine_records
 # ----------------------------------------------------------------------------
 # PySpark port of pipeline/dq/01_setup.sql. The SQL is embedded VERBATIM; the
-# only runtime change is the catalog token swap g3_catalog -> g3_dev. The SQL
+# only runtime change is replacing the g3_catalog token with the selected catalog. The SQL
 # is split into statements with a string/comment-aware splitter and each
 # statement is run via spark.sql. This supersedes the earlier hand-chunked
 # version whose naive ';' split broke on semicolons inside string literals
@@ -16,7 +16,8 @@ from pyspark.sql import SparkSession
 # `spark` is pre-initialized in a Databricks notebook.
 spark = SparkSession.builder.getOrCreate()
 
-CATALOG = "g3_dev"
+dbutils.widgets.dropdown("catalog", "g3_dev", ["g3_dev", "g3_test", "g3_catalog"])
+catalog = dbutils.widgets.get("catalog")
 
 def _has_code(stmt):
     """True if the chunk has any SQL after stripping -- line comments, so a
@@ -183,8 +184,8 @@ SELECT 'silver.quarantine_records',        COUNT(*)           FROM g3_catalog.si
 
 
 def _run(stmt):
-    """Execute one statement with the catalog token swapped g3_catalog -> g3_dev."""
-    return spark.sql(stmt.replace("g3_catalog", CATALOG))
+    """Execute one statement with g3_catalog replaced by the selected catalog."""
+    return spark.sql(stmt.replace("g3_catalog", catalog))
 
 
 for _stmt in _statements(SQL):
