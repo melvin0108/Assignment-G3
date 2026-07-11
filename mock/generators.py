@@ -129,7 +129,10 @@ def gen_customers(ctx, n):
 
     # --- defects ---
     # 1) missing email
-    for idx in ctx.sample_indices(n, ctx.defect_count(n, 0.5)):
+    # Reserve CUST-0001 as a clean, deterministic SCD2 demonstration record.
+    defect_candidates = list(range(1, n))
+    missing_count = min(ctx.defect_count(n, 0.5), len(defect_candidates))
+    for idx in rng.sample(defect_candidates, missing_count):
         rows[idx]["email"] = ""
         man.add("customers", rows[idx]["customer_id"], "DQ-CUST-EMAIL-FMT",
                 "email must match pattern if present", "email is empty")
@@ -137,7 +140,10 @@ def gen_customers(ctx, n):
     # 2) exact duplicate customer_id (clone an existing row)
     next_extra = n + 1000
     for _ in range(ctx.defect_count(n, 0.3)):
-        src = rng.choice(rows[:max(1, n // 2)])
+        source_pool = rows[1:max(2, n // 2)]
+        if not source_pool:
+            break
+        src = rng.choice(source_pool)
         dup = dict(src)
         rows.append(dup)
         man.add("customers", src["customer_id"], "DQ-CUST-ID-DUP",
@@ -145,7 +151,10 @@ def gen_customers(ctx, n):
 
     # 3) near-duplicate (same name+dob+address+tax_id, new id)
     for j in range(ctx.defect_count(n, 0.3)):
-        src = rng.choice(rows[:max(1, n // 2)])
+        source_pool = rows[1:max(2, n // 2)]
+        if not source_pool:
+            break
+        src = rng.choice(source_pool)
         nid = seq_id(C.PFX["customer"], next_extra + j)
         dup = dict(src)
         dup["customer_id"] = nid

@@ -65,6 +65,15 @@ class ScdManifest:
     def count_for(self, table):
         return sum(1 for r in self.rows if r["source_table"] == table)
 
+    @classmethod
+    def read(cls, path):
+        """Load a previously-written oracle so later batches remain cumulative."""
+        manifest = cls()
+        if os.path.exists(path):
+            with open(path, newline="") as fh:
+                manifest.rows.extend(csv.DictReader(fh))
+        return manifest
+
     def write(self, path):
         with open(path, "w", newline="") as fh:
             w = csv.DictWriter(fh, fieldnames=[
@@ -127,7 +136,15 @@ def derive_snapshot(src_dir, snap_dir, snapshot_index, as_of_date, rate, seed, m
         if k <= 0:
             continue
 
-        for idx in sorted(rng.sample(eligible, k)):
+        required_keys = C.SCD2_REQUIRED_KEYS.get(dim, set())
+        required = [
+            i for i in eligible if rows[i][key_field] in required_keys
+        ]
+        required = required[:k]
+        remaining = [i for i in eligible if i not in set(required)]
+        selected = required + rng.sample(remaining, k - len(required))
+
+        for idx in sorted(selected):
             row = rows[idx]
             old = row[attr]
             new = _fresh_value(dim, faker, rng, old)

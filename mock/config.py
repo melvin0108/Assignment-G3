@@ -162,6 +162,9 @@ SCD2_MUTATIONS = {
     "cards": "status",          # card lifecycle (active -> blocked/closed)
     "merchants": "risk_rating", # merchant risk re-assessment (low -> high)
 }
+SCD2_REQUIRED_KEYS = {
+    "customers": {"CUST-0001"},  # deterministic end-to-end SCD2 demonstration
+}
 SCD2_RATE_DEFAULT = 0.02        # fraction of dim keys that change per snapshot
 
 # Snapshot as-of dates. T0 = RUN_DATE (unchanged from the single-run baseline);
