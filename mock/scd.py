@@ -11,9 +11,10 @@ recorded in `scd_changes_manifest.csv` (the oracle for the future Silver SCD2
 windowing step) and are deliberately kept disjoint from DefectManifest —
 defective dim rows are excluded from mutation so the two oracles never overlap.
 
-Bronze needs no change: its append + dedup-by-`_record_hash` keeps both versions
-of a mutated key (different content -> different hash) while collapsing every
-unchanged row (identical content -> identical hash -> deduped).
+Bronze needs no row-level deduplication: Auto Loader appends each unseen
+snapshot file in full and records a deterministic `_record_hash`. Silver uses
+the effective timestamp and hash to interpret SCD2 versions and repeated
+unchanged extracts.
 """
 import csv
 import os

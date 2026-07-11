@@ -39,11 +39,12 @@ BRONZE_TABLES = [
     "investigation_notes",
     "merchant_categories",
     "merchants",
+    "scd_changes_manifest",
     "transaction_devices",
     "transactions",
 ]
 
-INGESTED_BRONZE_TABLES = [t for t in BRONZE_TABLES if t != "defects_manifest"]
+INGESTED_BRONZE_TABLES = BRONZE_TABLES
 
 BRONZE_METADATA_COLS = [
     "_source_file",
@@ -128,6 +129,19 @@ for table_name in ["transactions", "customers", "accounts", "cards", "defects_ma
     fail_if_zero(
         f"bronze.{table_name} has rows",
         f"SELECT COUNT(*) FROM {CATALOG}.bronze.{table_name}",
+    )
+
+for table_name in INGESTED_BRONZE_TABLES:
+    fail_if_rows(
+        f"bronze.{table_name} has valid file/batch lineage",
+        f"""
+        SELECT _source_file, _batch_id, _run_id
+        FROM {CATALOG}.bronze.{table_name}
+        WHERE _source_file IS NULL
+           OR _batch_id IS NULL
+           OR _run_id <> CONCAT('RUN-', LPAD(CAST(_batch_id AS STRING), 2, '0'))
+        LIMIT 20
+        """,
     )
 
 for table_name in ["transactions", "customers", "accounts", "cards"]:
