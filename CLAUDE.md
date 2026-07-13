@@ -151,6 +151,7 @@ docs/
 ## Conventions
 
 - **Table/layer prefixes:** source tables are unprefixed and **plural** (`customers`, not `customer`) — the schema-adjustment-brief §1 mandates a single convention across source/bronze/silver/gold/DQ/lineage. Pipeline models use `raw__`, `silver__`, `gold__` (or dbt folders `raw/`, `silver/`, `gold/`).
+- **Ordered pipeline filenames:** runnable files that must execute in order within one folder use a two-digit numeric prefix, for example `01_silver_transactions.py`. Keep non-runnable templates unnumbered.
 - **Identifiers:** stable string keys (`customer_id`, `transaction_id`, `case_id`), built from `config.PFX` prefixes via `helpers.seq_id`. Surrogate hash keys only in silver/gold.
 - **Determinism:** all generators take a seed; reruns from the same seed reproduce the same defects (essential for tests).
 - **Timestamps:** store as ISO-8601 UTC (`helpers.iso` → `%Y-%m-%dT%H:%M:%SZ`); never rely on local time. Dates via `helpers.iso_date`.
