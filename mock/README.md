@@ -11,6 +11,23 @@ so `transactions` can scale to millions of rows.
 pip install -r requirements.txt   # just: Faker
 ```
 
+## Run on Databricks (no local step)
+
+Instead of running locally and uploading CSVs, generate straight into the bronze landing
+Volume from a Databricks notebook. It calls the *same* `mock/` generator with the same
+seed, so the output is byte-identical to a local run and bronze's `_record_hash` dedup
+treats a re-run as a no-op.
+
+1. In Databricks Repos, open `generate_mock_databricks.py` (repo root) on your personal
+   branch and **Pull**.
+2. **Run All** — the first cell installs Faker and restarts Python.
+3. Pick the catalog from the dropdown (`g3_dev` DEV / `g3_test` TEST / `g3_catalog` PROD)
+   and set `transactions` (default `200000`; `2000000` for the full baseline).
+
+CSVs (including `defects_manifest.csv`) are written flat to
+`/Volumes/{catalog}/bronze/raw_data/` — exactly where the bronze notebooks read.
+Design/detail: `docs/superpowers/specs/2026-07-10-mock-databricks-notebook-design.md`.
+
 ## Usage
 
 ```bash

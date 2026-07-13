@@ -3,7 +3,7 @@
 # DQ failures — ALL 35 rules -> silver.quarantine_records
 # ----------------------------------------------------------------------------
 # PySpark port of pipeline/dq/04_failures_all_rules.sql. The SQL is embedded VERBATIM; the
-# only runtime change is the catalog token swap g3_catalog -> g3_dev. The SQL
+# only runtime change is replacing the g3_catalog token with the selected catalog. The SQL
 # is split into statements with a string/comment-aware splitter and each
 # statement is run via spark.sql. This supersedes the earlier hand-chunked
 # version whose naive ';' split broke on semicolons inside string literals
@@ -16,7 +16,8 @@ from pyspark.sql import SparkSession
 # `spark` is pre-initialized in a Databricks notebook.
 spark = SparkSession.builder.getOrCreate()
 
-CATALOG = "g3_dev"
+dbutils.widgets.dropdown("catalog", "g3_dev", ["g3_dev", "g3_test", "g3_catalog"])
+catalog = dbutils.widgets.get("catalog")
 
 def _has_code(stmt):
     """True if the chunk has any SQL after stripping -- line comments, so a
@@ -275,6 +276,9 @@ WHERE status_code = 'open'
 -- ============================================================================
 
 -- DQ-CUST-ID-DUP — customer_id must be unique
+-- NOTE: partition by (customer_id, effective_at) so SCD2 version history (same
+-- customer_id, later effective_at) is NOT flagged as a dup. The injected defect
+-- is a verbatim copy (same customer_id AND same effective_at) -> still rn > 1.
 INSERT INTO g3_catalog.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
 SELECT 'RUN-20260708-DQ1','customers',_source_record_id,customer_id,
@@ -282,7 +286,7 @@ SELECT 'RUN-20260708-DQ1','customers',_source_record_id,customer_id,
        to_json(named_struct('customer_id',customer_id,'first_name',first_name,'last_name',last_name,'dob',dob)), current_timestamp()
 FROM (
   SELECT customer_id, _source_record_id, first_name, last_name, dob,
-         row_number() OVER (PARTITION BY customer_id ORDER BY _source_record_id) AS rn
+         row_number() OVER (PARTITION BY customer_id, effective_at ORDER BY _source_record_id) AS rn
   FROM g3_catalog.bronze.customers)
 WHERE rn > 1;
 
@@ -299,6 +303,9 @@ FROM (
 WHERE rn > 1;
 
 -- DQ-CARD-DUP — card_id must be unique
+-- NOTE: partition by (card_id, effective_at) so SCD2 version history (same
+-- card_id, later effective_at) is NOT flagged as a dup. The injected defect is
+-- a verbatim copy (same card_id AND same effective_at) -> still rn > 1.
 INSERT INTO g3_catalog.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
 SELECT 'RUN-20260708-DQ1','cards',_source_record_id,card_id,
@@ -306,7 +313,7 @@ SELECT 'RUN-20260708-DQ1','cards',_source_record_id,card_id,
        to_json(named_struct('card_id',card_id,'account_id',account_id,'expiry',expiry,'status',status)), current_timestamp()
 FROM (
   SELECT card_id, _source_record_id, account_id, expiry, status,
-         row_number() OVER (PARTITION BY card_id ORDER BY _source_record_id) AS rn
+         row_number() OVER (PARTITION BY card_id, effective_at ORDER BY _source_record_id) AS rn
   FROM g3_catalog.bronze.cards)
 WHERE rn > 1;
 
@@ -551,8 +558,8 @@ ORDER BY m.rule_id;
 
 
 def _run(stmt):
-    """Execute one statement with the catalog token swapped g3_catalog -> g3_dev."""
-    return spark.sql(stmt.replace("g3_catalog", CATALOG))
+    """Execute one statement with g3_catalog replaced by the selected catalog."""
+    return spark.sql(stmt.replace("g3_catalog", catalog))
 
 
 for _stmt in _statements(SQL):

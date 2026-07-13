@@ -186,6 +186,50 @@ SELECT
 FROM g3_catalog.bronze.investigation_notes;
 -- If quoting is fine: pii_prefix ≈ 750. If pii_prefix = 0 → the PII text was mangled away.
 
+
+-- ============================================================================
+-- (5) SCD2 guardrail for the duplicate rules (DQ-CUST-ID-DUP, DQ-CARD-DUP).
+--     dq_03 partitions those windows by (key, effective_at), so legitimate SCD2
+--     version history (same key, later effective_at) must NOT be quarantined —
+--     only the genuine injected dup (same key AND same effective_at) is caught.
+--     (5a)/(5b) confirm no SCD2 version leaked into quarantine; (5c) confirms
+--     the test is non-trivial by showing multi-version keys actually exist.
+
+-- (5a) DQ-CUST-ID-DUP — caught keys NOT explained by a defect = SCD2 leak.
+--      EXPECTED 0 rows. Any row here means an SCD2 customer version slipped
+--      through the (customer_id, effective_at) partition; re-check dq_03.
+SELECT 'DQ-CUST-ID-DUP' AS rule_id, q.record_key
+FROM (
+  SELECT DISTINCT record_key FROM g3_catalog.silver.quarantine_records
+  WHERE rule_id = 'DQ-CUST-ID-DUP' AND run_id = 'RUN-20260708-DQ1') q
+LEFT JOIN (
+  SELECT DISTINCT record_key FROM g3_catalog.bronze.defects_manifest
+  WHERE rule_id = 'DQ-CUST-ID-DUP') m ON q.record_key = m.record_key
+WHERE m.record_key IS NULL;
+
+-- (5b) DQ-CARD-DUP — same SCD2 leak check. EXPECTED 0 rows.
+SELECT 'DQ-CARD-DUP' AS rule_id, q.record_key
+FROM (
+  SELECT DISTINCT record_key FROM g3_catalog.silver.quarantine_records
+  WHERE rule_id = 'DQ-CARD-DUP' AND run_id = 'RUN-20260708-DQ1') q
+LEFT JOIN (
+  SELECT DISTINCT record_key FROM g3_catalog.bronze.defects_manifest
+  WHERE rule_id = 'DQ-CARD-DUP') m ON q.record_key = m.record_key
+WHERE m.record_key IS NULL;
+
+-- (5c) Confirm SCD2 versions exist in bronze for the two dims (so 5a/5b are
+--      meaningful). EXPECTED both > 0 once a T1+ snapshot has been ingested;
+--      = 0 means only a flat T0 batch was loaded (the guardrail is then trivial).
+SELECT 'customers' AS dim, COUNT(*) AS multi_version_keys
+FROM (
+  SELECT customer_id FROM g3_catalog.bronze.customers
+  GROUP BY customer_id HAVING COUNT(DISTINCT effective_at) > 1)
+UNION ALL
+SELECT 'cards', COUNT(*)
+FROM (
+  SELECT card_id FROM g3_catalog.bronze.cards
+  GROUP BY card_id HAVING COUNT(DISTINCT effective_at) > 1);
+
 """
 
 
