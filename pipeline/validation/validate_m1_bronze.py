@@ -169,3 +169,7 @@ fail_if_rows(
 )
 
 print("\nPASS: M1 Bronze validation completed with no blocking failures.")
+
+# COMMAND ----------
+
+
