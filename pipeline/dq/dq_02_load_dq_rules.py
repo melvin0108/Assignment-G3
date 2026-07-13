@@ -7,7 +7,7 @@
 # Mirrors silver_masking_policies.py / silver_metadata_lineage.py: build a
 # DataFrame from an explicit schema + a Python list, then saveAsTable(overwrite).
 # The 35 rows below are parsed verbatim from pipeline/dq/02_load_dq_rules.sql;
-# The target catalog is selected through the shared catalog widget.
+# The target catalog is selected through the team-standard catalog widget.
 # ============================================================================
 
 from pyspark.sql import SparkSession
@@ -19,8 +19,24 @@ spark = SparkSession.builder.getOrCreate()
 # ---------------------------------------------------------------------------
 # CONFIGURATION
 # ---------------------------------------------------------------------------
-dbutils.widgets.dropdown("catalog", "g3_dev", ["g3_dev", "g3_test", "g3_catalog"])
-catalog = dbutils.widgets.get("catalog")
+def _catalog_widget():
+    """Create the team-standard catalog widget and return its validated value.
+
+    Mirrors pipeline/bronze/autoloader_common.py: idempotent (reuses an existing
+    widget if a parent notebook or job parameter already set one) and validated
+    against the team's dev/test/prod catalogs (g3_dev / g3_test / g3_catalog).
+    """
+    try:
+        dbutils.widgets.get("catalog")
+    except Exception:
+        dbutils.widgets.dropdown("catalog", "g3_dev", ["g3_dev", "g3_test", "g3_catalog"])
+    catalog = dbutils.widgets.get("catalog")
+    if catalog not in {"g3_dev", "g3_test", "g3_catalog"}:
+        raise ValueError(f"Unsupported catalog: {catalog}")
+    return catalog
+
+
+catalog = _catalog_widget()
 SCHEMA = "gov"
 TABLE_NAME = "dq_rules"
 FULL_TABLE_NAME = f"{catalog}.{SCHEMA}.{TABLE_NAME}"
