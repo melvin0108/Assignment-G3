@@ -12,18 +12,30 @@
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
+from pyspark.dbutils import DBUtils
 from pyspark.sql.types import (
     StructType, StructField, StringType, IntegerType, TimestampType, DoubleType
 )
 
-# In a Databricks notebook, `spark` is already available.
-# This line is only needed if you're running outside a notebook context.
-# spark = SparkSession.builder.getOrCreate()
+# In a Databricks notebook, this returns the pre-initialized session.
+spark = SparkSession.builder.getOrCreate()
+dbutils = DBUtils(spark)
+
+
+def _catalog_widget():
+    try:
+        dbutils.widgets.get("catalog")
+    except Exception:
+        dbutils.widgets.dropdown("catalog", "g3_dev", ["g3_dev", "g3_test", "g3_catalog"])
+    catalog = dbutils.widgets.get("catalog")
+    if catalog not in {"g3_dev", "g3_test", "g3_catalog"}:
+        raise ValueError(f"Unsupported catalog: {catalog}")
+    return catalog
 
 # ---------------------------------------------------------------------------
 # CONFIG — edit these
 # ---------------------------------------------------------------------------
-CATALOG = "main"                 # Unity Catalog catalog name (or omit if not using UC)
+CATALOG = _catalog_widget()
 SCHEMA = "default"               # database / schema name
 TABLE_NAME = "my_table"
 FULL_TABLE_NAME = f"{CATALOG}.{SCHEMA}.{TABLE_NAME}"

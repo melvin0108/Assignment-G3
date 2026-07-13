@@ -1,12 +1,13 @@
 # Databricks notebook source
 # ============================================================================
-# SILVER TRANSFORMATION & DATA QUALITY PIPELINE: customer_contact_logs
+# SILVER TRANSFORMATION & DATA QUALITY PIPELINE: accounts
 # ============================================================================
-# Implements Bronze -> Silver transformation for the customer_contact_logs dataset:
-#   1. Reads from bronze.customer_contact_logs
-#   2. Enforces Data Quality (DQ) rules and identifies failures
-#   3. Quarantines failed records to silver.quarantine_records
-#   4. Writes clean records to silver.customer_contact_logs
+# Implements Bronze -> Silver transformation for the accounts dataset:
+#   1. Reads from bronze.accounts
+#   2. Performs referential integrity checks against silver.customers
+#   3. Enforces Data Quality (DQ) rules and identifies failures
+#   4. Quarantines failed records to silver.quarantine_records
+#   5. Writes clean records to silver.accounts
 # ============================================================================
 
 from pyspark.sql import SparkSession
@@ -14,17 +15,30 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import (
     StructType, StructField, StringType, IntegerType, TimestampType, DoubleType
 )
+from pyspark.dbutils import DBUtils
 
 # In a Databricks environment, `spark` is pre-initialized.
 # This line gets the existing session or initializes one.
 spark = SparkSession.builder.getOrCreate()
+dbutils = DBUtils(spark)
 
 # ---------------------------------------------------------------------------
 # CONFIGURATION
 # ---------------------------------------------------------------------------
-CATALOG = "g3_dev"
+def _catalog_widget():
+    try:
+        dbutils.widgets.get("catalog")
+    except Exception:
+        dbutils.widgets.dropdown("catalog", "g3_dev", ["g3_dev", "g3_test", "g3_catalog"])
+    catalog = dbutils.widgets.get("catalog")
+    if catalog not in {"g3_dev", "g3_test", "g3_catalog"}:
+        raise ValueError(f"Unsupported catalog: {catalog}")
+    return catalog
+
+
+CATALOG = _catalog_widget()
 SCHEMA = "silver"
-TABLE_NAME = "customer_contact_logs"
+TABLE_NAME = "accounts"
 FULL_TABLE_NAME = f"{CATALOG}.{SCHEMA}.{TABLE_NAME}"
 BRONZE_TABLE_NAME = f"{CATALOG}.bronze.{TABLE_NAME}"
 QUARANTINE_TABLE_NAME = f"{CATALOG}.{SCHEMA}.quarantine_records"
@@ -33,45 +47,56 @@ RUN_ID = "RUN-20260706-1"  # Run ID used to track this execution batch
 # ---------------------------------------------------------------------------
 # 1. LOAD BRONZE DATA
 # ---------------------------------------------------------------------------
+# Load raw conformed data from Bronze
 print(f"Reading from Bronze table: {BRONZE_TABLE_NAME}")
 df = spark.read.table(BRONZE_TABLE_NAME)
+
+# Load clean customers from Silver to perform referential integrity (FK) check
+print(f"Reading from Silver customers for FK validation...")
+customers_df = spark.read.table(f"{CATALOG}.{SCHEMA}.customers").select("customer_id").distinct()
 
 # ---------------------------------------------------------------------------
 # 2. RUN DQ RULES & IDENTIFY FAILURES (QUARANTINE)
 # ---------------------------------------------------------------------------
+# Left join with customers to check if customer_id exists
+df_joined = df.join(
+    customers_df.withColumn("cust_exists", F.lit(True)),
+    on="customer_id",
+    how="left"
+)
+
 # DQ conditions
-is_dnc_violation = (F.col("direction") == "outbound") & (F.col("do_not_contact") == "true")
+is_future_date = (F.col("open_date").isNotNull()) & (F.col("open_date") != "") & (
+            F.col("open_date").cast("date") > F.lit("2026-07-06").cast("date"))
+is_missing_fk = F.col("customer_id").isNotNull() & F.col("cust_exists").isNull()
 
-# Regex pattern matching email, phone number (+d{6,15}), card/PAN (13-19 digits, or 4 blocks of 4 digits)
-regex_pattern = r'([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})|(\+\d{6,15})|(\b\d{13,19}\b)|(\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b)'
-is_pii_leak = F.col("note").rlike(regex_pattern)
+# DQ failure expressions aligning with gov.dq_rules
+rule_id_expr = F.when(is_future_date, "DQ-ACC-OPENDATE-FUTURE") \
+    .when(is_missing_fk, "DQ-ACC-CUST-FK")
 
-# DQ failure expressions aligning with gov.dq_rules / dq_failures SQL
-rule_id_expr = F.when(is_dnc_violation, "DQ-CTL-DNC-VIOLATION") \
-                .when(is_pii_leak, "DQ-CTL-NOTE-PII")
+rule_name_expr = F.when(is_future_date, "open_date must not be in the future") \
+    .when(is_missing_fk, "customer_id must exist in customers")
 
-rule_name_expr = F.when(is_dnc_violation, "no outbound contact when do_not_contact=true") \
-                  .when(is_pii_leak, "note must not contain raw PII/PAN")
-
-failure_reason_expr = F.when(is_dnc_violation, F.lit("DNC business-rule break")) \
-                      .when(is_pii_leak, F.lit("leaked PII in contact note"))
+failure_reason_expr = F.when(is_future_date, F.concat(F.lit("open_date in the future: "), F.col("open_date"))) \
+    .when(is_missing_fk, F.concat(F.lit("Referential integrity break: customer_id "), F.col("customer_id"),
+                                  F.lit(" not found in silver.customers")))
 
 # Filter out failed records for quarantine
-failed_df = df.filter(is_dnc_violation | is_pii_leak)
+failed_df = df_joined.filter(is_future_date | is_missing_fk)
 
 # Structure the quarantined DataFrame matching silver.quarantine_records schema
 quarantine_df = failed_df.select(
     F.lit(RUN_ID).alias("run_id"),
-    F.lit("customer_contact_logs").alias("source_table"),
+    F.lit("accounts").alias("source_table"),
     F.col("_source_record_id").alias("source_record_id"),
-    F.col("contact_id").alias("record_key"),
+    F.col("account_id").alias("record_key"),
     rule_id_expr.alias("rule_id"),
     rule_name_expr.alias("rule_name"),
     failure_reason_expr.alias("failure_reason"),
     F.lit("quarantine").alias("severity"),
     F.lit("quarantined").alias("disposition"),
     F.to_json(F.struct(
-        "contact_id", "customer_id", "direction", "contact_method", "do_not_contact", "contacted_at", "employee_id", "note"
+        "account_id", "customer_id", "product_type", "open_date", "status", "currency"
     )).alias("raw_record"),
     F.current_timestamp().alias("detected_at")
 )
@@ -84,10 +109,10 @@ spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SCHEMA}")
 
 # Idempotent write: clean up this run's prior quarantine rows first
 try:
-    print(f"Cleaning prior quarantine records for customer_contact_logs under run {RUN_ID}...")
+    print(f"Cleaning prior quarantine records for accounts under run {RUN_ID}...")
     spark.sql(f"""
         DELETE FROM {QUARANTINE_TABLE_NAME} 
-        WHERE source_table = 'customer_contact_logs' AND run_id = '{RUN_ID}'
+        WHERE source_table = 'accounts' AND run_id = '{RUN_ID}'
     """)
 except Exception as e:
     print(f"Quarantine delete skipped (table might not exist yet): {e}")
@@ -106,22 +131,20 @@ else:
 # 4. FILTER CLEAN RECORDS
 # ---------------------------------------------------------------------------
 # Get clean records using a left anti-join on _source_record_id
-clean_df = df.join(
+clean_df = df_joined.join(
     failed_df,
     on="_source_record_id",
     how="left_anti"
 )
 
 # Construct Silver DataFrame
-silver_customer_contact_logs_df = clean_df.select(
-    F.col("contact_id"),
+silver_accounts_df = clean_df.select(
+    F.col("account_id"),
     F.col("customer_id"),
-    F.col("direction"),
-    F.col("contact_method"),
-    F.col("do_not_contact").cast("boolean").alias("do_not_contact"),
-    F.col("contacted_at").cast("timestamp").alias("contacted_at"),
-    F.col("employee_id"),
-    F.col("note"),
+    F.col("product_type"),
+    F.col("open_date").cast("date").alias("open_date"),
+    F.col("status"),
+    F.col("currency"),
     F.col("_source_file"),
     F.col("_source_file_mod_time").cast("timestamp").alias("_source_file_mod_time"),
     F.col("_ingest_ts").cast("timestamp").alias("_ingest_ts"),
@@ -132,11 +155,11 @@ silver_customer_contact_logs_df = clean_df.select(
 )
 
 # ---------------------------------------------------------------------------
-# 5. WRITE CLEAN SILVER CUSTOMER_CONTACT_LOGS TABLE
+# 5. WRITE CLEAN SILVER ACCOUNTS TABLE
 # ---------------------------------------------------------------------------
 print(f"Writing clean records to Silver table: {FULL_TABLE_NAME}")
 (
-    silver_customer_contact_logs_df.write
+    silver_accounts_df.write
     .format("delta")
     .mode("overwrite")
     .option("overwriteSchema", "true")
@@ -148,6 +171,6 @@ print(f"Table created/updated successfully: {FULL_TABLE_NAME}")
 # ---------------------------------------------------------------------------
 # 6. VERIFY & DESCRIBE
 # ---------------------------------------------------------------------------
-print("\nVerifying Silver Customer Contact Logs:")
+print("\nVerifying Silver Accounts:")
 spark.sql(f"SELECT * FROM {FULL_TABLE_NAME} LIMIT 10").show()
 spark.sql(f"DESCRIBE TABLE {FULL_TABLE_NAME}").show(truncate=False)

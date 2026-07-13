@@ -7,15 +7,28 @@
 
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, StringType
+from pyspark.dbutils import DBUtils
 
 # In a Databricks environment, `spark` is pre-initialized.
 # This line gets the existing session or initializes one.
 spark = SparkSession.builder.getOrCreate()
+dbutils = DBUtils(spark)
 
 # ---------------------------------------------------------------------------
 # CONFIGURATION
 # ---------------------------------------------------------------------------
-CATALOG = "g3_dev"
+def _catalog_widget():
+    try:
+        dbutils.widgets.get("catalog")
+    except Exception:
+        dbutils.widgets.dropdown("catalog", "g3_dev", ["g3_dev", "g3_test", "g3_catalog"])
+    catalog = dbutils.widgets.get("catalog")
+    if catalog not in {"g3_dev", "g3_test", "g3_catalog"}:
+        raise ValueError(f"Unsupported catalog: {catalog}")
+    return catalog
+
+
+CATALOG = _catalog_widget()
 SCHEMA = "gov"
 TABLE_NAME = "metadata_lineage"
 FULL_TABLE_NAME = f"{CATALOG}.{SCHEMA}.{TABLE_NAME}"
@@ -35,17 +48,17 @@ schema = StructType([
 
 # Define metadata lineage rows
 data = [
-    ("g3_dev", "bronze", "customers", "customer_id", "g3_dev", "silver", "customers", "customer_id", "Direct copy"),
-    ("g3_dev", "bronze", "customers", "first_name", "g3_dev", "silver", "customers", "first_name", "Tokenized with SHA256 and salt"),
-    ("g3_dev", "bronze", "customers", "last_name", "g3_dev", "silver", "customers", "last_name", "Tokenized with SHA256 and salt"),
-    ("g3_dev", "bronze", "customers", "dob", "g3_dev", "silver", "customers", "dob", "Generalized into age bands based on RUN_DATE"),
-    ("g3_dev", "bronze", "customers", "email", "g3_dev", "silver", "customers", "email", "Masked first character + domain replace"),
-    ("g3_dev", "bronze", "customers", "phone", "g3_dev", "silver", "customers", "phone", "Masked keeping last 4 digits only"),
-    ("g3_dev", "bronze", "customers", "address", "g3_dev", "silver", "customers", "address", "Hashed with SHA256 and salt"),
-    ("g3_dev", "bronze", "customers", "tax_id", "g3_dev", "silver", "customers", "tax_id", "Hashed with SHA256 and salt"),
-    ("g3_dev", "bronze", "cards", "pan", "g3_dev", "silver", "cards", "pan", "Masked showing last 4 digits only"),
-    ("g3_dev", "bronze", "employees", "full_name", "g3_dev", "silver", "employees", "full_name", "Hashed with SHA256 and salt"),
-    ("g3_dev", "bronze", "employees", "email", "g3_dev", "silver", "employees", "email", "Hashed with SHA256 and salt")
+    (CATALOG, "bronze", "customers", "customer_id", CATALOG, "silver", "customers", "customer_id", "Direct copy"),
+    (CATALOG, "bronze", "customers", "first_name", CATALOG, "silver", "customers", "first_name", "Tokenized with SHA256 and salt"),
+    (CATALOG, "bronze", "customers", "last_name", CATALOG, "silver", "customers", "last_name", "Tokenized with SHA256 and salt"),
+    (CATALOG, "bronze", "customers", "dob", CATALOG, "silver", "customers", "dob", "Generalized into age bands based on RUN_DATE"),
+    (CATALOG, "bronze", "customers", "email", CATALOG, "silver", "customers", "email", "Masked first character + domain replace"),
+    (CATALOG, "bronze", "customers", "phone", CATALOG, "silver", "customers", "phone", "Masked keeping last 4 digits only"),
+    (CATALOG, "bronze", "customers", "address", CATALOG, "silver", "customers", "address", "Hashed with SHA256 and salt"),
+    (CATALOG, "bronze", "customers", "tax_id", CATALOG, "silver", "customers", "tax_id", "Hashed with SHA256 and salt"),
+    (CATALOG, "bronze", "cards", "pan", CATALOG, "silver", "cards", "pan", "Masked showing last 4 digits only"),
+    (CATALOG, "bronze", "employees", "full_name", CATALOG, "silver", "employees", "full_name", "Hashed with SHA256 and salt"),
+    (CATALOG, "bronze", "employees", "email", CATALOG, "silver", "employees", "email", "Hashed with SHA256 and salt"),
 ]
 
 # Create DataFrame

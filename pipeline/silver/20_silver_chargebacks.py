@@ -1,13 +1,13 @@
 # Databricks notebook source
 # ============================================================================
-# SILVER TRANSFORMATION & DATA QUALITY PIPELINE: accounts
+# SILVER TRANSFORMATION & DATA QUALITY PIPELINE: chargebacks
 # ============================================================================
-# Implements Bronze -> Silver transformation for the accounts dataset:
-#   1. Reads from bronze.accounts
-#   2. Performs referential integrity checks against silver.customers
+# Implements Bronze -> Silver transformation for the chargebacks dataset:
+#   1. Reads from bronze.chargebacks
+#   2. Performs referential integrity checks against disputes
 #   3. Enforces Data Quality (DQ) rules and identifies failures
 #   4. Quarantines failed records to silver.quarantine_records
-#   5. Writes clean records to silver.accounts
+#   5. Writes clean records to silver.chargebacks
 # ============================================================================
 
 from pyspark.sql import SparkSession
@@ -15,75 +15,85 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import (
     StructType, StructField, StringType, IntegerType, TimestampType, DoubleType
 )
+from pyspark.dbutils import DBUtils
 
 # In a Databricks environment, `spark` is pre-initialized.
 # This line gets the existing session or initializes one.
 spark = SparkSession.builder.getOrCreate()
+dbutils = DBUtils(spark)
 
 # ---------------------------------------------------------------------------
 # CONFIGURATION
 # ---------------------------------------------------------------------------
-CATALOG = "g3_dev"
+def _catalog_widget():
+    try:
+        dbutils.widgets.get("catalog")
+    except Exception:
+        dbutils.widgets.dropdown("catalog", "g3_dev", ["g3_dev", "g3_test", "g3_catalog"])
+    catalog = dbutils.widgets.get("catalog")
+    if catalog not in {"g3_dev", "g3_test", "g3_catalog"}:
+        raise ValueError(f"Unsupported catalog: {catalog}")
+    return catalog
+
+
+CATALOG = _catalog_widget()
 SCHEMA = "silver"
-TABLE_NAME = "accounts"
+TABLE_NAME = "chargebacks"
 FULL_TABLE_NAME = f"{CATALOG}.{SCHEMA}.{TABLE_NAME}"
 BRONZE_TABLE_NAME = f"{CATALOG}.bronze.{TABLE_NAME}"
 QUARANTINE_TABLE_NAME = f"{CATALOG}.{SCHEMA}.quarantine_records"
 RUN_ID = "RUN-20260706-1"  # Run ID used to track this execution batch
 
 # ---------------------------------------------------------------------------
-# 1. LOAD BRONZE DATA
+# 1. LOAD BRONZE DATA & REFERENCES
 # ---------------------------------------------------------------------------
-# Load raw conformed data from Bronze
 print(f"Reading from Bronze table: {BRONZE_TABLE_NAME}")
 df = spark.read.table(BRONZE_TABLE_NAME)
 
-# Load clean customers from Silver to perform referential integrity (FK) check
-print(f"Reading from Silver customers for FK validation...")
-customers_df = spark.read.table(f"{CATALOG}.{SCHEMA}.customers").select("customer_id").distinct()
+# Load disputes for referential integrity (FK) check.
+# Try silver first, fall back to bronze if silver is not available yet.
+print("Loading disputes reference table...")
+try:
+    disputes_df = spark.read.table(f"{CATALOG}.{SCHEMA}.disputes").select("dispute_id").distinct()
+    print("Using silver.disputes for FK validation.")
+except Exception as e:
+    print(f"Silver disputes not found, falling back to bronze: {e}")
+    disputes_df = spark.read.table(f"{CATALOG}.bronze.disputes").select("dispute_id").distinct()
 
 # ---------------------------------------------------------------------------
 # 2. RUN DQ RULES & IDENTIFY FAILURES (QUARANTINE)
 # ---------------------------------------------------------------------------
-# Left join with customers to check if customer_id exists
+# Left join with disputes to check if dispute_id exists
 df_joined = df.join(
-    customers_df.withColumn("cust_exists", F.lit(True)),
-    on="customer_id",
+    disputes_df.withColumn("disp_exists", F.lit(True)),
+    on="dispute_id",
     how="left"
 )
 
 # DQ conditions
-is_future_date = (F.col("open_date").isNotNull()) & (F.col("open_date") != "") & (
-            F.col("open_date").cast("date") > F.lit("2026-07-06").cast("date"))
-is_missing_fk = F.col("customer_id").isNotNull() & F.col("cust_exists").isNull()
+is_missing_fk = F.col("dispute_id").isNotNull() & F.col("disp_exists").isNull()
 
-# DQ failure expressions aligning with gov.dq_rules
-rule_id_expr = F.when(is_future_date, "DQ-ACC-OPENDATE-FUTURE") \
-    .when(is_missing_fk, "DQ-ACC-CUST-FK")
-
-rule_name_expr = F.when(is_future_date, "open_date must not be in the future") \
-    .when(is_missing_fk, "customer_id must exist in customers")
-
-failure_reason_expr = F.when(is_future_date, F.concat(F.lit("open_date in the future: "), F.col("open_date"))) \
-    .when(is_missing_fk, F.concat(F.lit("Referential integrity break: customer_id "), F.col("customer_id"),
-                                  F.lit(" not found in silver.customers")))
+# DQ failure expressions aligning with gov.dq_rules / dq_failures SQL
+rule_id_expr = F.when(is_missing_fk, "DQ-CBK-DISP-FK")
+rule_name_expr = F.when(is_missing_fk, "dispute_id must exist in disputes")
+failure_reason_expr = F.when(is_missing_fk, F.lit("orphan dispute_id"))
 
 # Filter out failed records for quarantine
-failed_df = df_joined.filter(is_future_date | is_missing_fk)
+failed_df = df_joined.filter(is_missing_fk)
 
 # Structure the quarantined DataFrame matching silver.quarantine_records schema
 quarantine_df = failed_df.select(
     F.lit(RUN_ID).alias("run_id"),
-    F.lit("accounts").alias("source_table"),
+    F.lit("chargebacks").alias("source_table"),
     F.col("_source_record_id").alias("source_record_id"),
-    F.col("account_id").alias("record_key"),
+    F.col("chargeback_id").alias("record_key"),
     rule_id_expr.alias("rule_id"),
     rule_name_expr.alias("rule_name"),
     failure_reason_expr.alias("failure_reason"),
     F.lit("quarantine").alias("severity"),
     F.lit("quarantined").alias("disposition"),
     F.to_json(F.struct(
-        "account_id", "customer_id", "product_type", "open_date", "status", "currency"
+        "chargeback_id", "dispute_id", "stage"
     )).alias("raw_record"),
     F.current_timestamp().alias("detected_at")
 )
@@ -96,10 +106,10 @@ spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SCHEMA}")
 
 # Idempotent write: clean up this run's prior quarantine rows first
 try:
-    print(f"Cleaning prior quarantine records for accounts under run {RUN_ID}...")
+    print(f"Cleaning prior quarantine records for chargebacks under run {RUN_ID}...")
     spark.sql(f"""
         DELETE FROM {QUARANTINE_TABLE_NAME} 
-        WHERE source_table = 'accounts' AND run_id = '{RUN_ID}'
+        WHERE source_table = 'chargebacks' AND run_id = '{RUN_ID}'
     """)
 except Exception as e:
     print(f"Quarantine delete skipped (table might not exist yet): {e}")
@@ -125,13 +135,13 @@ clean_df = df_joined.join(
 )
 
 # Construct Silver DataFrame
-silver_accounts_df = clean_df.select(
-    F.col("account_id"),
-    F.col("customer_id"),
-    F.col("product_type"),
-    F.col("open_date").cast("date").alias("open_date"),
-    F.col("status"),
-    F.col("currency"),
+silver_chargebacks_df = clean_df.select(
+    F.col("chargeback_id"),
+    F.col("dispute_id"),
+    F.col("scheme"),
+    F.col("amount").cast("double").alias("amount"),
+    F.col("stage"),
+    F.col("processed_at").cast("timestamp").alias("processed_at"),
     F.col("_source_file"),
     F.col("_source_file_mod_time").cast("timestamp").alias("_source_file_mod_time"),
     F.col("_ingest_ts").cast("timestamp").alias("_ingest_ts"),
@@ -142,11 +152,11 @@ silver_accounts_df = clean_df.select(
 )
 
 # ---------------------------------------------------------------------------
-# 5. WRITE CLEAN SILVER ACCOUNTS TABLE
+# 5. WRITE CLEAN SILVER CHARGEBACKS TABLE
 # ---------------------------------------------------------------------------
 print(f"Writing clean records to Silver table: {FULL_TABLE_NAME}")
 (
-    silver_accounts_df.write
+    silver_chargebacks_df.write
     .format("delta")
     .mode("overwrite")
     .option("overwriteSchema", "true")
@@ -158,6 +168,6 @@ print(f"Table created/updated successfully: {FULL_TABLE_NAME}")
 # ---------------------------------------------------------------------------
 # 6. VERIFY & DESCRIBE
 # ---------------------------------------------------------------------------
-print("\nVerifying Silver Accounts:")
+print("\nVerifying Silver Chargebacks:")
 spark.sql(f"SELECT * FROM {FULL_TABLE_NAME} LIMIT 10").show()
 spark.sql(f"DESCRIBE TABLE {FULL_TABLE_NAME}").show(truncate=False)

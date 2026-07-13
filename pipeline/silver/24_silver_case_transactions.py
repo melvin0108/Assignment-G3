@@ -15,15 +15,28 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import (
     StructType, StructField, StringType, IntegerType, TimestampType, DoubleType
 )
+from pyspark.dbutils import DBUtils
 
 # In a Databricks environment, `spark` is pre-initialized.
 # This line gets the existing session or initializes one.
 spark = SparkSession.builder.getOrCreate()
+dbutils = DBUtils(spark)
 
 # ---------------------------------------------------------------------------
 # CONFIGURATION
 # ---------------------------------------------------------------------------
-CATALOG = "g3_dev"
+def _catalog_widget():
+    try:
+        dbutils.widgets.get("catalog")
+    except Exception:
+        dbutils.widgets.dropdown("catalog", "g3_dev", ["g3_dev", "g3_test", "g3_catalog"])
+    catalog = dbutils.widgets.get("catalog")
+    if catalog not in {"g3_dev", "g3_test", "g3_catalog"}:
+        raise ValueError(f"Unsupported catalog: {catalog}")
+    return catalog
+
+
+CATALOG = _catalog_widget()
 SCHEMA = "silver"
 TABLE_NAME = "case_transactions"
 FULL_TABLE_NAME = f"{CATALOG}.{SCHEMA}.{TABLE_NAME}"
