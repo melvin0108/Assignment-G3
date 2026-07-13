@@ -73,7 +73,7 @@ Legend — **PII**: 🔴 high · 🟠 medium · ⚪ none. **DQ defects** are int
 | `case_transactions` | one row per case↔txn link | Bridge | ⚪ | orphan keys |
 | `case_parties` | one row per case↔party link | Bridge (conditional RI) | 🟠 | invalid `party_type`; unresolvable `party_id` |
 
-> **Count:** A–D = **22 source tables** (satisfies 20–30). `currencies`, `branches`, `auth_attempts` are easiest to drop to trim; bridges/`transaction_devices` easiest to add weight.
+> **Count:** A–D = **25 source tables** (satisfies 20–30). `currencies`, `branches`, `auth_attempts` are easiest to drop to trim; bridges/`transaction_devices` easiest to add weight.
 
 ### E. Governance (pipeline-emitted — not mocked)
 | Table | Purpose |

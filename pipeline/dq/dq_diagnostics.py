@@ -3,7 +3,7 @@
 # Read-only reconciliation diagnostics (run on Serverless/Pro)
 # ----------------------------------------------------------------------------
 # PySpark port of pipeline/dq/diagnostics.sql. The SQL is embedded VERBATIM; the
-# only runtime change is the catalog token swap g3_catalog -> g3_dev. The SQL
+# only runtime change is the __CATALOG__ token replaced by the selected catalog. The SQL
 # is split into statements with a string/comment-aware splitter and each
 # statement is run via spark.sql. This supersedes the earlier hand-chunked
 # version whose naive ';' split broke on semicolons inside string literals
@@ -16,7 +16,24 @@ from pyspark.sql import SparkSession
 # `spark` is pre-initialized in a Databricks notebook.
 spark = SparkSession.builder.getOrCreate()
 
-CATALOG = "g3_dev"
+def _catalog_widget():
+    """Create the team-standard catalog widget and return its validated value.
+
+    Mirrors pipeline/bronze/autoloader_common.py: idempotent (reuses an existing
+    widget if a parent notebook or job parameter already set one) and validated
+    against the team's dev/test/prod catalogs (g3_dev / g3_test / g3_catalog).
+    """
+    try:
+        dbutils.widgets.get("catalog")
+    except Exception:
+        dbutils.widgets.dropdown("catalog", "g3_dev", ["g3_dev", "g3_test", "g3_catalog"])
+    catalog = dbutils.widgets.get("catalog")
+    if catalog not in {"g3_dev", "g3_test", "g3_catalog"}:
+        raise ValueError(f"Unsupported catalog: {catalog}")
+    return catalog
+
+
+catalog = _catalog_widget()
 
 def _has_code(stmt):
     """True if the chunk has any SQL after stripping -- line comments, so a
@@ -110,13 +127,13 @@ SQL = r"""
 SELECT
   COUNT(*)                                                   AS cbk_rows,
   SUM(CASE WHEN dispute_id = 'DSP-9999' THEN 1 ELSE 0 END)  AS dsp9999_in_chargebacks
-FROM g3_catalog.bronze.chargebacks;
+FROM __CATALOG__.bronze.chargebacks;
 -- EXPECTED: cbk_rows > 0 AND dsp9999_in_chargebacks = 480.
 --   cbk_rows = 0            → chargebacks.csv not uploaded/loaded (re-upload + re-COPY).
 --   dsp9999 = 0, rows > 0   → loaded CSV is stale vs the current manifest (regenerate/re-upload).
 
 SELECT COUNT(*) AS dsp9999_in_disputes
-FROM g3_catalog.bronze.disputes
+FROM __CATALOG__.bronze.disputes
 WHERE dispute_id = 'DSP-9999';
 -- EXPECTED 0. If >0 the anti-join matched and DSP-9999 unexpectedly resolves.
 
@@ -126,19 +143,19 @@ WHERE dispute_id = 'DSP-9999';
 --     real-but-unlogged base-data violations, not a query bug. EXPECTED = 540 and 120.
 SELECT 'DQ-CARD-EXPIRED-ACTIVE' AS rule_id, COUNT(*) AS logged_keys_caught
 FROM (
-  SELECT DISTINCT record_key FROM g3_catalog.bronze.defects_manifest
+  SELECT DISTINCT record_key FROM __CATALOG__.bronze.defects_manifest
   WHERE rule_id = 'DQ-CARD-EXPIRED-ACTIVE'
     AND record_key IN (
-      SELECT DISTINCT record_key FROM g3_catalog.silver.quarantine_records
+      SELECT DISTINCT record_key FROM __CATALOG__.silver.quarantine_records
       WHERE rule_id = 'DQ-CARD-EXPIRED-ACTIVE' AND run_id = 'RUN-20260708-DQ1')
 ) z
 UNION ALL
 SELECT 'DQ-CASE-STALE', COUNT(*)
 FROM (
-  SELECT DISTINCT record_key FROM g3_catalog.bronze.defects_manifest
+  SELECT DISTINCT record_key FROM __CATALOG__.bronze.defects_manifest
   WHERE rule_id = 'DQ-CASE-STALE'
     AND record_key IN (
-      SELECT DISTINCT record_key FROM g3_catalog.silver.quarantine_records
+      SELECT DISTINCT record_key FROM __CATALOG__.silver.quarantine_records
       WHERE rule_id = 'DQ-CASE-STALE' AND run_id = 'RUN-20260708-DQ1')
 ) z;
 
@@ -150,16 +167,16 @@ FROM (
 -- STATUS-ENUM: missed cases whose status_code is no longer 'on_hold'
 -- (overwritten to a valid value by the STALE or LEGALHOLD defect).
 SELECT m.record_key AS case_id, c.status_code
-FROM (SELECT DISTINCT record_key FROM g3_catalog.bronze.defects_manifest WHERE rule_id='DQ-CASE-STATUS-ENUM') m
-JOIN g3_catalog.bronze.investigation_cases c ON m.record_key = c.case_id
+FROM (SELECT DISTINCT record_key FROM __CATALOG__.bronze.defects_manifest WHERE rule_id='DQ-CASE-STATUS-ENUM') m
+JOIN __CATALOG__.bronze.investigation_cases c ON m.record_key = c.case_id
 WHERE c.status_code IN ('open','in_progress','suspended','closed');
 -- EXPECTED ~6 rows whose status_code is NOT 'on_hold' (the violation was masked).
 
 -- CASEPARTY-RESOLVE: missed rows whose party_type is no longer 'customer'
 -- (overwritten to 'suspect' by the TYPE-ENUM defect).
 SELECT m.record_key, cp.party_type, cp.party_id
-FROM (SELECT DISTINCT record_key FROM g3_catalog.bronze.defects_manifest WHERE rule_id='DQ-CASEPARTY-RESOLVE') m
-JOIN g3_catalog.bronze.case_parties cp
+FROM (SELECT DISTINCT record_key FROM __CATALOG__.bronze.defects_manifest WHERE rule_id='DQ-CASEPARTY-RESOLVE') m
+JOIN __CATALOG__.bronze.case_parties cp
   ON cp.case_id    = SPLIT(m.record_key,'\\|')[0]
  AND cp.party_type = SPLIT(m.record_key,'\\|')[1]
 WHERE cp.party_type <> 'customer';
@@ -174,8 +191,8 @@ WHERE cp.party_type <> 'customer';
 
 -- (a) Are the PII-leak notes present, and what does note_text actually look like?
 SELECT m.record_key AS note_id, n.note_text, LENGTH(n.note_text) AS txt_len
-FROM (SELECT DISTINCT record_key FROM g3_catalog.bronze.defects_manifest WHERE rule_id='DQ-NOTE-PII-LEAK' LIMIT 5) m
-LEFT JOIN g3_catalog.bronze.investigation_notes n ON m.record_key = n.note_id;
+FROM (SELECT DISTINCT record_key FROM __CATALOG__.bronze.defects_manifest WHERE rule_id='DQ-NOTE-PII-LEAK' LIMIT 5) m
+LEFT JOIN __CATALOG__.bronze.investigation_notes n ON m.record_key = n.note_id;
 -- If note_text is NULL / truncated / starts mid-quote → CSV quoting broke the row.
 
 -- (b) How many notes still carry the PII prefix at all?
@@ -183,15 +200,59 @@ SELECT
   COUNT(*)                                                              AS total_notes,
   SUM(CASE WHEN note_text IS NULL                THEN 1 ELSE 0 END)     AS null_text,
   SUM(CASE WHEN note_text LIKE 'Spoke to customer%' THEN 1 ELSE 0 END)  AS pii_prefix
-FROM g3_catalog.bronze.investigation_notes;
+FROM __CATALOG__.bronze.investigation_notes;
 -- If quoting is fine: pii_prefix ≈ 750. If pii_prefix = 0 → the PII text was mangled away.
+
+
+-- ============================================================================
+-- (5) SCD2 guardrail for the duplicate rules (DQ-CUST-ID-DUP, DQ-CARD-DUP).
+--     dq_03 partitions those windows by (key, effective_at), so legitimate SCD2
+--     version history (same key, later effective_at) must NOT be quarantined —
+--     only the genuine injected dup (same key AND same effective_at) is caught.
+--     (5a)/(5b) confirm no SCD2 version leaked into quarantine; (5c) confirms
+--     the test is non-trivial by showing multi-version keys actually exist.
+
+-- (5a) DQ-CUST-ID-DUP — caught keys NOT explained by a defect = SCD2 leak.
+--      EXPECTED 0 rows. Any row here means an SCD2 customer version slipped
+--      through the (customer_id, effective_at) partition; re-check dq_03.
+SELECT 'DQ-CUST-ID-DUP' AS rule_id, q.record_key
+FROM (
+  SELECT DISTINCT record_key FROM __CATALOG__.silver.quarantine_records
+  WHERE rule_id = 'DQ-CUST-ID-DUP' AND run_id = 'RUN-20260708-DQ1') q
+LEFT JOIN (
+  SELECT DISTINCT record_key FROM __CATALOG__.bronze.defects_manifest
+  WHERE rule_id = 'DQ-CUST-ID-DUP') m ON q.record_key = m.record_key
+WHERE m.record_key IS NULL;
+
+-- (5b) DQ-CARD-DUP — same SCD2 leak check. EXPECTED 0 rows.
+SELECT 'DQ-CARD-DUP' AS rule_id, q.record_key
+FROM (
+  SELECT DISTINCT record_key FROM __CATALOG__.silver.quarantine_records
+  WHERE rule_id = 'DQ-CARD-DUP' AND run_id = 'RUN-20260708-DQ1') q
+LEFT JOIN (
+  SELECT DISTINCT record_key FROM __CATALOG__.bronze.defects_manifest
+  WHERE rule_id = 'DQ-CARD-DUP') m ON q.record_key = m.record_key
+WHERE m.record_key IS NULL;
+
+-- (5c) Confirm SCD2 versions exist in bronze for the two dims (so 5a/5b are
+--      meaningful). EXPECTED both > 0 once a T1+ snapshot has been ingested;
+--      = 0 means only a flat T0 batch was loaded (the guardrail is then trivial).
+SELECT 'customers' AS dim, COUNT(*) AS multi_version_keys
+FROM (
+  SELECT customer_id FROM __CATALOG__.bronze.customers
+  GROUP BY customer_id HAVING COUNT(DISTINCT effective_at) > 1)
+UNION ALL
+SELECT 'cards', COUNT(*)
+FROM (
+  SELECT card_id FROM __CATALOG__.bronze.cards
+  GROUP BY card_id HAVING COUNT(DISTINCT effective_at) > 1);
 
 """
 
 
 def _run(stmt):
-    """Execute one statement with the catalog token swapped g3_catalog -> g3_dev."""
-    return spark.sql(stmt.replace("g3_catalog", CATALOG))
+    """Execute one statement with the __CATALOG__ token replaced by the selected catalog."""
+    return spark.sql(stmt.replace("__CATALOG__", catalog))
 
 
 for _stmt in _statements(SQL):

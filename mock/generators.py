@@ -110,6 +110,7 @@ def gen_customers(ctx, n):
     for i in range(1, n + 1):
         cid = seq_id(C.PFX["customer"], i)
         first, last = f.first_name(), f.last_name()
+        created = iso(past_ts(rng, now, 1000))
         rows.append({
             "customer_id": cid,
             "first_name": first, "last_name": last,
@@ -118,7 +119,8 @@ def gen_customers(ctx, n):
             "phone": phone_au(rng),
             "address": f"{f.street_address()}, {f.city()}",
             "tax_id": tax_id(rng),
-            "created_at": iso(past_ts(rng, now, 1000)),
+            "created_at": created,
+            "effective_at": created,
         })
     ctx.ids["customers"] = [r["customer_id"] for r in rows]
     ctx.pools["cust_email"] = {r["customer_id"]: r["email"] for r in rows}
@@ -127,7 +129,10 @@ def gen_customers(ctx, n):
 
     # --- defects ---
     # 1) missing email
-    for idx in ctx.sample_indices(n, ctx.defect_count(n, 0.5)):
+    # Reserve CUST-0001 as a clean, deterministic SCD2 demonstration record.
+    defect_candidates = list(range(1, n))
+    missing_count = min(ctx.defect_count(n, 0.5), len(defect_candidates))
+    for idx in rng.sample(defect_candidates, missing_count):
         rows[idx]["email"] = ""
         man.add("customers", rows[idx]["customer_id"], "DQ-CUST-EMAIL-FMT",
                 "email must match pattern if present", "email is empty")
@@ -135,7 +140,10 @@ def gen_customers(ctx, n):
     # 2) exact duplicate customer_id (clone an existing row)
     next_extra = n + 1000
     for _ in range(ctx.defect_count(n, 0.3)):
-        src = rng.choice(rows[:max(1, n // 2)])
+        source_pool = rows[1:max(2, n // 2)]
+        if not source_pool:
+            break
+        src = rng.choice(source_pool)
         dup = dict(src)
         rows.append(dup)
         man.add("customers", src["customer_id"], "DQ-CUST-ID-DUP",
@@ -143,7 +151,10 @@ def gen_customers(ctx, n):
 
     # 3) near-duplicate (same name+dob+address+tax_id, new id)
     for j in range(ctx.defect_count(n, 0.3)):
-        src = rng.choice(rows[:max(1, n // 2)])
+        source_pool = rows[1:max(2, n // 2)]
+        if not source_pool:
+            break
+        src = rng.choice(source_pool)
         nid = seq_id(C.PFX["customer"], next_extra + j)
         dup = dict(src)
         dup["customer_id"] = nid
@@ -228,6 +239,7 @@ def gen_accounts(ctx, n):
 def gen_cards(ctx, n):
     rng, man = ctx.rng, ctx.manifest
     acct_ids = ctx.ids["accounts"]
+    now = run_now()
     rows = []
     for i in range(1, n + 1):
         rows.append({
@@ -237,6 +249,7 @@ def gen_cards(ctx, n):
             "pan": full_pan(rng),
             "expiry": f"{rng.randint(2024, 2030)}-{rng.randint(1, 12):02d}",
             "status": rng.choices(C.CARD_STATUS, weights=[80, 5, 5, 10])[0],
+            "effective_at": iso(past_ts(rng, now, 1000)),
         })
     ctx.ids["cards"] = [r["card_id"] for r in rows]
     # ensure at least one closed card exists (precondition for transactions defect)
@@ -266,6 +279,7 @@ def gen_cards(ctx, n):
 def gen_merchants(ctx, n):
     f, rng, man = ctx.f, ctx.rng, ctx.manifest
     mccs = [m[0] for m in C.MERCHANT_CATEGORIES]
+    now = run_now()
     rows = []
     for i in range(1, n + 1):
         rows.append({
@@ -275,6 +289,7 @@ def gen_merchants(ctx, n):
             "country": rng.choice([c[0] for c in C.COUNTRIES]),
             "risk_rating": rng.choice(C.RISK_RATING),
             "status": rng.choices(C.MERCHANT_STATUS, weights=[85, 8, 7])[0],
+            "effective_at": iso(past_ts(rng, now, 1000)),
         })
     ctx.ids["merchants"] = [r["merchant_id"] for r in rows]
     # ensure at least one closed merchant exists (referenced by transactions defect)

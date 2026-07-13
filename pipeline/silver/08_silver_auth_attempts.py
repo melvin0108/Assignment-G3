@@ -3,7 +3,7 @@
 # SILVER TRANSFORMATION & DATA QUALITY PIPELINE: auth_attempts
 # ============================================================================
 # Implements Bronze -> Silver transformation for authorization attempts:
-#   1. Reads from bronze.auth_attempts
+#   1. Reads the latest bronze.auth_attempts snapshot
 #   2. Checks transaction FK and timestamp ordering
 #   3. Quarantines failed records to silver.quarantine_records
 #   4. Writes clean records to silver.auth_attempts
@@ -13,15 +13,29 @@
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.types import StructType, StructField, StringType
+from pyspark.dbutils import DBUtils
 
 # In a Databricks environment, `spark` is pre-initialized.
 # This line gets the existing session or initializes one.
 spark = SparkSession.builder.getOrCreate()
+dbutils = DBUtils(spark)
 
 # ---------------------------------------------------------------------------
 # CONFIGURATION
 # ---------------------------------------------------------------------------
-CATALOG = "g3_test"
+def _catalog_widget():
+    """Create or reuse the shared catalog widget and validate its value."""
+    try:
+        dbutils.widgets.get("catalog")
+    except Exception:
+        dbutils.widgets.dropdown("catalog", "g3_dev", ["g3_dev", "g3_test", "g3_catalog"])
+    catalog = dbutils.widgets.get("catalog")
+    if catalog not in {"g3_dev", "g3_test", "g3_catalog"}:
+        raise ValueError(f"Unsupported catalog: {catalog}")
+    return catalog
+
+
+CATALOG = _catalog_widget()
 SCHEMA = "silver"
 TABLE_NAME = "auth_attempts"
 FULL_TABLE_NAME = f"{CATALOG}.{SCHEMA}.{TABLE_NAME}"
@@ -35,7 +49,10 @@ RUN_ID = "RUN-20260706-1"
 # 1. LOAD BRONZE AND REFERENCE DATA
 # ---------------------------------------------------------------------------
 print(f"Reading from Bronze table: {BRONZE_TABLE_NAME}")
-auth_attempts_df = spark.read.table(BRONZE_TABLE_NAME).alias("a")
+auth_attempts_all_df = spark.read.table(BRONZE_TABLE_NAME)
+latest_batch_id = auth_attempts_all_df.select(F.max("_batch_id").alias("batch_id")).first()["batch_id"]
+print(f"Using latest auth_attempts batch: {latest_batch_id}")
+auth_attempts_df = auth_attempts_all_df.filter(F.col("_batch_id") == latest_batch_id).alias("a")
 
 print(f"Reading Silver transactions for FK validation: {TRANSACTIONS_TABLE_NAME}")
 transactions_df = spark.read.table(TRANSACTIONS_TABLE_NAME).select("transaction_id", "txn_ts").alias("t")
@@ -185,7 +202,7 @@ lineage_schema = StructType([
 ])
 
 lineage_rows = [
-    (CATALOG, "bronze", TABLE_NAME, "attempt_id", CATALOG, SCHEMA, TABLE_NAME, "attempt_id", "Direct copy"),
+    (CATALOG, "bronze", TABLE_NAME, "attempt_id", CATALOG, SCHEMA, TABLE_NAME, "attempt_id", "Direct copy from latest Bronze batch"),
     (CATALOG, "bronze", TABLE_NAME, "transaction_id", CATALOG, SCHEMA, TABLE_NAME, "transaction_id", "Direct copy after Silver transaction relationship check"),
     (CATALOG, "bronze", TABLE_NAME, "decision", CATALOG, SCHEMA, TABLE_NAME, "decision", "Lowercased and trimmed"),
     (CATALOG, "bronze", TABLE_NAME, "decline_reason", CATALOG, SCHEMA, TABLE_NAME, "decline_reason", "Trimmed; empty string converted to NULL"),

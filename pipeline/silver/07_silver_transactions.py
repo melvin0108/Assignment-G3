@@ -4,7 +4,8 @@
 # ============================================================================
 # Implements Bronze -> Silver transformation for the transactions dataset:
 #   1. Reads from bronze.transactions
-#   2. Checks duplicate transaction IDs, required fields, typing, and source FK rules
+#   2. Uses the latest fact snapshot and validates source relationships
+#      against Bronze history, including the card version effective at txn_ts
 #   3. Quarantines failed records to silver.quarantine_records
 #   4. Writes clean records to silver.transactions
 #   5. Appends lineage rows to gov.metadata_lineage
@@ -14,15 +15,29 @@ from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.types import StructType, StructField, StringType
 from pyspark.sql.window import Window
+from pyspark.dbutils import DBUtils
 
 # In a Databricks environment, `spark` is pre-initialized.
 # This line gets the existing session or initializes one.
 spark = SparkSession.builder.getOrCreate()
+dbutils = DBUtils(spark)
 
 # ---------------------------------------------------------------------------
 # CONFIGURATION
 # ---------------------------------------------------------------------------
-CATALOG = "g3_test"
+def _catalog_widget():
+    """Create or reuse the shared catalog widget and validate its value."""
+    try:
+        dbutils.widgets.get("catalog")
+    except Exception:
+        dbutils.widgets.dropdown("catalog", "g3_dev", ["g3_dev", "g3_test", "g3_catalog"])
+    catalog = dbutils.widgets.get("catalog")
+    if catalog not in {"g3_dev", "g3_test", "g3_catalog"}:
+        raise ValueError(f"Unsupported catalog: {catalog}")
+    return catalog
+
+
+CATALOG = _catalog_widget()
 SCHEMA = "silver"
 TABLE_NAME = "transactions"
 FULL_TABLE_NAME = f"{CATALOG}.{SCHEMA}.{TABLE_NAME}"
@@ -36,19 +51,28 @@ RUN_TS_LIMIT = "2026-07-06 23:59:59"
 # 1. LOAD BRONZE AND REFERENCE DATA
 # ---------------------------------------------------------------------------
 print(f"Reading from Bronze table: {BRONZE_TABLE_NAME}")
-transactions_df = spark.read.table(BRONZE_TABLE_NAME).alias("t")
+transactions_all_df = spark.read.table(BRONZE_TABLE_NAME)
+latest_batch_id = transactions_all_df.select(F.max("_batch_id").alias("batch_id")).first()["batch_id"]
+print(f"Using latest transactions batch: {latest_batch_id}")
+transactions_df = transactions_all_df.filter(F.col("_batch_id") == latest_batch_id).alias("t")
 
 print("Reading Bronze accounts and cards for source FK validation...")
 accounts_df = spark.read.table(f"{CATALOG}.bronze.accounts").select("account_id").distinct().alias("a")
-cards_df = (
+cards_history_df = (
     spark.read.table(f"{CATALOG}.bronze.cards")
-    .groupBy("card_id")
-    .agg(
-        F.max(
-            F.when(F.lower(F.trim(F.col("status"))) == "closed", F.lit(1))
-            .otherwise(F.lit(0))
-        ).alias("bronze_card_is_closed")
+    .withColumn(
+        "card_effective_at",
+        F.expr("try_to_timestamp(replace(replace(effective_at, 'T', ' '), 'Z', ''))"),
     )
+    .withColumn(
+        "rn_card_version",
+        F.row_number().over(
+            Window.partitionBy("card_id", "card_effective_at", "_record_hash")
+            .orderBy(F.col("_batch_id").desc(), F.col("_ingest_ts").desc())
+        ),
+    )
+    .filter(F.col("rn_card_version") == 1)
+    .select("card_id", "status", "card_effective_at", "_batch_id", "_record_hash")
     .alias("c")
 )
 
@@ -56,23 +80,42 @@ cards_df = (
 # 2. RUN DQ RULES & IDENTIFY FAILURES (QUARANTINE)
 # ---------------------------------------------------------------------------
 txn_window = Window.partitionBy("transaction_id").orderBy("_ingest_ts", "_record_hash")
+card_as_of_window = Window.partitionBy(
+    F.col("t._source_record_id"), F.col("t.rn_txn")
+).orderBy(
+    F.col("c.card_effective_at").desc_nulls_last(),
+    F.col("c._batch_id").desc_nulls_last(),
+    F.col("c._record_hash").desc_nulls_last(),
+)
 
-checked_df = (
+typed_transactions_df = (
     transactions_df
     .withColumn("amount_typed", F.expr("try_cast(amount AS DECIMAL(12,2))"))
     .withColumn("txn_ts_typed", F.expr("try_to_timestamp(replace(replace(txn_ts, 'T', ' '), 'Z', ''))"))
     .withColumn("rn_txn", F.row_number().over(txn_window))
-    .join(accounts_df, F.col("t.account_id") == F.col("a.account_id"), "left")
-    .join(cards_df, F.col("t.card_id") == F.col("c.card_id"), "left")
+)
+
+transactions_with_card_df = (
+    typed_transactions_df.alias("t")
+    .join(
+        cards_history_df,
+        (F.col("t.card_id") == F.col("c.card_id")) &
+        (F.col("c.card_effective_at") <= F.col("t.txn_ts_typed")),
+        "left",
+    )
+    .withColumn("rn_card_as_of", F.row_number().over(card_as_of_window))
+    .filter(F.col("rn_card_as_of") == 1)
     .select(
         "t.*",
-        "amount_typed",
-        "txn_ts_typed",
-        "rn_txn",
-        F.col("a.account_id").alias("bronze_account_id"),
         F.col("c.card_id").alias("bronze_card_id"),
-        F.col("c.bronze_card_is_closed"),
+        F.lower(F.trim(F.col("c.status"))).alias("bronze_card_status"),
     )
+)
+
+checked_df = (
+    transactions_with_card_df.alias("t")
+    .join(accounts_df, F.col("t.account_id") == F.col("a.account_id"), "left")
+    .select("t.*", F.col("a.account_id").alias("bronze_account_id"))
 )
 
 amount_invalid = F.col("amount_typed").isNull() | (F.col("amount_typed") <= 0)
@@ -87,7 +130,7 @@ card_fk_missing = (
     (F.trim(F.col("card_id")) != "") &
     F.col("bronze_card_id").isNull()
 )
-closed_card = F.col("bronze_card_is_closed") == 1
+closed_card = F.col("bronze_card_status") == "closed"
 
 
 def quarantine_rows(condition, rule_id, rule_name, failure_reason):
@@ -171,7 +214,7 @@ silver_transactions_df = checked_df.filter(
         (F.trim(F.col("card_id")) == "") |
         F.col("bronze_card_id").isNotNull()
     ) &
-    (F.coalesce(F.col("bronze_card_is_closed"), F.lit(0)) != 1)
+    (F.coalesce(F.col("bronze_card_status"), F.lit("")) != "closed")
 ).select(
     F.col("transaction_id"),
     F.col("account_id"),
@@ -221,9 +264,9 @@ lineage_schema = StructType([
 ])
 
 lineage_rows = [
-    (CATALOG, "bronze", TABLE_NAME, "transaction_id", CATALOG, SCHEMA, TABLE_NAME, "transaction_id", "Direct copy after duplicate filtering"),
+    (CATALOG, "bronze", TABLE_NAME, "transaction_id", CATALOG, SCHEMA, TABLE_NAME, "transaction_id", "Direct copy from latest Bronze batch after duplicate filtering"),
     (CATALOG, "bronze", TABLE_NAME, "account_id", CATALOG, SCHEMA, TABLE_NAME, "account_id", "Direct copy after Bronze account existence check"),
-    (CATALOG, "bronze", TABLE_NAME, "card_id", CATALOG, SCHEMA, TABLE_NAME, "card_id", "Direct copy after Bronze card existence and active-card checks"),
+    (CATALOG, "bronze", TABLE_NAME, "card_id", CATALOG, SCHEMA, TABLE_NAME, "card_id", "Direct copy after Bronze card as-of txn_ts existence and closed-card checks"),
     (CATALOG, "bronze", TABLE_NAME, "merchant_id", CATALOG, SCHEMA, TABLE_NAME, "merchant_id", "Direct copy when present"),
     (CATALOG, "bronze", TABLE_NAME, "channel", CATALOG, SCHEMA, TABLE_NAME, "channel", "Lowercased and trimmed"),
     (CATALOG, "bronze", TABLE_NAME, "amount", CATALOG, SCHEMA, TABLE_NAME, "amount", "TRY_CAST to DECIMAL(12,2); non-positive or invalid values quarantined"),

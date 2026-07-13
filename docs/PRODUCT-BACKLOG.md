@@ -7,7 +7,7 @@
 | **Goal** | Turn generated banking data into trusted, governed, Silver-layer context that is safe for an internal AI consumer to read |
 | **Platform assumption** | Databricks Free Edition + Unity Catalog — workspace catalog is `g3_catalog` (verified); schemas `bronze` ✓ and `silver` ✓ created, `gov` ⬜ planned but not yet created |
 | **Status** | Mock data generation complete; backlog created; Databricks workspace linked with GitHub; catalog and layer schemas created; source data uploaded to Databricks Volume; Bronze ingestion complete (E2-I2/I3/I4 done; E2-I5 raw-load validation still to do); DQ engine + quarantine complete (E3-I1–I5 done — ~99.8% recall vs the defects manifest; E3-I6 reconciliation next); Silver, governance, tests, and demo evidence still to build |
-| **Last updated** | 2026-07-08 |
+| **Last updated** | 2026-07-10 |
 
 ### Team & Status Key
 
@@ -76,6 +76,7 @@ These are current implementation assumptions. They can change if the team learns
 | Sensitive data | Mask, redact, tokenize, hash, or remove sensitive fields before AI use. | The exact method can differ by field, but unsafe raw values must not appear in the AI surface. |
 | AI surface | Provide a Silver AI-ready table or view with only allowed fields. | The physical implementation may be a table or view if it proves the same access and exclusion controls. |
 | Validation | Use automated checks where possible and keep manual demo checks only where automation is not practical. | Add tests as each capability becomes stable instead of waiting until the end. |
+| Silver implementation | Silver transforms are built as PySpark `.py` notebooks; the `pipeline/silver/*.sql` files are reference-only. | A table that exists only in `.sql` is **not** built — port the logic to a `silver_<table>.py` notebook before marking it Review/Done. |
 
 ---
 
@@ -152,6 +153,7 @@ These are current implementation assumptions. They can change if the team learns
 | E2-I3 | Load generated source files into the raw/Bronze tables in a repeatable way. | Prove the team can move data from local mock output into the platform without duplicating rows. | Re-running the same load does not duplicate records; source file metadata is available. | M | M1 | Done |
 | E2-I4 | Load the defects manifest as a reference table for validation. | Bring the known expected data problems into the platform for later reconciliation. | Manifest table exists and contains the generated defect rows. | S | M2 | Done |
 | E2-I5 | Add a simple raw-load validation check. | Catch missing files, missing rows, or broken ingestion early. | Row counts match source files, and the check result is saved or printed for review. | S | M5 | To Do |
+| E2-I6 | Build a clean-state rerun command and prove idempotency. | Satisfy the "rerun from a clean state" pipeline requirement with an engineering artifact, not only runbook text. | A command (e.g., `make clean` + rebuild) drops and recreates bronze → silver → gold; a cold rerun produces consistent outputs without duplicate rows. | M | M1 | To Do |
 
 ### Epic 3 - Data-Quality Rules and Issue Handling
 
@@ -167,6 +169,7 @@ These are current implementation assumptions. They can change if the team learns
 | E3-I4 | Implement executable checks for the highest-value or first-slice rules. | Prove the rule approach on a small useful set before implementing all rules. | Selected rules produce pass/fail results and quarantine rows that can be reviewed. | M | M2 | Done |
 | E3-I5 | Expand rule execution until all injected rules are covered. | Satisfy the assignment requirement that all intended defects are checked. | All expected rule IDs have runnable checks and result records. | L | M2 | Done |
 | E3-I6 | Compare actual quarantined records with the defects manifest. | Prove that the DQ implementation catches the intended bad records and avoids unexpected false positives. | Reconciliation report shows match quality per rule, with exceptions explained. | M | M5 | To Do |
+| E3-I7 | Address allowed status-transition checks. | Cover the "Allowed status transition checks" DQ requirement, which is not in the current 36 rules. | Either a cross-field consistency rule is implemented (e.g., `status='closed'` requires `closed_at` to be present), or the snapshot limitation is documented and the enum checks are accepted as partial coverage. | S | M2 | To Do |
 
 ### Epic 4 - Silver Data Products and Sensitive-Data Treatment
 
@@ -177,12 +180,13 @@ These are current implementation assumptions. They can change if the team learns
 | ID | Backlog item | Objective | Deliverable / completion evidence | Size | Assignee | Status |
 |---|---|---|---|---|---|---|
 | E4-I1 | Build the first Silver table or small table group that proves the raw-to-clean pattern. | Learn the transformation, typing, DQ, lineage, and privacy pattern on a small slice. | One useful Silver output exists, matches its contract, and has basic validation evidence. | M | M3 | To Do |
-| E4-I2 | Build Silver outputs for customer, employee, account, and card data. | Provide clean people and account entities while protecting direct identifiers and card data. | Silver outputs exist; sensitive fields are masked, tokenized, hashed, reduced, or removed as appropriate. | M | M3 | To Do |
-| E4-I3 | Build Silver outputs for transactions, authorization activity, and device data. | Provide clean transaction activity for investigations and AI context. | Silver outputs exist with typed amounts/timestamps and protected device-related fields. | M | M4 | Review |
-| E4-I4 | Build Silver outputs for disputes, chargebacks, fraud alerts, cases, notes, links, parties, contact logs, and reference tables. | Provide the investigation story around each transaction or case. | Silver outputs exist and match the documented purpose, keys, and accepted values. | L | M5 | To Do |
+| E4-I2 | Build Silver outputs for customer, employee, account, and card data. | Provide clean people and account entities while protecting direct identifiers and card data. | Silver outputs exist; sensitive fields are masked, tokenized, hashed, reduced, or removed as appropriate. | M | M3 | Review |
+| E4-I3 | Build Silver outputs for transactions, authorization activity, and device data. | Provide clean transaction activity for investigations and AI context. | Silver outputs exist with typed amounts/timestamps and protected device-related fields. Active `.py` notebooks not yet built (reference `.sql` exists — see §2). | M | M4 | To Do |
+| E4-I4 | Build Silver outputs for disputes, chargebacks, fraud alerts, cases, notes, links, parties, and contact logs. | Provide the investigation story around each transaction or case. | Silver outputs exist and match the documented purpose, keys, and accepted values. | L | M4 | To Do |
 | E4-I5 | Standardize values that should use a controlled set, while preserving evidence of invalid raw values. | Make Silver easier to query without hiding that the source contained defects. | Controlled fields are conformed or flagged; original defect evidence remains available. | S | M5 | To Do |
 | E4-I6 | Redact sensitive values from free-text notes and logs. | Prevent emails, phone numbers, card numbers, or other unsafe text from leaking into Silver or AI context. | Redacted text is available; rows with remaining leaks are flagged or quarantined. | M | M5 | To Do |
 | E4-I7 | Handle duplicate and broken-relationship records in a documented way. | Keep investigation evidence without letting duplicates or broken joins mislead downstream users. | Duplicates and orphan relationships are flagged, quarantined, excluded, or retained according to documented handling. | M | M4 | Review |
+| E4-I8 | Build Silver outputs for reference/dimension tables, split by treatment. | Right-size the work: most reference dims are clean pass-throughs, but `merchants` carries real defects. | Clean dims (`merchant_categories`, `channels`, `case_status_types`, `dispute_reason_codes`, `fraud_types`, `countries`, `currencies`, `branches`, `date_dim`) are type-cast with lineage and no DQ; `merchants` gets casing conformance + closed-merchant RI + quarantine. Note several are FK/enum targets for other silver rules. | M | M3 | To Do |
 
 ### Epic 5 - Governance, Access, Lineage, and Run Evidence
 
@@ -197,7 +201,7 @@ Before implementing access controls or AI-facing views, confirm which Unity Cata
 | E5-I1 | Capture one run record for each pipeline execution. | Make every demo or test run traceable. | Run tracking includes run ID, start/end time, status, and key row counts. | S | M1 | To Do |
 | E5-I2 | Publish DQ summary results for each run. | Let reviewers see rule outcomes without reading every quarantined row. | DQ summary includes rule-level totals and sample failed keys. | S | M2 | To Do |
 | E5-I3 | Maintain masking-policy metadata for sensitive fields. | Document how sensitive fields are protected and who can see what. | Masking policy table or document lists field, classification, method, and owner. | S | M3 | To Do |
-| E5-I4 | Maintain access-policy metadata for internal, masked, auditor, and AI-consumer use. | Make allowed data use explicit instead of relying on assumptions. | Access policy table or document identifies fields allowed or blocked for each role. | M | M2 | To Do |
+| E5-I4 | Maintain access-policy metadata for internal, masked, auditor, AI-consumer, and customer-facing use. | Make allowed data use explicit instead of relying on assumptions. | Access policy table or document identifies fields allowed or blocked for each role. | M | M2 | To Do |
 | E5-I5 | Implement the access controls needed for the demo environment. | Prove that sensitive data is not available to roles that should not see it. | Supported Unity Catalog controls are confirmed, fallback is documented if needed, and role-based query checks show allowed and blocked access behavior. | M | M1 | To Do |
 | E5-I6 | Emit lineage for important Silver and AI-facing fields. | Let reviewers trace final values back to source fields. | Lineage evidence covers AI-facing fields and masked sensitive fields. | M | M3 | To Do |
 | E5-I7 | Keep governance outputs aligned with actual pipeline behavior. | Avoid stale governance tables that describe rules or policies differently from implementation. | Spot checks show rule, policy, lineage, and run evidence match current outputs. | S | M2 | To Do |
@@ -214,8 +218,9 @@ Before implementing access controls or AI-facing views, confirm which Unity Cata
 | E6-I2 | Build an initial AI-ready context from the first useful slice. | Prove the AI surface early and expose gaps before all tables are complete. | Sample context records exist and can be inspected safely. | M | M1 | To Do |
 | E6-I3 | Expand the AI-ready context to include relevant transactions, merchants, disputes, alerts, parties, and redacted notes. | Give AI enough context to help with investigation questions while staying within policy. | Final context includes the expected investigation sections and source references. | L | M1 | To Do |
 | E6-I4 | Exclude legal-hold, unsafe, unsupported, or below-threshold records from the AI-facing surface. | Prevent AI use of data that should not be used or cannot be trusted. | Query checks show excluded records do not appear in the AI surface. | M | M1 | To Do |
-| E6-I5 | Add final context metadata such as quality status, masking status, warning flags, version, refresh time, and usage restrictions. | Help AI consumers and reviewers understand what the context can and cannot support. | Metadata fields are present and populated for context records. | M | M1 | To Do |
+| E6-I5 | Add final context metadata such as context category, quality status, masking status, warning flags, version, refresh time, and usage restrictions. | Help AI consumers and reviewers understand what the context can and cannot support. | Metadata fields are present and populated for context records. | M | M1 | To Do |
 | E6-I6 | Add safety checks against raw PII, raw card numbers, and legal-hold leakage in the AI surface. | Catch unsafe exposure even if an upstream transformation changes. | Automated or repeatable checks fail when unsafe values appear. | M | M5 | To Do |
+| E6-I7 | Produce Zero-Trust example prompts the AI can answer and must refuse. | Demonstrate Zero Trust at the consumption layer, not only the data layer. | Documented prompts: answerable ones grounded in allowed context, and refusable ones (legal-hold, missing, unsafe) with the refusal reason tied to excluded/flagged records. | S | M1 | To Do |
 
 ### Epic 7 - Validation, Evidence, and Scale Confidence
 

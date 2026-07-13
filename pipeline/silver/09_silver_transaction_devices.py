@@ -3,7 +3,7 @@
 # SILVER TRANSFORMATION & DATA QUALITY PIPELINE: transaction_devices
 # ============================================================================
 # Implements Bronze -> Silver transformation for transaction device activity:
-#   1. Reads from bronze.transaction_devices
+#   1. Reads the latest bronze.transaction_devices snapshot
 #   2. Checks transaction FK and required device type
 #   3. Quarantines failed records to silver.quarantine_records
 #   4. Tokenizes device_id and protects IP values
@@ -14,15 +14,29 @@
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.types import StructType, StructField, StringType
+from pyspark.dbutils import DBUtils
 
 # In a Databricks environment, `spark` is pre-initialized.
 # This line gets the existing session or initializes one.
 spark = SparkSession.builder.getOrCreate()
+dbutils = DBUtils(spark)
 
 # ---------------------------------------------------------------------------
 # CONFIGURATION
 # ---------------------------------------------------------------------------
-CATALOG = "g3_test"
+def _catalog_widget():
+    """Create or reuse the shared catalog widget and validate its value."""
+    try:
+        dbutils.widgets.get("catalog")
+    except Exception:
+        dbutils.widgets.dropdown("catalog", "g3_dev", ["g3_dev", "g3_test", "g3_catalog"])
+    catalog = dbutils.widgets.get("catalog")
+    if catalog not in {"g3_dev", "g3_test", "g3_catalog"}:
+        raise ValueError(f"Unsupported catalog: {catalog}")
+    return catalog
+
+
+CATALOG = _catalog_widget()
 SCHEMA = "silver"
 TABLE_NAME = "transaction_devices"
 FULL_TABLE_NAME = f"{CATALOG}.{SCHEMA}.{TABLE_NAME}"
@@ -38,7 +52,10 @@ SALT = "NAB_SALT_2026"
 # 1. LOAD BRONZE AND REFERENCE DATA
 # ---------------------------------------------------------------------------
 print(f"Reading from Bronze table: {BRONZE_TABLE_NAME}")
-devices_df = spark.read.table(BRONZE_TABLE_NAME).alias("d")
+devices_all_df = spark.read.table(BRONZE_TABLE_NAME)
+latest_batch_id = devices_all_df.select(F.max("_batch_id").alias("batch_id")).first()["batch_id"]
+print(f"Using latest transaction_devices batch: {latest_batch_id}")
+devices_df = devices_all_df.filter(F.col("_batch_id") == latest_batch_id).alias("d")
 
 print(f"Reading Silver transactions for FK validation: {TRANSACTIONS_TABLE_NAME}")
 transactions_df = spark.read.table(TRANSACTIONS_TABLE_NAME).select("transaction_id").distinct().alias("t")
@@ -205,7 +222,7 @@ lineage_schema = StructType([
 ])
 
 lineage_rows = [
-    (CATALOG, "bronze", TABLE_NAME, "device_id", CATALOG, SCHEMA, TABLE_NAME, "device_id", "Tokenized with salted SHA256 prefix"),
+    (CATALOG, "bronze", TABLE_NAME, "device_id", CATALOG, SCHEMA, TABLE_NAME, "device_id", "Tokenized with salted SHA256 prefix from latest Bronze batch"),
     (CATALOG, "bronze", TABLE_NAME, "transaction_id", CATALOG, SCHEMA, TABLE_NAME, "transaction_id", "Direct copy after Silver transaction relationship check"),
     (CATALOG, "bronze", TABLE_NAME, "device_type", CATALOG, SCHEMA, TABLE_NAME, "device_type", "Lowercased and trimmed; missing values quarantined"),
     (CATALOG, "bronze", TABLE_NAME, "ip", CATALOG, SCHEMA, TABLE_NAME, "ip", "IPv4 reduced to /24-style network; non-IPv4 hashed"),
