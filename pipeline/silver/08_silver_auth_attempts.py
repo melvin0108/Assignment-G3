@@ -21,7 +21,7 @@ spark = SparkSession.builder.getOrCreate()
 # ---------------------------------------------------------------------------
 # CONFIGURATION
 # ---------------------------------------------------------------------------
-CATALOG = "g3_test"
+CATALOG = "g3_dev"
 SCHEMA = "silver"
 TABLE_NAME = "auth_attempts"
 FULL_TABLE_NAME = f"{CATALOG}.{SCHEMA}.{TABLE_NAME}"
