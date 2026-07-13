@@ -4,7 +4,7 @@
 # ----------------------------------------------------------------------------
 # Defines and populates the rule registry under gov.dq_rules — one row per
 # executable data-quality rule (the 35 rule_ids the mock generator injects).
-# Mirrors 05_silver_masking_policies.py / 06_silver_metadata_lineage.py: build a
+# Mirrors 27_silver_masking_policies.py / 28_silver_metadata_lineage.py: build a
 # DataFrame from an explicit schema + a Python list, then saveAsTable(overwrite).
 # The 35 rows below are parsed verbatim from pipeline/dq/02_load_dq_rules.sql;
 # The target catalog is selected through the team-standard catalog widget.
