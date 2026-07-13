@@ -32,7 +32,7 @@ invalid_risk = ~F.col("risk_rating").isin("low", "medium", "high")
 
 quarantine_df = checked_df.filter(invalid_risk).select(
     F.lit(RUN_ID).alias("run_id"), F.lit(TABLE_NAME).alias("source_table"),
-    "_source_record_id", F.col("merchant_id").alias("record_key"),
+    F.col("_source_record_id").alias("source_record_id"), F.col("merchant_id").alias("record_key"),
     F.lit("DQ-MERCH-RISK-CASING").alias("rule_id"),
     F.lit("risk_rating must be in {low,medium,high}").alias("rule_name"),
     F.lit("inconsistent casing").alias("failure_reason"), F.lit("quarantine").alias("severity"),
