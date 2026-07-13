@@ -37,7 +37,8 @@ checked_df = (source_df.filter(F.col("_batch_id") == latest_batch_id).alias("d")
 
 def failures(condition, rule_id, rule_name, reason):
     return checked_df.filter(condition).select(
-        F.lit(RUN_ID).alias("run_id"), F.lit(TABLE_NAME).alias("source_table"), "_source_record_id",
+        F.lit(RUN_ID).alias("run_id"), F.lit(TABLE_NAME).alias("source_table"),
+        F.col("_source_record_id").alias("source_record_id"),
         F.col("dispute_id").alias("record_key"), F.lit(rule_id).alias("rule_id"),
         F.lit(rule_name).alias("rule_name"), F.lit(reason).alias("failure_reason"),
         F.lit("quarantine").alias("severity"), F.lit("quarantined").alias("disposition"),

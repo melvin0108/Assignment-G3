@@ -34,7 +34,8 @@ checked_df = (spark.read.table(bronze_table)
 
 def failures(condition, rule_id, rule_name, reason, disposition="quarantined"):
     return checked_df.filter(condition).select(
-        F.lit(RUN_ID).alias("run_id"), F.lit(TABLE_NAME).alias("source_table"), "_source_record_id",
+        F.lit(RUN_ID).alias("run_id"), F.lit(TABLE_NAME).alias("source_table"),
+        F.col("_source_record_id").alias("source_record_id"),
         F.col("case_id").alias("record_key"), F.lit(rule_id).alias("rule_id"), F.lit(rule_name).alias("rule_name"),
         F.lit(reason).alias("failure_reason"), F.lit("quarantine").alias("severity"), F.lit(disposition).alias("disposition"),
         F.to_json(F.struct("case_id", "status_code", "fraud_type_code", "legal_hold")).alias("raw_record"),
