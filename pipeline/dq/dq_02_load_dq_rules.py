@@ -7,7 +7,7 @@
 # Mirrors 05_silver_masking_policies.py / 06_silver_metadata_lineage.py: build a
 # DataFrame from an explicit schema + a Python list, then saveAsTable(overwrite).
 # The 35 rows below are parsed verbatim from pipeline/dq/02_load_dq_rules.sql;
-# only the catalog token differs (g3_dev here vs g3_catalog in the .sql).
+# The target catalog is selected through the team-standard catalog widget.
 # ============================================================================
 
 from pyspark.sql import SparkSession
@@ -19,10 +19,27 @@ spark = SparkSession.builder.getOrCreate()
 # ---------------------------------------------------------------------------
 # CONFIGURATION
 # ---------------------------------------------------------------------------
-CATALOG = "g3_test"
+def _catalog_widget():
+    """Create the team-standard catalog widget and return its validated value.
+
+    Mirrors pipeline/bronze/autoloader_common.py: idempotent (reuses an existing
+    widget if a parent notebook or job parameter already set one) and validated
+    against the team's dev/test/prod catalogs (g3_dev / g3_test / g3_catalog).
+    """
+    try:
+        dbutils.widgets.get("catalog")
+    except Exception:
+        dbutils.widgets.dropdown("catalog", "g3_dev", ["g3_dev", "g3_test", "g3_catalog"])
+    catalog = dbutils.widgets.get("catalog")
+    if catalog not in {"g3_dev", "g3_test", "g3_catalog"}:
+        raise ValueError(f"Unsupported catalog: {catalog}")
+    return catalog
+
+
+catalog = _catalog_widget()
 SCHEMA = "gov"
 TABLE_NAME = "dq_rules"
-FULL_TABLE_NAME = f"{CATALOG}.{SCHEMA}.{TABLE_NAME}"
+FULL_TABLE_NAME = f"{catalog}.{SCHEMA}.{TABLE_NAME}"
 
 # Schema matches gov.dq_rules DDL in 01_setup.sql (rule_id .. enabled).
 schema = StructType([
@@ -53,9 +70,9 @@ data = [
     ("DQ-DEV-TYPE-REQ", "device_type is required", "bronze", "transaction_devices", "device_id", "single_row", "quarantine", "device_type IS NULL OR device_type = ''", True),
     ("DQ-CASE-STATUS-ENUM", "status_code must be in case_status enum", "bronze", "investigation_cases", "case_id", "single_row", "quarantine", "status_code NOT IN case_status enum", True),
     ("DQ-CASE-STALE", "open cases older than 180 days are stale", "bronze", "investigation_cases", "case_id", "single_row", "quarantine", "status_code = 'open' AND opened_at < RUN_DATE - 180 days", True),
-    ("DQ-CUST-ID-DUP", "customer_id must be unique", "bronze", "customers", "customer_id", "duplicate", "quarantine", "row_number() OVER (PARTITION BY customer_id) > 1", True),
+    ("DQ-CUST-ID-DUP", "(customer_id, effective_at) must be unique", "bronze", "customers", "customer_id", "duplicate", "quarantine", "row_number() OVER (PARTITION BY customer_id, effective_at) > 1  (SCD2: same customer_id + later effective_at is a new version, not a dup)", True),
     ("DQ-TXN-ID-DUP", "transaction_id must be unique", "bronze", "transactions", "transaction_id", "duplicate", "quarantine", "row_number() OVER (PARTITION BY transaction_id) > 1", True),
-    ("DQ-CARD-DUP", "card_id must be unique", "bronze", "cards", "card_id", "duplicate", "quarantine", "row_number() OVER (PARTITION BY card_id) > 1", True),
+    ("DQ-CARD-DUP", "(card_id, effective_at) must be unique", "bronze", "cards", "card_id", "duplicate", "quarantine", "row_number() OVER (PARTITION BY card_id, effective_at) > 1  (SCD2: same card_id + later effective_at is a new version, not a dup)", True),
     ("DQ-EMP-EMAIL-UNIQ", "email must be unique", "bronze", "employees", "employee_id", "duplicate", "quarantine", "row_number() OVER (PARTITION BY email) > 1", True),
     ("DQ-CUST-NEAR-DUP", "no two customers share name+dob+address+tax_id", "bronze", "customers", "customer_id", "duplicate", "quarantine", "row_number() OVER (PARTITION BY first_name,last_name,dob,address,tax_id) > 1  (exact first pass; fuzzy TODO)", True),
     ("DQ-EMP-NAME-NEAR-DUP", "flag near-duplicate employee names", "bronze", "employees", "employee_id", "duplicate", "quarantine", "row_number() OVER (PARTITION BY full_name) > 1  (exact first pass; fuzzy TODO)", True),
@@ -83,7 +100,7 @@ data = [
 # ---------------------------------------------------------------------------
 df = spark.createDataFrame(data, schema=schema)
 
-spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SCHEMA}")
+spark.sql(f"CREATE SCHEMA IF NOT EXISTS {catalog}.{SCHEMA}")
 
 print(f"Writing DQ rule registry to {FULL_TABLE_NAME}")
 (
@@ -110,7 +127,7 @@ spark.sql(
 print("Registry drift vs defects_manifest (expected 0 rows):")
 spark.sql(
     f"SELECT r.rule_id FROM {FULL_TABLE_NAME} r "
-    f"LEFT JOIN (SELECT DISTINCT rule_id FROM {CATALOG}.bronze.defects_manifest) m "
+    f"LEFT JOIN (SELECT DISTINCT rule_id FROM {catalog}.bronze.defects_manifest) m "
     f"ON r.rule_id = m.rule_id WHERE m.rule_id IS NULL"
 ).show()
 
