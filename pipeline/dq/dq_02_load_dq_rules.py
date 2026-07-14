@@ -4,7 +4,7 @@
 # ----------------------------------------------------------------------------
 # Defines and populates the rule registry under gov.dq_rules — one row per
 # executable data-quality rule (the 35 rule_ids the mock generator injects).
-# Mirrors 27_silver_masking_policies.py / 28_silver_metadata_lineage.py: build a
+# Mirrors silver_masking_policies.py / silver_metadata_lineage.py: build a
 # DataFrame from an explicit schema + a Python list, then saveAsTable(overwrite).
 # The 35 rows below are parsed verbatim from pipeline/dq/02_load_dq_rules.sql;
 # The target catalog is selected through the team-standard catalog widget.
@@ -54,8 +54,8 @@ schema = StructType([
     StructField("enabled", BooleanType(), nullable=True),
 ])
 
-# The 36 DQ rules (single_row=13, duplicate=6, fk_anti_join=13, text_pii=2,
-# ai_exclusion=2). severity is 'quarantine' for all runtime DQ outputs.
+# The 35 DQ rules (single_row=13, duplicate=6, fk_anti_join=12, text_pii=2,
+# ai_exclusion=2). severity is 'quarantine' for all (matches defects_manifest).
 data = [
     ("DQ-TXN-AMT-POS", "amount must be > 0", "bronze", "transactions", "transaction_id", "single_row", "quarantine", "CAST(amount AS DOUBLE) <= 0", True),
     ("DQ-TXN-MERCH-REQ", "merchant_id is required", "bronze", "transactions", "transaction_id", "single_row", "quarantine", "merchant_id IS NULL OR merchant_id = ''", True),
@@ -70,15 +70,14 @@ data = [
     ("DQ-DEV-TYPE-REQ", "device_type is required", "bronze", "transaction_devices", "device_id", "single_row", "quarantine", "device_type IS NULL OR device_type = ''", True),
     ("DQ-CASE-STATUS-ENUM", "status_code must be in case_status enum", "bronze", "investigation_cases", "case_id", "single_row", "quarantine", "status_code NOT IN case_status enum", True),
     ("DQ-CASE-STALE", "open cases older than 180 days are stale", "bronze", "investigation_cases", "case_id", "single_row", "quarantine", "status_code = 'open' AND opened_at < RUN_DATE - 180 days", True),
-    ("DQ-CUST-ID-DUP", "(customer_id, effective_at) must be unique", "bronze", "customers", "customer_id", "duplicate", "quarantine", "row_number() OVER (PARTITION BY customer_id, effective_at) > 1  (SCD2: same customer_id + later effective_at is a new version, not a dup)", True),
+    ("DQ-CUST-ID-DUP", "customer_id must be unique", "bronze", "customers", "customer_id", "duplicate", "quarantine", "row_number() OVER (PARTITION BY customer_id ORDER BY effective_at DESC) > 1  (SCD1: keep latest effective_at)", True),
     ("DQ-TXN-ID-DUP", "transaction_id must be unique", "bronze", "transactions", "transaction_id", "duplicate", "quarantine", "row_number() OVER (PARTITION BY transaction_id) > 1", True),
-    ("DQ-CARD-DUP", "(card_id, effective_at) must be unique", "bronze", "cards", "card_id", "duplicate", "quarantine", "row_number() OVER (PARTITION BY card_id, effective_at) > 1  (SCD2: same card_id + later effective_at is a new version, not a dup)", True),
+    ("DQ-CARD-DUP", "card_id must be unique", "bronze", "cards", "card_id", "duplicate", "quarantine", "row_number() OVER (PARTITION BY card_id ORDER BY effective_at DESC) > 1  (SCD1: keep latest effective_at)", True),
     ("DQ-EMP-EMAIL-UNIQ", "email must be unique", "bronze", "employees", "employee_id", "duplicate", "quarantine", "row_number() OVER (PARTITION BY email) > 1", True),
     ("DQ-CUST-NEAR-DUP", "no two customers share name+dob+address+tax_id", "bronze", "customers", "customer_id", "duplicate", "quarantine", "row_number() OVER (PARTITION BY first_name,last_name,dob,address,tax_id) > 1  (exact first pass; fuzzy TODO)", True),
     ("DQ-EMP-NAME-NEAR-DUP", "flag near-duplicate employee names", "bronze", "employees", "employee_id", "duplicate", "quarantine", "row_number() OVER (PARTITION BY full_name) > 1  (exact first pass; fuzzy TODO)", True),
     ("DQ-ACC-CUST-FK", "customer_id must exist in customers", "bronze", "accounts", "account_id", "fk_anti_join", "quarantine", "accounts.customer_id NOT IN customers.customer_id", True),
     ("DQ-TXN-ACCT-FK", "account_id must exist in accounts", "bronze", "transactions", "transaction_id", "fk_anti_join", "quarantine", "transactions.account_id NOT IN accounts.account_id", True),
-    ("DQ-TXN-CARD-FK", "card_id must exist in cards", "bronze", "transactions", "transaction_id", "fk_anti_join", "quarantine", "transactions.card_id NOT IN cards.card_id", True),
     ("DQ-AUTH-TXN-FK", "transaction_id must exist in transactions", "bronze", "auth_attempts", "attempt_id", "fk_anti_join", "quarantine", "auth_attempts.transaction_id NOT IN transactions.transaction_id", True),
     ("DQ-DISP-TXN-FK", "transaction_id must exist in transactions", "bronze", "disputes", "dispute_id", "fk_anti_join", "quarantine", "disputes.transaction_id NOT IN transactions.transaction_id", True),
     ("DQ-CBK-DISP-FK", "dispute_id must exist in disputes", "bronze", "chargebacks", "chargeback_id", "fk_anti_join", "quarantine", "chargebacks.dispute_id NOT IN disputes.dispute_id", True),

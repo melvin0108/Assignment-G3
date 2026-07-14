@@ -291,18 +291,20 @@ WHERE status_code = 'open'
 --  DUPLICATE (6) — flag the injected copy via row_number() > 1
 -- ============================================================================
 
--- DQ-CUST-ID-DUP — (customer_id, effective_at) must be unique
--- NOTE: partition by (customer_id, effective_at) so SCD2 version history (same
--- customer_id, later effective_at) is NOT flagged as a dup. The injected defect
--- is a verbatim copy (same customer_id AND same effective_at) -> still rn > 1.
+-- DQ-CUST-ID-DUP — customer_id must be unique for SCD1
+-- Keep the row with the latest effective_at; older or repeated versions fail.
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
 SELECT 'RUN-20260708-DQ1','customers',_source_record_id,customer_id,
-       'DQ-CUST-ID-DUP','(customer_id, effective_at) must be unique','exact duplicate (customer_id, effective_at)','quarantine','quarantined',
+       'DQ-CUST-ID-DUP','customer_id must be unique','exact duplicate customer_id','quarantine','quarantined',
        to_json(named_struct('customer_id',customer_id,'first_name',first_name,'last_name',last_name,'dob',dob)), current_timestamp()
 FROM (
   SELECT customer_id, _source_record_id, first_name, last_name, dob,
-         row_number() OVER (PARTITION BY customer_id, effective_at ORDER BY _source_record_id) AS rn
+         row_number() OVER (
+           PARTITION BY customer_id
+           ORDER BY try_to_timestamp(replace(replace(effective_at,'T',' '),'Z','')) DESC NULLS LAST,
+                    _source_record_id DESC
+         ) AS rn
   FROM __CATALOG__.bronze.customers)
 WHERE rn > 1;
 
@@ -318,18 +320,20 @@ FROM (
   FROM __CATALOG__.bronze.transactions)
 WHERE rn > 1;
 
--- DQ-CARD-DUP — (card_id, effective_at) must be unique
--- NOTE: partition by (card_id, effective_at) so SCD2 version history (same
--- card_id, later effective_at) is NOT flagged as a dup. The injected defect is
--- a verbatim copy (same card_id AND same effective_at) -> still rn > 1.
+-- DQ-CARD-DUP — card_id must be unique for SCD1
+-- Keep the row with the latest effective_at; older or repeated versions fail.
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
 SELECT 'RUN-20260708-DQ1','cards',_source_record_id,card_id,
-       'DQ-CARD-DUP','(card_id, effective_at) must be unique','exact duplicate (card_id, effective_at)','quarantine','quarantined',
+       'DQ-CARD-DUP','card_id must be unique','duplicate card','quarantine','quarantined',
        to_json(named_struct('card_id',card_id,'account_id',account_id,'expiry',expiry,'status',status)), current_timestamp()
 FROM (
   SELECT card_id, _source_record_id, account_id, expiry, status,
-         row_number() OVER (PARTITION BY card_id, effective_at ORDER BY _source_record_id) AS rn
+         row_number() OVER (
+           PARTITION BY card_id
+           ORDER BY try_to_timestamp(replace(replace(effective_at,'T',' '),'Z','')) DESC NULLS LAST,
+                    _source_record_id DESC
+         ) AS rn
   FROM __CATALOG__.bronze.cards)
 WHERE rn > 1;
 
