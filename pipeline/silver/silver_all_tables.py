@@ -27,9 +27,6 @@ CATALOG = _catalog_widget()
 
 # COMMAND ----------
 
-# ---------------------------------------------------------------------------
-# MAIN
-# ---------------------------------------------------------------------------
 # Governance registries run before notebooks 16-18, which append their
 # device-masking and lineage records to those tables.
 SILVER_NOTEBOOKS = [
