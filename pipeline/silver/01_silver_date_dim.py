@@ -4,6 +4,7 @@
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.dbutils import DBUtils
+from pipeline.silver.snapshot import latest_batch_snapshot
 
 spark = SparkSession.builder.getOrCreate()
 dbutils = DBUtils(spark)
@@ -25,7 +26,7 @@ TABLE_NAME = "date_dim"
 bronze_table = f"{CATALOG}.bronze.{TABLE_NAME}"
 silver_table = f"{CATALOG}.silver.{TABLE_NAME}"
 
-silver_df = spark.read.table(bronze_table).select(
+silver_df = latest_batch_snapshot(spark.read.table(bronze_table)).select(
     F.expr("try_to_timestamp(date_id, 'yyyyMMdd')").cast("date").alias("date_id"),
     F.col("year").cast("int").alias("year"),
     F.col("month").cast("int").alias("month"),

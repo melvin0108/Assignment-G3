@@ -4,6 +4,7 @@
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.dbutils import DBUtils
+from pipeline.silver.snapshot import latest_batch_snapshot
 
 spark = SparkSession.builder.getOrCreate()
 dbutils = DBUtils(spark)
@@ -30,7 +31,7 @@ quarantine_table = f"{CATALOG}.silver.quarantine_records"
 PII_PATTERN = r"([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})|(\+\d{6,15})|(\b\d{13,19}\b)|(\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b)"
 
 cases_df = spark.read.table(cases_table).select("case_id", F.col("legal_hold").cast("boolean").alias("case_legal_hold")).distinct()
-checked_df = spark.read.table(bronze_table).join(cases_df, "case_id", "left")
+checked_df = latest_batch_snapshot(spark.read.table(bronze_table)).join(cases_df, "case_id", "left")
 
 def failures(condition, rule_id, rule_name, reason, disposition="quarantined"):
     return checked_df.filter(condition).select(

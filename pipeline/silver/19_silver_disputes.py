@@ -4,6 +4,7 @@
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.dbutils import DBUtils
+from pipeline.silver.snapshot import latest_batch_snapshot
 
 spark = SparkSession.builder.getOrCreate()
 dbutils = DBUtils(spark)
@@ -29,9 +30,8 @@ transactions_table = f"{CATALOG}.silver.transactions"
 quarantine_table = f"{CATALOG}.silver.quarantine_records"
 
 source_df = spark.read.table(bronze_table)
-latest_batch_id = source_df.select(F.max("_batch_id").alias("batch_id")).first()["batch_id"]
 transactions_df = spark.read.table(transactions_table).select("transaction_id").distinct()
-checked_df = (source_df.filter(F.col("_batch_id") == latest_batch_id).alias("d")
+checked_df = (latest_batch_snapshot(source_df).alias("d")
     .join(transactions_df.alias("t"), F.col("d.transaction_id") == F.col("t.transaction_id"), "left")
     .select("d.*", F.col("t.transaction_id").alias("silver_transaction_id")))
 

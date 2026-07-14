@@ -16,6 +16,7 @@ from pyspark.sql.types import (
     StructType, StructField, StringType, IntegerType, TimestampType, DoubleType
 )
 from pyspark.dbutils import DBUtils
+from pipeline.silver.snapshot import latest_batch_snapshot
 
 # In a Databricks environment, `spark` is pre-initialized.
 # This line gets the existing session or initializes one.
@@ -48,7 +49,7 @@ RUN_ID = "RUN-20260706-1"  # Run ID used to track this execution batch
 # 1. LOAD BRONZE DATA & REFERENCES
 # ---------------------------------------------------------------------------
 print(f"Reading from Bronze table: {BRONZE_TABLE_NAME}")
-df = spark.read.table(BRONZE_TABLE_NAME)
+df = latest_batch_snapshot(spark.read.table(BRONZE_TABLE_NAME))
 
 # Load transactions for referential integrity (FK) check.
 # Try silver first, fall back to bronze if silver is not available yet.

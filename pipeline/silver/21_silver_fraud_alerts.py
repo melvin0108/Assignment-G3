@@ -4,6 +4,7 @@
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.dbutils import DBUtils
+from pipeline.silver.snapshot import latest_batch_snapshot
 
 spark = SparkSession.builder.getOrCreate()
 dbutils = DBUtils(spark)
@@ -28,8 +29,7 @@ silver_table = f"{CATALOG}.silver.{TABLE_NAME}"
 quarantine_table = f"{CATALOG}.silver.quarantine_records"
 
 source_df = spark.read.table(bronze_table)
-latest_batch_id = source_df.select(F.max("_batch_id").alias("batch_id")).first()["batch_id"]
-checked_df = source_df.filter(F.col("_batch_id") == latest_batch_id).withColumn("score_typed", F.expr("try_cast(score AS DOUBLE)"))
+checked_df = latest_batch_snapshot(source_df).withColumn("score_typed", F.expr("try_cast(score AS DOUBLE)"))
 invalid_score = (F.col("score_typed") < 0) | (F.col("score_typed") > 1)
 quarantine_df = checked_df.filter(invalid_score).select(
     F.lit(RUN_ID).alias("run_id"), F.lit(TABLE_NAME).alias("source_table"),

@@ -4,6 +4,7 @@
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.dbutils import DBUtils
+from pipeline.silver.snapshot import latest_batch_snapshot
 
 spark = SparkSession.builder.getOrCreate()
 dbutils = DBUtils(spark)
@@ -27,7 +28,7 @@ bronze_table = f"{CATALOG}.bronze.{TABLE_NAME}"
 silver_table = f"{CATALOG}.silver.{TABLE_NAME}"
 quarantine_table = f"{CATALOG}.silver.quarantine_records"
 
-checked_df = (spark.read.table(bronze_table)
+checked_df = (latest_batch_snapshot(spark.read.table(bronze_table))
     .withColumn("opened_at_typed", F.to_timestamp("opened_at"))
     .withColumn("closed_at_typed", F.to_timestamp("closed_at"))
     .withColumn("legal_hold_typed", F.col("legal_hold").cast("boolean")))

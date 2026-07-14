@@ -4,6 +4,7 @@
 from pyspark.sql import SparkSession, Window
 from pyspark.sql import functions as F
 from pyspark.dbutils import DBUtils
+from pipeline.silver.snapshot import latest_batch_snapshot
 
 spark = SparkSession.builder.getOrCreate()
 dbutils = DBUtils(spark)
@@ -27,7 +28,10 @@ bronze_table = f"{CATALOG}.bronze.{TABLE_NAME}"
 silver_table = f"{CATALOG}.silver.{TABLE_NAME}"
 quarantine_table = f"{CATALOG}.silver.quarantine_records"
 
-checked_df = spark.read.table(bronze_table).withColumn("risk_rating_normalized", F.lower(F.trim("risk_rating")))
+checked_df = (
+    latest_batch_snapshot(spark.read.table(bronze_table))
+    .withColumn("risk_rating_normalized", F.lower(F.trim("risk_rating")))
+)
 invalid_risk = ~F.col("risk_rating").isin("low", "medium", "high")
 
 quarantine_df = checked_df.filter(invalid_risk).select(
@@ -50,8 +54,8 @@ spark.sql(f"DELETE FROM {quarantine_table} WHERE source_table = '{TABLE_NAME}' A
 if not quarantine_df.isEmpty():
     quarantine_df.write.format("delta").mode("append").saveAsTable(quarantine_table)
 
-# Keep SCD history while removing repeated ingestion copies of the same version.
-dedupe_window = Window.partitionBy("merchant_id", "effective_at", "_record_hash").orderBy(F.col("_ingest_ts").desc())
+# SCD Type 1: retain one current merchant row from the latest full snapshot.
+dedupe_window = Window.partitionBy("merchant_id").orderBy(F.col("_ingest_ts").desc(), F.col("_record_hash").desc())
 silver_df = (checked_df.filter(~invalid_risk).withColumn("_row_num", F.row_number().over(dedupe_window))
     .filter(F.col("_row_num") == 1).select(
         "merchant_id", "name", "mcc", "country", "risk_rating_normalized", "status",
