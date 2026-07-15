@@ -4,7 +4,7 @@
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.dbutils import DBUtils
-from pipeline.silver.snapshot import latest_batch_snapshot
+from pipeline.silver.snapshot import deduplicate_quarantine_rows, latest_batch_snapshot, snapshot_run_id
 
 spark = SparkSession.builder.getOrCreate()
 dbutils = DBUtils(spark)
@@ -23,7 +23,6 @@ def _catalog_widget():
 
 CATALOG = _catalog_widget()
 TABLE_NAME = "disputes"
-RUN_ID = "RUN-20260713-1"
 bronze_table = f"{CATALOG}.bronze.{TABLE_NAME}"
 silver_table = f"{CATALOG}.silver.{TABLE_NAME}"
 transactions_table = f"{CATALOG}.silver.transactions"
@@ -34,6 +33,7 @@ transactions_df = spark.read.table(transactions_table).select("transaction_id").
 checked_df = (latest_batch_snapshot(source_df).alias("d")
     .join(transactions_df.alias("t"), F.col("d.transaction_id") == F.col("t.transaction_id"), "left")
     .select("d.*", F.col("t.transaction_id").alias("silver_transaction_id")))
+RUN_ID = snapshot_run_id(checked_df)
 
 def failures(condition, rule_id, rule_name, reason):
     return checked_df.filter(condition).select(
@@ -52,6 +52,7 @@ missing_transaction = F.col("silver_transaction_id").isNull()
 quarantine_df = (failures(invalid_status, "DQ-DISP-STATUS-ENUM", "status must be a lowercase dispute enum", "status casing/unknown")
     .unionByName(failures(missing_reason, "DQ-DISP-REASON-REQ", "reason_code is required", "missing reason_code"))
     .unionByName(failures(missing_transaction, "DQ-DISP-TXN-FK", "transaction_id must exist in transactions", "orphan transaction_id")))
+quarantine_df = deduplicate_quarantine_rows(quarantine_df)
 
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.silver")
 spark.sql(f"""CREATE TABLE IF NOT EXISTS {quarantine_table} (

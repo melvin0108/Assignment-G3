@@ -4,7 +4,7 @@
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.dbutils import DBUtils
-from pipeline.silver.snapshot import latest_batch_snapshot
+from pipeline.silver.snapshot import deduplicate_quarantine_rows, latest_batch_snapshot, snapshot_run_id
 
 spark = SparkSession.builder.getOrCreate()
 dbutils = DBUtils(spark)
@@ -23,7 +23,6 @@ def _catalog_widget():
 
 CATALOG = _catalog_widget()
 TABLE_NAME = "investigation_cases"
-RUN_ID = "RUN-20260713-1"
 bronze_table = f"{CATALOG}.bronze.{TABLE_NAME}"
 silver_table = f"{CATALOG}.silver.{TABLE_NAME}"
 quarantine_table = f"{CATALOG}.silver.quarantine_records"
@@ -32,6 +31,7 @@ checked_df = (latest_batch_snapshot(spark.read.table(bronze_table))
     .withColumn("opened_at_typed", F.to_timestamp("opened_at"))
     .withColumn("closed_at_typed", F.to_timestamp("closed_at"))
     .withColumn("legal_hold_typed", F.col("legal_hold").cast("boolean")))
+RUN_ID = snapshot_run_id(checked_df)
 
 def failures(condition, rule_id, rule_name, reason, disposition="quarantined"):
     return checked_df.filter(condition).select(
@@ -49,6 +49,7 @@ legal_hold = F.col("legal_hold_typed")
 quarantine_df = (failures(invalid_status, "DQ-CASE-STATUS-ENUM", "status_code must be in case_status enum", "status not in enum")
     .unionByName(failures(stale_open, "DQ-CASE-STALE", "open cases older than 180 days are stale", "stale open case"))
     .unionByName(failures(legal_hold, "DQ-CASE-LEGALHOLD", "legal_hold cases excluded from AI output", "legal_hold=true (must-not-expose)", "allowed_with_warning")))
+quarantine_df = deduplicate_quarantine_rows(quarantine_df)
 
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.silver")
 spark.sql(f"""CREATE TABLE IF NOT EXISTS {quarantine_table} (

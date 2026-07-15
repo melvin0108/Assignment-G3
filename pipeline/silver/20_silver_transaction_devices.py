@@ -15,7 +15,7 @@ from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.types import StructType, StructField, StringType
 from pyspark.dbutils import DBUtils
-from pipeline.silver.snapshot import latest_batch_snapshot
+from pipeline.silver.snapshot import deduplicate_quarantine_rows, latest_batch_snapshot, snapshot_run_id
 
 # In a Databricks environment, `spark` is pre-initialized.
 # This line gets the existing session or initializes one.
@@ -46,7 +46,6 @@ TRANSACTIONS_TABLE_NAME = f"{CATALOG}.{SCHEMA}.transactions"
 QUARANTINE_TABLE_NAME = f"{CATALOG}.{SCHEMA}.quarantine_records"
 MASKING_POLICIES_TABLE_NAME = f"{CATALOG}.gov.masking_policies"
 LINEAGE_TABLE_NAME = f"{CATALOG}.gov.metadata_lineage"
-RUN_ID = "RUN-20260706-1"
 SALT = "NAB_SALT_2026"
 
 # ---------------------------------------------------------------------------
@@ -56,6 +55,7 @@ print(f"Reading from Bronze table: {BRONZE_TABLE_NAME}")
 devices_all_df = spark.read.table(BRONZE_TABLE_NAME)
 print("Using latest transaction_devices batch snapshot")
 devices_df = latest_batch_snapshot(devices_all_df).alias("d")
+RUN_ID = snapshot_run_id(devices_df)
 
 print(f"Reading Silver transactions for FK validation: {TRANSACTIONS_TABLE_NAME}")
 transactions_df = spark.read.table(TRANSACTIONS_TABLE_NAME).select("transaction_id").distinct().alias("t")
@@ -108,6 +108,7 @@ quarantine_df = (
         "missing device_type",
     ))
 )
+quarantine_df = deduplicate_quarantine_rows(quarantine_df)
 
 # ---------------------------------------------------------------------------
 # 3. WRITE TO QUARANTINE SINK

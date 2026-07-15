@@ -13,12 +13,17 @@
 # ============================================================================
 
 from pyspark.sql import SparkSession
+from pipeline.silver.snapshot import latest_batch_snapshot, snapshot_run_id
 
 spark = SparkSession.builder.getOrCreate()
 
 dbutils.widgets.dropdown("catalog", "g3_dev", ["g3_dev", "g3_test", "g3_catalog"])
 catalog = dbutils.widgets.get("catalog")
-DQ_RUN_ID = None
+manifest_snapshot = latest_batch_snapshot(
+    spark.read.table(f"{catalog}.bronze.defects_manifest")
+)
+SNAPSHOT_BATCH_ID = manifest_snapshot.select("_batch_id").first()["_batch_id"]
+DQ_RUN_ID = f"{snapshot_run_id(manifest_snapshot)}-DQ"
 
 
 def sql(query):
@@ -52,28 +57,8 @@ def fail_if_zero(name, query):
     print(f"PASS: {name} = {value}")
 
 
-def get_dq_run_id():
-    if DQ_RUN_ID:
-        return DQ_RUN_ID
-
-    rows = sql(
-        f"""
-        SELECT run_id
-        FROM {catalog}.silver.quarantine_records
-        GROUP BY run_id
-        ORDER BY MAX(detected_at) DESC, COUNT(*) DESC, run_id DESC
-        LIMIT 1
-        """
-    ).collect()
-    if not rows:
-        raise Exception("Validation failed: no quarantine run_id found")
-
-    run_id = rows[0][0]
-    print(f"INFO: using quarantine run_id = {run_id}")
-    return run_id
-
-
 print("=== M2 DQ/quarantine validation ===")
+print(f"INFO: validating Bronze batch {SNAPSHOT_BATCH_ID} with DQ run {DQ_RUN_ID}")
 
 fail_if_zero(
     "enabled DQ rules are loaded",
@@ -88,6 +73,7 @@ fail_if_rows(
     ),
     manifest AS (
       SELECT DISTINCT rule_id FROM {catalog}.bronze.defects_manifest
+      WHERE _batch_id = {SNAPSHOT_BATCH_ID}
     )
     SELECT rule_id FROM manifest
     EXCEPT
@@ -103,6 +89,7 @@ warn_if_rows(
     ),
     manifest AS (
       SELECT DISTINCT rule_id FROM {catalog}.bronze.defects_manifest
+      WHERE _batch_id = {SNAPSHOT_BATCH_ID}
     )
     SELECT rule_id FROM registry
     EXCEPT
@@ -110,14 +97,12 @@ warn_if_rows(
     """,
 )
 
-dq_run_id = get_dq_run_id()
-
 fail_if_zero(
     "quarantine rows for DQ run",
     f"""
     SELECT COUNT(*)
     FROM {catalog}.silver.quarantine_records
-    WHERE run_id = '{dq_run_id}'
+    WHERE run_id = '{DQ_RUN_ID}'
     """,
 )
 
@@ -126,7 +111,7 @@ fail_if_rows(
     f"""
     SELECT *
     FROM {catalog}.silver.quarantine_records
-    WHERE run_id = '{dq_run_id}'
+    WHERE run_id = '{DQ_RUN_ID}'
       AND (
         source_table IS NULL OR source_table = ''
         OR record_key IS NULL OR record_key = ''
@@ -144,11 +129,12 @@ summary = sql(
     WITH manifest AS (
       SELECT rule_id, record_key
       FROM {catalog}.bronze.defects_manifest
+      WHERE _batch_id = {SNAPSHOT_BATCH_ID}
     ),
     quarantine AS (
       SELECT rule_id, record_key
       FROM {catalog}.silver.quarantine_records
-      WHERE run_id = '{dq_run_id}'
+      WHERE run_id = '{DQ_RUN_ID}'
     ),
     expected AS (
       SELECT rule_id, COUNT(DISTINCT record_key) AS expected_keys

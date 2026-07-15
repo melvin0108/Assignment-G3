@@ -16,7 +16,7 @@ from pyspark.sql.types import (
     StructType, StructField, StringType, IntegerType, TimestampType, DoubleType
 )
 from pyspark.dbutils import DBUtils
-from pipeline.silver.snapshot import latest_batch_snapshot
+from pipeline.silver.snapshot import deduplicate_quarantine_rows, latest_batch_snapshot, snapshot_run_id
 
 # In a Databricks environment, `spark` is pre-initialized.
 # This line gets the existing session or initializes one.
@@ -43,7 +43,6 @@ TABLE_NAME = "accounts"
 FULL_TABLE_NAME = f"{CATALOG}.{SCHEMA}.{TABLE_NAME}"
 BRONZE_TABLE_NAME = f"{CATALOG}.bronze.{TABLE_NAME}"
 QUARANTINE_TABLE_NAME = f"{CATALOG}.{SCHEMA}.quarantine_records"
-RUN_ID = "RUN-20260706-1"  # Run ID used to track this execution batch
 
 # ---------------------------------------------------------------------------
 # 1. LOAD BRONZE DATA
@@ -51,6 +50,7 @@ RUN_ID = "RUN-20260706-1"  # Run ID used to track this execution batch
 # Load raw conformed data from Bronze
 print(f"Reading from Bronze table: {BRONZE_TABLE_NAME}")
 df = latest_batch_snapshot(spark.read.table(BRONZE_TABLE_NAME))
+RUN_ID = snapshot_run_id(df)
 
 # Load clean customers from Silver to perform referential integrity (FK) check
 print(f"Reading from Silver customers for FK validation...")
@@ -101,6 +101,7 @@ quarantine_df = failed_df.select(
     )).alias("raw_record"),
     F.current_timestamp().alias("detected_at")
 )
+quarantine_df = deduplicate_quarantine_rows(quarantine_df)
 
 # ---------------------------------------------------------------------------
 # 3. WRITE TO QUARANTINE SINK
