@@ -4,7 +4,7 @@
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.dbutils import DBUtils
-from pipeline.silver.snapshot import latest_batch_snapshot
+from pipeline.silver.snapshot import deduplicate_quarantine_rows, latest_batch_snapshot, snapshot_run_id
 
 spark = SparkSession.builder.getOrCreate()
 dbutils = DBUtils(spark)
@@ -23,15 +23,26 @@ def _catalog_widget():
 
 CATALOG = _catalog_widget()
 TABLE_NAME = "investigation_notes"
-RUN_ID = "RUN-20260713-1"
 bronze_table = f"{CATALOG}.bronze.{TABLE_NAME}"
-cases_table = f"{CATALOG}.bronze.investigation_cases"
+cases_table = f"{CATALOG}.silver.investigation_cases"
+employees_table = f"{CATALOG}.silver.employees"
 silver_table = f"{CATALOG}.silver.{TABLE_NAME}"
 quarantine_table = f"{CATALOG}.silver.quarantine_records"
 PII_PATTERN = r"([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})|(\+\d{6,15})|(\b\d{13,19}\b)|(\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b)"
 
-cases_df = spark.read.table(cases_table).select("case_id", F.col("legal_hold").cast("boolean").alias("case_legal_hold")).distinct()
-checked_df = latest_batch_snapshot(spark.read.table(bronze_table)).join(cases_df, "case_id", "left")
+cases_df = spark.read.table(cases_table).select(
+    F.col("case_id").alias("silver_case_id"),
+    F.col("legal_hold").cast("boolean").alias("case_legal_hold"),
+).distinct()
+employees_df = spark.read.table(employees_table).select(
+    F.col("employee_id").alias("silver_employee_id")
+).distinct()
+checked_df = (
+    latest_batch_snapshot(spark.read.table(bronze_table))
+    .join(cases_df, F.col("case_id") == F.col("silver_case_id"), "left")
+    .join(employees_df, F.col("author_employee_id") == F.col("silver_employee_id"), "left")
+)
+RUN_ID = snapshot_run_id(checked_df)
 
 def failures(condition, rule_id, rule_name, reason, disposition="quarantined"):
     return checked_df.filter(condition).select(
@@ -44,8 +55,14 @@ def failures(condition, rule_id, rule_name, reason, disposition="quarantined"):
 
 contains_pii = F.col("note_text").rlike(PII_PATTERN)
 legal_hold_note = F.coalesce(F.col("case_legal_hold"), F.lit(False))
-quarantine_df = (failures(contains_pii, "DQ-NOTE-PII-LEAK", "note_text must not contain raw PII/PAN", "leaked PII and PAN in free text")
-    .unionByName(failures(legal_hold_note, "DQ-NOTE-LEGALHOLD", "notes on legal_hold cases must not reach AI", "note on legal_hold case", "allowed_with_warning")))
+missing_case = F.col("silver_case_id").isNull()
+missing_employee = F.col("silver_employee_id").isNull()
+quarantine_df = deduplicate_quarantine_rows(
+    failures(contains_pii, "DQ-NOTE-PII-LEAK", "note_text must not contain raw PII/PAN", "leaked PII and PAN in free text")
+    .unionByName(failures(legal_hold_note, "DQ-NOTE-LEGALHOLD", "notes on legal_hold cases must not reach AI", "note on legal_hold case", "allowed_with_warning"))
+    .unionByName(failures(missing_case, "DQ-NOTE-CASE-FK", "case_id must exist in Silver investigation cases", "case_id does not resolve to Silver investigation cases"))
+    .unionByName(failures(missing_employee, "DQ-NOTE-EMP-FK", "author_employee_id must exist in Silver employees", "author_employee_id does not resolve to Silver employees"))
+)
 
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.silver")
 spark.sql(f"""CREATE TABLE IF NOT EXISTS {quarantine_table} (
@@ -56,7 +73,9 @@ spark.sql(f"DELETE FROM {quarantine_table} WHERE source_table = '{TABLE_NAME}' A
 if not quarantine_df.isEmpty():
     quarantine_df.write.format("delta").mode("append").saveAsTable(quarantine_table)
 
-silver_df = checked_df.filter(~contains_pii & ~legal_hold_note).select(
+silver_df = checked_df.filter(
+    ~contains_pii & ~legal_hold_note & ~missing_case & ~missing_employee
+).select(
     "note_id", "case_id", "author_employee_id", "note_text", F.to_timestamp("created_at").alias("created_at"),
     "_source_file", F.col("_source_file_mod_time").cast("timestamp").alias("_source_file_mod_time"),
     F.col("_ingest_ts").cast("timestamp").alias("_ingest_ts"), "_run_id",

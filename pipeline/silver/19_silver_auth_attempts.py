@@ -14,7 +14,7 @@ from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.types import StructType, StructField, StringType
 from pyspark.dbutils import DBUtils
-from pipeline.silver.snapshot import latest_batch_snapshot
+from pipeline.silver.snapshot import deduplicate_quarantine_rows, latest_batch_snapshot, snapshot_run_id
 
 # In a Databricks environment, `spark` is pre-initialized.
 # This line gets the existing session or initializes one.
@@ -44,7 +44,6 @@ BRONZE_TABLE_NAME = f"{CATALOG}.bronze.{TABLE_NAME}"
 TRANSACTIONS_TABLE_NAME = f"{CATALOG}.{SCHEMA}.transactions"
 QUARANTINE_TABLE_NAME = f"{CATALOG}.{SCHEMA}.quarantine_records"
 LINEAGE_TABLE_NAME = f"{CATALOG}.gov.metadata_lineage"
-RUN_ID = "RUN-20260706-1"
 
 # ---------------------------------------------------------------------------
 # 1. LOAD BRONZE AND REFERENCE DATA
@@ -53,6 +52,7 @@ print(f"Reading from Bronze table: {BRONZE_TABLE_NAME}")
 auth_attempts_all_df = spark.read.table(BRONZE_TABLE_NAME)
 print("Using latest auth_attempts batch snapshot")
 auth_attempts_df = latest_batch_snapshot(auth_attempts_all_df).alias("a")
+RUN_ID = snapshot_run_id(auth_attempts_df)
 
 print(f"Reading Silver transactions for FK validation: {TRANSACTIONS_TABLE_NAME}")
 transactions_df = spark.read.table(TRANSACTIONS_TABLE_NAME).select("transaction_id", "txn_ts").alias("t")
@@ -111,6 +111,7 @@ quarantine_df = (
         "auth_ts is missing, invalid, or after linked transaction timestamp",
     ))
 )
+quarantine_df = deduplicate_quarantine_rows(quarantine_df)
 
 # ---------------------------------------------------------------------------
 # 3. WRITE TO QUARANTINE SINK

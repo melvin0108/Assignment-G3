@@ -17,7 +17,7 @@ from pyspark.sql.types import (
 )
 from pyspark.sql.window import Window
 from pyspark.dbutils import DBUtils
-from pipeline.silver.snapshot import latest_batch_snapshot
+from pipeline.silver.snapshot import deduplicate_quarantine_rows, latest_batch_snapshot, snapshot_run_id
 
 # In a Databricks environment, `spark` is pre-initialized.
 # This line gets the existing session or initializes one.
@@ -44,7 +44,6 @@ TABLE_NAME = "cards"
 FULL_TABLE_NAME = f"{CATALOG}.{SCHEMA}.{TABLE_NAME}"
 BRONZE_TABLE_NAME = f"{CATALOG}.bronze.{TABLE_NAME}"
 QUARANTINE_TABLE_NAME = f"{CATALOG}.{SCHEMA}.quarantine_records"
-RUN_ID = "RUN-20260706-1"  # Run ID used to track this execution batch
 
 # ---------------------------------------------------------------------------
 # 1. LOAD BRONZE DATA
@@ -52,6 +51,11 @@ RUN_ID = "RUN-20260706-1"  # Run ID used to track this execution batch
 # Load raw conformed data from Bronze
 print(f"Reading from Bronze table: {BRONZE_TABLE_NAME}")
 df = latest_batch_snapshot(spark.read.table(BRONZE_TABLE_NAME))
+RUN_ID = snapshot_run_id(df)
+
+print(f"Reading Silver accounts for FK validation...")
+accounts_df = spark.read.table(f"{CATALOG}.{SCHEMA}.accounts") \
+    .select("account_id").distinct()
 
 # ---------------------------------------------------------------------------
 # 2. RUN DQ RULES & IDENTIFY FAILURES (QUARANTINE)
@@ -60,8 +64,15 @@ df = latest_batch_snapshot(spark.read.table(BRONZE_TABLE_NAME))
 # - rn_pk: Detects exact card_id duplicates (keeps first by _ingest_ts)
 pk_window = Window.partitionBy("card_id").orderBy("_ingest_ts")
 
-# Rank the records to detect duplicates
-df_ranked = df.withColumn("rn_pk", F.row_number().over(pk_window))
+# Rank the records to detect duplicates and validate the clean parent key.
+df_ranked = (
+    df.withColumn("rn_pk", F.row_number().over(pk_window))
+    .join(
+        accounts_df.withColumn("account_exists", F.lit(True)),
+        on="account_id",
+        how="left",
+    )
+)
 
 # Expired but active check
 is_expired_active = (
@@ -71,21 +82,26 @@ is_expired_active = (
         (F.to_date(F.concat(F.col("expiry"), F.lit("-01")), "yyyy-MM-dd") < F.to_date(F.lit("2026-07-01"),
                                                                                       "yyyy-MM-dd"))
 )
+is_missing_account = F.col("account_id").isNull() | (F.trim(F.col("account_id")) == "") | F.col("account_exists").isNull()
 
 # DQ failure expressions aligning with gov.dq_rules
 rule_id_expr = F.when(F.col("rn_pk") > 1, "DQ-CARD-DUP") \
-    .when(is_expired_active, "DQ-CARD-EXPIRED-ACTIVE")
+    .when(is_expired_active, "DQ-CARD-EXPIRED-ACTIVE") \
+    .when(is_missing_account, "DQ-CARD-ACCT-FK")
 
 rule_name_expr = F.when(F.col("rn_pk") > 1, "card_id must be unique") \
-    .when(is_expired_active, "active card must not have a past expiry")
+    .when(is_expired_active, "active card must not have a past expiry") \
+    .when(is_missing_account, "account_id must exist in Silver accounts")
 
 failure_reason_expr = F.when(F.col("rn_pk") > 1, F.concat(F.lit("Duplicate card_id found: "), F.col("card_id"))) \
-    .when(is_expired_active, F.concat(F.lit("Card active but expired. expiry: "), F.col("expiry")))
+    .when(is_expired_active, F.concat(F.lit("Card active but expired. expiry: "), F.col("expiry"))) \
+    .when(is_missing_account, F.lit("account_id does not resolve to Silver accounts"))
 
 # Filter out failed records for quarantine
 failed_df = df_ranked.filter(
     (F.col("rn_pk") > 1) |
-    is_expired_active
+    is_expired_active |
+    is_missing_account
 )
 
 # Structure the quarantined DataFrame matching silver.quarantine_records schema
@@ -104,6 +120,7 @@ quarantine_df = failed_df.select(
     )).alias("raw_record"),
     F.current_timestamp().alias("detected_at")
 )
+quarantine_df = deduplicate_quarantine_rows(quarantine_df)
 
 # ---------------------------------------------------------------------------
 # 3. WRITE TO QUARANTINE SINK

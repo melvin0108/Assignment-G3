@@ -4,7 +4,7 @@
 from pyspark.sql import SparkSession, Window
 from pyspark.sql import functions as F
 from pyspark.dbutils import DBUtils
-from pipeline.silver.snapshot import latest_batch_snapshot
+from pipeline.silver.snapshot import deduplicate_quarantine_rows, latest_batch_snapshot, snapshot_run_id
 
 spark = SparkSession.builder.getOrCreate()
 dbutils = DBUtils(spark)
@@ -23,7 +23,6 @@ def _catalog_widget():
 
 CATALOG = _catalog_widget()
 TABLE_NAME = "merchants"
-RUN_ID = "RUN-20260713-1"
 bronze_table = f"{CATALOG}.bronze.{TABLE_NAME}"
 silver_table = f"{CATALOG}.silver.{TABLE_NAME}"
 quarantine_table = f"{CATALOG}.silver.quarantine_records"
@@ -32,7 +31,8 @@ checked_df = (
     latest_batch_snapshot(spark.read.table(bronze_table))
     .withColumn("risk_rating_normalized", F.lower(F.trim("risk_rating")))
 )
-invalid_risk = ~F.col("risk_rating").isin("low", "medium", "high")
+RUN_ID = snapshot_run_id(checked_df)
+invalid_risk = ~F.col("risk_rating_normalized").isin("low", "medium", "high")
 
 quarantine_df = checked_df.filter(invalid_risk).select(
     F.lit(RUN_ID).alias("run_id"), F.lit(TABLE_NAME).alias("source_table"),
@@ -44,6 +44,7 @@ quarantine_df = checked_df.filter(invalid_risk).select(
     F.to_json(F.struct("merchant_id", "risk_rating", "status")).alias("raw_record"),
     F.current_timestamp().alias("detected_at"),
 )
+quarantine_df = deduplicate_quarantine_rows(quarantine_df)
 
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.silver")
 spark.sql(f"""CREATE TABLE IF NOT EXISTS {quarantine_table} (

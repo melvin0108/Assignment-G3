@@ -3,6 +3,7 @@
 
 from pyspark.sql import SparkSession
 from pyspark.dbutils import DBUtils
+from pipeline.silver.snapshot import assert_matching_latest_snapshots
 
 
 spark = SparkSession.builder.getOrCreate()
@@ -25,10 +26,47 @@ def _catalog_widget():
 
 CATALOG = _catalog_widget()
 
+SNAPSHOT_SOURCE_TABLES = [
+    "date_dim",
+    "defects_manifest",
+    "countries",
+    "currencies",
+    "branches",
+    "channels",
+    "merchant_categories",
+    "dispute_reason_codes",
+    "fraud_types",
+    "case_status_types",
+    "customers",
+    "employees",
+    "accounts",
+    "cards",
+    "merchants",
+    "transactions",
+    "auth_attempts",
+    "transaction_devices",
+    "disputes",
+    "chargebacks",
+    "fraud_alerts",
+    "investigation_cases",
+    "investigation_notes",
+    "case_transactions",
+    "case_parties",
+    "customer_contact_logs",
+]
+
+SNAPSHOT_BATCH_ID, SNAPSHOT_RUN_ID = assert_matching_latest_snapshots(
+    spark, CATALOG, SNAPSHOT_SOURCE_TABLES
+)
+print(
+    f"Validated shared Bronze snapshot: batch {SNAPSHOT_BATCH_ID}, "
+    f"run {SNAPSHOT_RUN_ID}"
+)
+
 # COMMAND ----------
 
-# Governance registries run before notebooks 16-18, which append their
-# device-masking and lineage records to those tables.
+# Governance registries run before transaction, authentication, and device
+# notebooks, which append device-masking and lineage records to those tables.
 SILVER_NOTEBOOKS = [
     "01_silver_date_dim",
     "02_silver_defects_manifest",
@@ -45,19 +83,19 @@ SILVER_NOTEBOOKS = [
     "13_silver_accounts",
     "14_silver_cards",
     "15_silver_merchants",
-    "27_silver_masking_policies",
-    "28_silver_metadata_lineage",
-    "16_silver_transactions",
-    "17_silver_auth_attempts",
-    "18_silver_transaction_devices",
-    "19_silver_disputes",
-    "20_silver_chargebacks",
-    "21_silver_fraud_alerts",
-    "22_silver_investigation_cases",
-    "23_silver_investigation_notes",
-    "24_silver_case_transactions",
-    "25_silver_case_parties",
-    "26_silver_customer_contact_logs",
+    "16_silver_masking_policies",
+    "17_silver_metadata_lineage",
+    "18_silver_transactions",
+    "19_silver_auth_attempts",
+    "20_silver_transaction_devices",
+    "21_silver_disputes",
+    "22_silver_chargebacks",
+    "23_silver_fraud_alerts",
+    "24_silver_investigation_cases",
+    "25_silver_investigation_notes",
+    "26_silver_case_transactions",
+    "27_silver_case_parties",
+    "28_silver_customer_contact_logs",
 ]
 
 for position, notebook_name in enumerate(SILVER_NOTEBOOKS, start=1):

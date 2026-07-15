@@ -1,13 +1,13 @@
 # Databricks notebook source
 # ============================================================================
-# SILVER TRANSFORMATION & DATA QUALITY PIPELINE: chargebacks
+# SILVER TRANSFORMATION & DATA QUALITY PIPELINE: case_parties
 # ============================================================================
-# Implements Bronze -> Silver transformation for the chargebacks dataset:
-#   1. Reads from bronze.chargebacks
-#   2. Performs referential integrity checks against disputes
+# Implements Bronze -> Silver transformation for the case_parties dataset:
+#   1. Reads from bronze.case_parties
+#   2. Performs conditional referential integrity checks (by party_type)
 #   3. Enforces Data Quality (DQ) rules and identifies failures
 #   4. Quarantines failed records to silver.quarantine_records
-#   5. Writes clean records to silver.chargebacks
+#   5. Writes clean records to silver.case_parties
 # ============================================================================
 
 from pyspark.sql import SparkSession
@@ -16,7 +16,7 @@ from pyspark.sql.types import (
     StructType, StructField, StringType, IntegerType, TimestampType, DoubleType
 )
 from pyspark.dbutils import DBUtils
-from pipeline.silver.snapshot import latest_batch_snapshot
+from pipeline.silver.snapshot import deduplicate_quarantine_rows, latest_batch_snapshot, snapshot_run_id
 
 # In a Databricks environment, `spark` is pre-initialized.
 # This line gets the existing session or initializes one.
@@ -39,65 +39,87 @@ def _catalog_widget():
 
 CATALOG = _catalog_widget()
 SCHEMA = "silver"
-TABLE_NAME = "chargebacks"
+TABLE_NAME = "case_parties"
 FULL_TABLE_NAME = f"{CATALOG}.{SCHEMA}.{TABLE_NAME}"
 BRONZE_TABLE_NAME = f"{CATALOG}.bronze.{TABLE_NAME}"
 QUARANTINE_TABLE_NAME = f"{CATALOG}.{SCHEMA}.quarantine_records"
-RUN_ID = "RUN-20260706-1"  # Run ID used to track this execution batch
 
 # ---------------------------------------------------------------------------
 # 1. LOAD BRONZE DATA & REFERENCES
 # ---------------------------------------------------------------------------
 print(f"Reading from Bronze table: {BRONZE_TABLE_NAME}")
 df = latest_batch_snapshot(spark.read.table(BRONZE_TABLE_NAME))
+RUN_ID = snapshot_run_id(df)
 
-# Load disputes for referential integrity (FK) check.
-# Try silver first, fall back to bronze if silver is not available yet.
-print("Loading disputes reference table...")
-try:
-    disputes_df = spark.read.table(f"{CATALOG}.{SCHEMA}.disputes").select("dispute_id").distinct()
-    print("Using silver.disputes for FK validation.")
-except Exception as e:
-    print(f"Silver disputes not found, falling back to bronze: {e}")
-    disputes_df = spark.read.table(f"{CATALOG}.bronze.disputes").select("dispute_id").distinct()
+# Load clean parents for referential integrity checks.
+print("Loading Silver customers, merchants, and investigation cases...")
+customers_df = spark.read.table(f"{CATALOG}.{SCHEMA}.customers").select("customer_id").distinct()
+merchants_df = spark.read.table(f"{CATALOG}.{SCHEMA}.merchants").select("merchant_id").distinct()
+cases_df = spark.read.table(f"{CATALOG}.{SCHEMA}.investigation_cases").select("case_id").distinct()
 
 # ---------------------------------------------------------------------------
 # 2. RUN DQ RULES & IDENTIFY FAILURES (QUARANTINE)
 # ---------------------------------------------------------------------------
-# Left join with disputes to check if dispute_id exists
+# Left join with customers to check if customer party exists
 df_joined = df.join(
-    disputes_df.withColumn("disp_exists", F.lit(True)),
-    on="dispute_id",
+    customers_df.withColumn("cust_exists", F.lit(True)),
+    on=(df.party_type == "customer") & (df.party_id == customers_df.customer_id),
     how="left"
 )
 
+# Left join with merchants to check if merchant party exists
+df_joined = df_joined.join(
+    merchants_df.withColumn("merch_exists", F.lit(True)),
+    on=(df_joined.party_type == "merchant") & (df_joined.party_id == merchants_df.merchant_id),
+    how="left"
+).join(
+    cases_df.withColumn("case_exists", F.lit(True)),
+    on="case_id",
+    how="left",
+)
+
 # DQ conditions
-is_missing_fk = F.col("dispute_id").isNotNull() & F.col("disp_exists").isNull()
+is_invalid_type = ~F.col("party_type").isin("customer", "merchant", "third_party")
+is_unresolved = (
+    ((F.col("party_type") == "customer") & F.col("cust_exists").isNull()) |
+    ((F.col("party_type") == "merchant") & F.col("merch_exists").isNull())
+)
+is_missing_case = F.col("case_id").isNull() | F.col("case_exists").isNull()
 
 # DQ failure expressions aligning with gov.dq_rules / dq_failures SQL
-rule_id_expr = F.when(is_missing_fk, "DQ-CBK-DISP-FK")
-rule_name_expr = F.when(is_missing_fk, "dispute_id must exist in disputes")
-failure_reason_expr = F.when(is_missing_fk, F.lit("orphan dispute_id"))
+rule_id_expr = F.when(is_invalid_type, "DQ-CASEPARTY-TYPE-ENUM") \
+                .when(is_unresolved, "DQ-CASEPARTY-RESOLVE") \
+                .when(is_missing_case, "DQ-CASEPARTY-CASE-FK")
+
+rule_name_expr = F.when(is_invalid_type, "party_type must be in {customer,merchant,third_party}") \
+                  .when(is_unresolved, "party_id must resolve per party_type") \
+                  .when(is_missing_case, "case_id must exist in Silver investigation cases")
+
+failure_reason_expr = F.when(is_invalid_type, F.lit("invalid party_type")) \
+                      .when(is_unresolved, F.lit("unresolvable party_id for party_type")) \
+                      .when(is_missing_case, F.lit("case_id does not resolve to Silver investigation cases"))
 
 # Filter out failed records for quarantine
-failed_df = df_joined.filter(is_missing_fk)
+failed_df = df_joined.filter(is_invalid_type | is_unresolved | is_missing_case)
 
 # Structure the quarantined DataFrame matching silver.quarantine_records schema
+# Note the composite record_key: case_id|party_type|party_id
 quarantine_df = failed_df.select(
     F.lit(RUN_ID).alias("run_id"),
-    F.lit("chargebacks").alias("source_table"),
+    F.lit("case_parties").alias("source_table"),
     F.col("_source_record_id").alias("source_record_id"),
-    F.col("chargeback_id").alias("record_key"),
+    F.concat_ws("|", F.col("case_id"), F.col("party_type"), F.col("party_id")).alias("record_key"),
     rule_id_expr.alias("rule_id"),
     rule_name_expr.alias("rule_name"),
     failure_reason_expr.alias("failure_reason"),
     F.lit("quarantine").alias("severity"),
     F.lit("quarantined").alias("disposition"),
     F.to_json(F.struct(
-        "chargeback_id", "dispute_id", "stage"
+        "case_id", "party_type", "party_id", "role"
     )).alias("raw_record"),
     F.current_timestamp().alias("detected_at")
 )
+quarantine_df = deduplicate_quarantine_rows(quarantine_df)
 
 # ---------------------------------------------------------------------------
 # 3. WRITE TO QUARANTINE SINK
@@ -107,10 +129,10 @@ spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SCHEMA}")
 
 # Idempotent write: clean up this run's prior quarantine rows first
 try:
-    print(f"Cleaning prior quarantine records for chargebacks under run {RUN_ID}...")
+    print(f"Cleaning prior quarantine records for case_parties under run {RUN_ID}...")
     spark.sql(f"""
         DELETE FROM {QUARANTINE_TABLE_NAME} 
-        WHERE source_table = 'chargebacks' AND run_id = '{RUN_ID}'
+        WHERE source_table = 'case_parties' AND run_id = '{RUN_ID}'
     """)
 except Exception as e:
     print(f"Quarantine delete skipped (table might not exist yet): {e}")
@@ -136,13 +158,11 @@ clean_df = df_joined.join(
 )
 
 # Construct Silver DataFrame
-silver_chargebacks_df = clean_df.select(
-    F.col("chargeback_id"),
-    F.col("dispute_id"),
-    F.col("scheme"),
-    F.col("amount").cast("double").alias("amount"),
-    F.col("stage"),
-    F.col("processed_at").cast("timestamp").alias("processed_at"),
+silver_case_parties_df = clean_df.select(
+    F.col("case_id"),
+    F.col("party_type"),
+    F.col("party_id"),
+    F.col("role"),
     F.col("_source_file"),
     F.col("_source_file_mod_time").cast("timestamp").alias("_source_file_mod_time"),
     F.col("_ingest_ts").cast("timestamp").alias("_ingest_ts"),
@@ -153,11 +173,11 @@ silver_chargebacks_df = clean_df.select(
 )
 
 # ---------------------------------------------------------------------------
-# 5. WRITE CLEAN SILVER CHARGEBACKS TABLE
+# 5. WRITE CLEAN SILVER CASE_PARTIES TABLE
 # ---------------------------------------------------------------------------
 print(f"Writing clean records to Silver table: {FULL_TABLE_NAME}")
 (
-    silver_chargebacks_df.write
+    silver_case_parties_df.write
     .format("delta")
     .mode("overwrite")
     .option("overwriteSchema", "true")
@@ -169,6 +189,6 @@ print(f"Table created/updated successfully: {FULL_TABLE_NAME}")
 # ---------------------------------------------------------------------------
 # 6. VERIFY & DESCRIBE
 # ---------------------------------------------------------------------------
-print("\nVerifying Silver Chargebacks:")
+print("\nVerifying Silver Case Parties:")
 spark.sql(f"SELECT * FROM {FULL_TABLE_NAME} LIMIT 10").show()
 spark.sql(f"DESCRIBE TABLE {FULL_TABLE_NAME}").show(truncate=False)
