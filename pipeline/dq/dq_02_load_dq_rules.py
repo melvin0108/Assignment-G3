@@ -3,11 +3,13 @@
 # GOVERNANCE PIPELINE: dq_rules  (the DQ rule registry)
 # ----------------------------------------------------------------------------
 # Defines and populates the rule registry under gov.dq_rules — one row per
-# executable data-quality rule (the 35 rule_ids the mock generator injects).
+# executable data-quality rule (35 injected Bronze rules plus 10 derived
+# Silver reconciliation rules).
 # Mirrors silver_masking_policies.py / silver_metadata_lineage.py: build a
 # DataFrame from an explicit schema + a Python list, then saveAsTable(overwrite).
-# The 35 rows below are parsed verbatim from pipeline/dq/02_load_dq_rules.sql;
-# The target catalog is selected through the team-standard catalog widget.
+# The Bronze rows mirror pipeline/dq/02_load_dq_rules.sql; the Silver rows
+# register relationships evaluated by the Silver transformations. The target
+# catalog is selected through the team-standard catalog widget.
 # ============================================================================
 
 from pyspark.sql import SparkSession
@@ -54,8 +56,8 @@ schema = StructType([
     StructField("enabled", BooleanType(), nullable=True),
 ])
 
-# The 35 DQ rules (single_row=13, duplicate=6, fk_anti_join=12, text_pii=2,
-# ai_exclusion=2). severity is 'quarantine' for all (matches defects_manifest).
+# The 35 Bronze rules plus 10 Silver reconciliation rules. Bronze-rule severity
+# matches defects_manifest; Silver rules capture descendants of rejected parents.
 data = [
     ("DQ-TXN-AMT-POS", "amount must be > 0", "bronze", "transactions", "transaction_id", "single_row", "quarantine", "CAST(amount AS DOUBLE) <= 0", True),
     ("DQ-TXN-MERCH-REQ", "merchant_id is required", "bronze", "transactions", "transaction_id", "single_row", "quarantine", "merchant_id IS NULL OR merchant_id = ''", True),
@@ -92,6 +94,16 @@ data = [
     ("DQ-CTL-NOTE-PII", "note must not contain raw PII/PAN", "bronze", "customer_contact_logs", "contact_id", "text_pii", "quarantine", "note RLIKE email|phone|PAN", True),
     ("DQ-CASE-LEGALHOLD", "legal_hold cases excluded from AI output", "bronze", "investigation_cases", "case_id", "ai_exclusion", "quarantine", "legal_hold = 'true'", True),
     ("DQ-NOTE-LEGALHOLD", "notes on legal_hold cases must not reach AI", "bronze", "investigation_notes", "note_id", "ai_exclusion", "quarantine", "JOIN investigation_cases ON case_id WHERE legal_hold = 'true'", True),
+    ("DQ-CARD-ACCT-FK", "account_id must exist in Silver accounts", "silver", "cards", "card_id", "fk_anti_join", "quarantine", "cards.account_id NOT IN silver.accounts.account_id", True),
+    ("DQ-TXN-CARD-FK", "card_id must exist in Silver cards", "silver", "transactions", "transaction_id", "fk_anti_join", "quarantine", "transactions.card_id NOT IN silver.cards.card_id when present", True),
+    ("DQ-TXN-MERCH-FK", "merchant_id must exist in Silver merchants", "silver", "transactions", "transaction_id", "fk_anti_join", "quarantine", "transactions.merchant_id NOT IN silver.merchants.merchant_id", True),
+    ("DQ-ALT-TXN-FK", "transaction_id must exist in Silver transactions", "silver", "fraud_alerts", "alert_id", "fk_anti_join", "quarantine", "fraud_alerts.transaction_id NOT IN silver.transactions.transaction_id", True),
+    ("DQ-NOTE-CASE-FK", "case_id must exist in Silver investigation cases", "silver", "investigation_notes", "note_id", "fk_anti_join", "quarantine", "investigation_notes.case_id NOT IN silver.investigation_cases.case_id", True),
+    ("DQ-NOTE-EMP-FK", "author_employee_id must exist in Silver employees", "silver", "investigation_notes", "note_id", "fk_anti_join", "quarantine", "investigation_notes.author_employee_id NOT IN silver.employees.employee_id", True),
+    ("DQ-CASETXN-CASE-FK", "case_id must exist in Silver investigation cases", "silver", "case_transactions", "case_id|transaction_id", "fk_anti_join", "quarantine", "case_transactions.case_id NOT IN silver.investigation_cases.case_id", True),
+    ("DQ-CASEPARTY-CASE-FK", "case_id must exist in Silver investigation cases", "silver", "case_parties", "case_id|party_type|party_id", "fk_anti_join", "quarantine", "case_parties.case_id NOT IN silver.investigation_cases.case_id", True),
+    ("DQ-CTL-CUST-FK", "customer_id must exist in Silver customers", "silver", "customer_contact_logs", "contact_id", "fk_anti_join", "quarantine", "customer_contact_logs.customer_id NOT IN silver.customers.customer_id", True),
+    ("DQ-CTL-EMP-FK", "employee_id must exist in Silver employees", "silver", "customer_contact_logs", "contact_id", "fk_anti_join", "quarantine", "customer_contact_logs.employee_id NOT IN silver.employees.employee_id", True),
 ]
 
 # ---------------------------------------------------------------------------
@@ -114,20 +126,20 @@ print(f"Table created/updated successfully: {FULL_TABLE_NAME}")
 # ---------------------------------------------------------------------------
 # VERIFY & DESCRIBE  (mirrors the VERIFY block of 02_load_dq_rules.sql)
 # ---------------------------------------------------------------------------
-print("\nRule count (expected 35):")
+print("\nRule count (expected 45: 35 Bronze + 10 Silver):")
 spark.sql(f"SELECT COUNT(*) AS rule_count FROM {FULL_TABLE_NAME}").show()
 
-print("Counts per pattern (expected single_row=13, duplicate=6, fk_anti_join=12, text_pii=2, ai_exclusion=2):")
+print("Counts per pattern (expected single_row=13, duplicate=6, fk_anti_join=22, text_pii=2, ai_exclusion=2):")
 spark.sql(
     f"SELECT pattern, COUNT(*) AS n FROM {FULL_TABLE_NAME} "
     f"GROUP BY pattern ORDER BY n DESC"
 ).show()
 
-print("Registry drift vs defects_manifest (expected 0 rows):")
+print("Bronze-rule registry drift vs defects_manifest (expected 0 rows):")
 spark.sql(
     f"SELECT r.rule_id FROM {FULL_TABLE_NAME} r "
     f"LEFT JOIN (SELECT DISTINCT rule_id FROM {catalog}.bronze.defects_manifest) m "
-    f"ON r.rule_id = m.rule_id WHERE m.rule_id IS NULL"
+    f"ON r.rule_id = m.rule_id WHERE r.layer = 'bronze' AND m.rule_id IS NULL"
 ).show()
 
 print("\nVerifying DQ Rule Registry:")

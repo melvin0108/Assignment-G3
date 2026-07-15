@@ -12,6 +12,11 @@
 # ============================================================================
 
 from pyspark.sql import SparkSession
+from pipeline.silver.snapshot import (
+    assert_matching_latest_snapshots,
+    deduplicate_quarantine_rows,
+    latest_batch_snapshot,
+)
 
 # `spark` is pre-initialized in a Databricks notebook.
 spark = SparkSession.builder.getOrCreate()
@@ -34,6 +39,72 @@ def _catalog_widget():
 
 
 catalog = _catalog_widget()
+QUARANTINE_TABLE_NAME = f"{catalog}.silver.quarantine_records"
+SOURCE_TABLES = (
+    "accounts",
+    "auth_attempts",
+    "cards",
+    "case_parties",
+    "case_transactions",
+    "chargebacks",
+    "customer_contact_logs",
+    "customers",
+    "defects_manifest",
+    "disputes",
+    "employees",
+    "fraud_alerts",
+    "investigation_cases",
+    "investigation_notes",
+    "merchants",
+    "transaction_devices",
+    "transactions",
+)
+
+
+def _prepare_current_source_views():
+    """Expose one latest-batch view per Bronze source for every DQ rule."""
+    snapshot_identity = assert_matching_latest_snapshots(
+        spark, catalog, SOURCE_TABLES
+    )
+    for table_name in SOURCE_TABLES:
+        latest_batch_snapshot(
+            spark.read.table(f"{catalog}.bronze.{table_name}")
+        ).createOrReplaceTempView(f"dq_current_{table_name}")
+    return snapshot_identity
+
+
+def _use_current_source_views(sql):
+    for table_name in SOURCE_TABLES:
+        sql = sql.replace(
+            f"__CATALOG__.bronze.{table_name}",
+            f"dq_current_{table_name}",
+        )
+    return sql
+
+
+def _deduplicate_quarantine_records():
+    """Enforce the quarantine natural key across current and historical runs."""
+    current_rows = spark.read.table(QUARANTINE_TABLE_NAME)
+    current_count = current_rows.count()
+    deduplicated_rows = deduplicate_quarantine_rows(current_rows).cache()
+    try:
+        deduplicated_count = deduplicated_rows.count()
+        if deduplicated_count == current_count:
+            print(f"Quarantine rows are already unique: {current_count}")
+            return
+
+        print(
+            f"Deduplicating {current_count - deduplicated_count} excess quarantine rows "
+            "across all runs..."
+        )
+        (
+            deduplicated_rows.write.format("delta")
+            .mode("overwrite")
+            .option("overwriteSchema", "false")
+            .saveAsTable(QUARANTINE_TABLE_NAME)
+        )
+    finally:
+        deduplicated_rows.unpersist()
 
 def _has_code(stmt):
     """True if the chunk has any SQL after stripping -- line comments, so a
@@ -133,8 +204,8 @@ SQL = r"""
 -- This script SUPERSEDES 03_failures_first_slice.sql once the slice is verified.
 --
 -- ── run_id ──────────────────────────────────────────────────────────────────
--- Inlined literal 'RUN-20260708-DQ1' (same convention as 01_ingest_bronze.sql —
--- no SQL variables/widgets). Find-replace across the file to use a new run_id.
+-- __DQ_RUN_ID__ is replaced at runtime with the selected Bronze snapshot's
+-- _run_id plus a -DQ suffix, so reruns of the same snapshot are idempotent.
 --
 -- ── IDEMPOTENCY ──────────────────────────────────────────────────────────────
 -- DELETE of this run_id's rows first → re-running replaces this run cleanly.
@@ -155,7 +226,7 @@ SQL = r"""
 
 
 -- 0. Reset this run's quarantine rows so the script is re-runnable.
-DELETE FROM __CATALOG__.silver.quarantine_records WHERE run_id = 'RUN-20260708-DQ1';
+DELETE FROM __CATALOG__.silver.quarantine_records WHERE run_id = '__DQ_RUN_ID__';
 
 
 -- ============================================================================
@@ -165,7 +236,7 @@ DELETE FROM __CATALOG__.silver.quarantine_records WHERE run_id = 'RUN-20260708-D
 -- DQ-TXN-AMT-POS — amount must be > 0
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','transactions',_source_record_id,transaction_id,
+SELECT '__DQ_RUN_ID__','transactions',_source_record_id,transaction_id,
        'DQ-TXN-AMT-POS','amount must be > 0','negative amount','quarantine','quarantined',
        to_json(named_struct('transaction_id',transaction_id,'amount',amount,'txn_ts',txn_ts,'status',status)), current_timestamp()
 FROM __CATALOG__.bronze.transactions
@@ -174,7 +245,7 @@ WHERE try_cast(amount AS DOUBLE) <= 0;
 -- DQ-TXN-MERCH-REQ — merchant_id is required
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','transactions',_source_record_id,transaction_id,
+SELECT '__DQ_RUN_ID__','transactions',_source_record_id,transaction_id,
        'DQ-TXN-MERCH-REQ','merchant_id is required','missing merchant_id','quarantine','quarantined',
        to_json(named_struct('transaction_id',transaction_id,'merchant_id',merchant_id,'amount',amount)), current_timestamp()
 FROM __CATALOG__.bronze.transactions
@@ -183,7 +254,7 @@ WHERE merchant_id IS NULL OR merchant_id = '';
 -- DQ-TXN-TS-FUTURE — txn_ts must not be in the future
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','transactions',_source_record_id,transaction_id,
+SELECT '__DQ_RUN_ID__','transactions',_source_record_id,transaction_id,
        'DQ-TXN-TS-FUTURE','txn_ts must not be in the future','future timestamp','quarantine','quarantined',
        to_json(named_struct('transaction_id',transaction_id,'txn_ts',txn_ts)), current_timestamp()
 FROM __CATALOG__.bronze.transactions
@@ -192,7 +263,7 @@ WHERE try_to_timestamp(replace(replace(txn_ts,'T',' '),'Z','')) > TIMESTAMP '202
 -- DQ-ACC-OPENDATE-FUTURE — open_date must not be in the future
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','accounts',_source_record_id,account_id,
+SELECT '__DQ_RUN_ID__','accounts',_source_record_id,account_id,
        'DQ-ACC-OPENDATE-FUTURE','open_date must not be in the future','future open_date','quarantine','quarantined',
        to_json(named_struct('account_id',account_id,'open_date',open_date,'status',status)), current_timestamp()
 FROM __CATALOG__.bronze.accounts
@@ -205,7 +276,7 @@ WHERE try_to_date(open_date) > DATE '2026-07-06';
 -- carry a valid email, so catching NULL/invalid does not over-fire.
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','customers',_source_record_id,customer_id,
+SELECT '__DQ_RUN_ID__','customers',_source_record_id,customer_id,
        'DQ-CUST-EMAIL-FMT','email must match pattern if present','email is empty','quarantine','quarantined',
        to_json(named_struct('customer_id',customer_id,'email',email)), current_timestamp()
 FROM __CATALOG__.bronze.customers
@@ -215,7 +286,7 @@ WHERE email IS NULL
 -- DQ-CARD-EXPIRED-ACTIVE — active card must not have a past expiry
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','cards',_source_record_id,card_id,
+SELECT '__DQ_RUN_ID__','cards',_source_record_id,card_id,
        'DQ-CARD-EXPIRED-ACTIVE','active card must not have a past expiry','expired-but-active','quarantine','quarantined',
        to_json(named_struct('card_id',card_id,'expiry',expiry,'status',status)), current_timestamp()
 FROM __CATALOG__.bronze.cards
@@ -225,7 +296,7 @@ WHERE status = 'active'
 -- DQ-MERCH-RISK-CASING — risk_rating must be in {low,medium,high}
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','merchants',_source_record_id,merchant_id,
+SELECT '__DQ_RUN_ID__','merchants',_source_record_id,merchant_id,
        'DQ-MERCH-RISK-CASING','risk_rating must be in {low,medium,high}','inconsistent casing','quarantine','quarantined',
        to_json(named_struct('merchant_id',merchant_id,'risk_rating',risk_rating,'status',status)), current_timestamp()
 FROM __CATALOG__.bronze.merchants
@@ -234,7 +305,7 @@ WHERE risk_rating NOT IN ('low','medium','high');
 -- DQ-DISP-STATUS-ENUM — status must be a lowercase dispute enum
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','disputes',_source_record_id,dispute_id,
+SELECT '__DQ_RUN_ID__','disputes',_source_record_id,dispute_id,
        'DQ-DISP-STATUS-ENUM','status must be a lowercase dispute enum','status casing/unknown','quarantine','quarantined',
        to_json(named_struct('dispute_id',dispute_id,'status',status,'reason_code',reason_code)), current_timestamp()
 FROM __CATALOG__.bronze.disputes
@@ -243,7 +314,7 @@ WHERE status NOT IN ('open','in_review','resolved','rejected','withdrawn');
 -- DQ-DISP-REASON-REQ — reason_code is required
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','disputes',_source_record_id,dispute_id,
+SELECT '__DQ_RUN_ID__','disputes',_source_record_id,dispute_id,
        'DQ-DISP-REASON-REQ','reason_code is required','missing reason_code','quarantine','quarantined',
        to_json(named_struct('dispute_id',dispute_id,'reason_code',reason_code,'status',status)), current_timestamp()
 FROM __CATALOG__.bronze.disputes
@@ -252,7 +323,7 @@ WHERE reason_code IS NULL OR reason_code = '';
 -- DQ-ALT-SCORE-RANGE — score must be within [0,1]
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','fraud_alerts',_source_record_id,alert_id,
+SELECT '__DQ_RUN_ID__','fraud_alerts',_source_record_id,alert_id,
        'DQ-ALT-SCORE-RANGE','score must be within [0,1]','score out of range','quarantine','quarantined',
        to_json(named_struct('alert_id',alert_id,'transaction_id',transaction_id,'score',score)), current_timestamp()
 FROM __CATALOG__.bronze.fraud_alerts
@@ -261,7 +332,7 @@ WHERE try_cast(score AS DOUBLE) < 0 OR try_cast(score AS DOUBLE) > 1;
 -- DQ-DEV-TYPE-REQ — device_type is required
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','transaction_devices',_source_record_id,device_id,
+SELECT '__DQ_RUN_ID__','transaction_devices',_source_record_id,device_id,
        'DQ-DEV-TYPE-REQ','device_type is required','missing device_type','quarantine','quarantined',
        to_json(named_struct('device_id',device_id,'transaction_id',transaction_id,'device_type',device_type)), current_timestamp()
 FROM __CATALOG__.bronze.transaction_devices
@@ -270,7 +341,7 @@ WHERE device_type IS NULL OR device_type = '';
 -- DQ-CASE-STATUS-ENUM — status_code must be in case_status enum
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','investigation_cases',_source_record_id,case_id,
+SELECT '__DQ_RUN_ID__','investigation_cases',_source_record_id,case_id,
        'DQ-CASE-STATUS-ENUM','status_code must be in case_status enum','status not in enum','quarantine','quarantined',
        to_json(named_struct('case_id',case_id,'status_code',status_code,'fraud_type_code',fraud_type_code)), current_timestamp()
 FROM __CATALOG__.bronze.investigation_cases
@@ -279,7 +350,7 @@ WHERE status_code NOT IN ('open','in_progress','suspended','closed');
 -- DQ-CASE-STALE — open cases older than 180 days are stale
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','investigation_cases',_source_record_id,case_id,
+SELECT '__DQ_RUN_ID__','investigation_cases',_source_record_id,case_id,
        'DQ-CASE-STALE','open cases older than 180 days are stale','stale open case','quarantine','quarantined',
        to_json(named_struct('case_id',case_id,'status_code',status_code,'opened_at',opened_at)), current_timestamp()
 FROM __CATALOG__.bronze.investigation_cases
@@ -295,7 +366,7 @@ WHERE status_code = 'open'
 -- Keep the row with the latest effective_at; older or repeated versions fail.
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','customers',_source_record_id,customer_id,
+SELECT '__DQ_RUN_ID__','customers',_source_record_id,customer_id,
        'DQ-CUST-ID-DUP','customer_id must be unique','exact duplicate customer_id','quarantine','quarantined',
        to_json(named_struct('customer_id',customer_id,'first_name',first_name,'last_name',last_name,'dob',dob)), current_timestamp()
 FROM (
@@ -311,7 +382,7 @@ WHERE rn > 1;
 -- DQ-TXN-ID-DUP — transaction_id must be unique
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','transactions',_source_record_id,transaction_id,
+SELECT '__DQ_RUN_ID__','transactions',_source_record_id,transaction_id,
        'DQ-TXN-ID-DUP','transaction_id must be unique','duplicate transaction_id','quarantine','quarantined',
        to_json(named_struct('transaction_id',transaction_id,'amount',amount,'txn_ts',txn_ts,'status',status)), current_timestamp()
 FROM (
@@ -324,7 +395,7 @@ WHERE rn > 1;
 -- Keep the row with the latest effective_at; older or repeated versions fail.
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','cards',_source_record_id,card_id,
+SELECT '__DQ_RUN_ID__','cards',_source_record_id,card_id,
        'DQ-CARD-DUP','card_id must be unique','duplicate card','quarantine','quarantined',
        to_json(named_struct('card_id',card_id,'account_id',account_id,'expiry',expiry,'status',status)), current_timestamp()
 FROM (
@@ -340,7 +411,7 @@ WHERE rn > 1;
 -- DQ-EMP-EMAIL-UNIQ — email must be unique
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','employees',_source_record_id,employee_id,
+SELECT '__DQ_RUN_ID__','employees',_source_record_id,employee_id,
        'DQ-EMP-EMAIL-UNIQ','email must be unique','duplicate email','quarantine','quarantined',
        to_json(named_struct('employee_id',employee_id,'full_name',full_name,'email',email)), current_timestamp()
 FROM (
@@ -352,7 +423,7 @@ WHERE rn > 1;
 -- DQ-CUST-NEAR-DUP — no two customers share name+dob+address+tax_id  ⚠️ exact first pass
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','customers',_source_record_id,customer_id,
+SELECT '__DQ_RUN_ID__','customers',_source_record_id,customer_id,
        'DQ-CUST-NEAR-DUP','no two customers share name+dob+address+tax_id','near-duplicate customer','quarantine','quarantined',
        to_json(named_struct('customer_id',customer_id,'first_name',first_name,'last_name',last_name,'dob',dob,'address',address,'tax_id',tax_id)), current_timestamp()
 FROM (
@@ -364,7 +435,7 @@ WHERE rn > 1;
 -- DQ-EMP-NAME-NEAR-DUP — flag near-duplicate employee names  ⚠️ exact first pass
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','employees',_source_record_id,employee_id,
+SELECT '__DQ_RUN_ID__','employees',_source_record_id,employee_id,
        'DQ-EMP-NAME-NEAR-DUP','flag near-duplicate employee names','near-duplicate employee name','quarantine','quarantined',
        to_json(named_struct('employee_id',employee_id,'full_name',full_name,'email',email)), current_timestamp()
 FROM (
@@ -381,7 +452,7 @@ WHERE rn > 1;
 -- DQ-ACC-CUST-FK — customer_id must exist in customers
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','accounts',a._source_record_id,a.account_id,
+SELECT '__DQ_RUN_ID__','accounts',a._source_record_id,a.account_id,
        'DQ-ACC-CUST-FK','customer_id must exist in customers','orphan customer_id','quarantine','quarantined',
        to_json(named_struct('account_id',a.account_id,'customer_id',a.customer_id,'open_date',a.open_date,'status',a.status)), current_timestamp()
 FROM __CATALOG__.bronze.accounts a
@@ -391,7 +462,7 @@ WHERE c.customer_id IS NULL;
 -- DQ-TXN-ACCT-FK — account_id must exist in accounts
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','transactions',t._source_record_id,t.transaction_id,
+SELECT '__DQ_RUN_ID__','transactions',t._source_record_id,t.transaction_id,
        'DQ-TXN-ACCT-FK','account_id must exist in accounts','orphan account+card','quarantine','quarantined',
        to_json(named_struct('transaction_id',t.transaction_id,'account_id',t.account_id,'card_id',t.card_id,'amount',t.amount)), current_timestamp()
 FROM __CATALOG__.bronze.transactions t
@@ -401,7 +472,7 @@ WHERE a.account_id IS NULL;
 -- DQ-AUTH-TXN-FK — transaction_id must exist in transactions
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','auth_attempts',a._source_record_id,a.attempt_id,
+SELECT '__DQ_RUN_ID__','auth_attempts',a._source_record_id,a.attempt_id,
        'DQ-AUTH-TXN-FK','transaction_id must exist in transactions','orphan transaction_id','quarantine','quarantined',
        to_json(named_struct('attempt_id',a.attempt_id,'transaction_id',a.transaction_id,'auth_ts',a.auth_ts)), current_timestamp()
 FROM __CATALOG__.bronze.auth_attempts a
@@ -411,7 +482,7 @@ WHERE t.transaction_id IS NULL;
 -- DQ-DISP-TXN-FK — transaction_id must exist in transactions
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','disputes',d._source_record_id,d.dispute_id,
+SELECT '__DQ_RUN_ID__','disputes',d._source_record_id,d.dispute_id,
        'DQ-DISP-TXN-FK','transaction_id must exist in transactions','orphan transaction_id','quarantine','quarantined',
        to_json(named_struct('dispute_id',d.dispute_id,'transaction_id',d.transaction_id,'status',d.status)), current_timestamp()
 FROM __CATALOG__.bronze.disputes d
@@ -421,7 +492,7 @@ WHERE t.transaction_id IS NULL;
 -- DQ-CBK-DISP-FK — dispute_id must exist in disputes
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','chargebacks',cb._source_record_id,cb.chargeback_id,
+SELECT '__DQ_RUN_ID__','chargebacks',cb._source_record_id,cb.chargeback_id,
        'DQ-CBK-DISP-FK','dispute_id must exist in disputes','orphan dispute_id','quarantine','quarantined',
        to_json(named_struct('chargeback_id',cb.chargeback_id,'dispute_id',cb.dispute_id,'stage',cb.stage)), current_timestamp()
 FROM __CATALOG__.bronze.chargebacks cb
@@ -431,7 +502,7 @@ WHERE d.dispute_id IS NULL;
 -- DQ-DEV-TXN-FK — transaction_id must exist in transactions
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','transaction_devices',x._source_record_id,x.device_id,
+SELECT '__DQ_RUN_ID__','transaction_devices',x._source_record_id,x.device_id,
        'DQ-DEV-TXN-FK','transaction_id must exist in transactions','orphan transaction_id','quarantine','quarantined',
        to_json(named_struct('device_id',x.device_id,'transaction_id',x.transaction_id,'device_type',x.device_type)), current_timestamp()
 FROM __CATALOG__.bronze.transaction_devices x
@@ -441,7 +512,7 @@ WHERE t.transaction_id IS NULL;
 -- DQ-CASETXN-TXN-FK — transaction_id must exist in transactions  (composite record_key)
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','case_transactions',ct._source_record_id,concat_ws('|',ct.case_id,ct.transaction_id),
+SELECT '__DQ_RUN_ID__','case_transactions',ct._source_record_id,concat_ws('|',ct.case_id,ct.transaction_id),
        'DQ-CASETXN-TXN-FK','transaction_id must exist in transactions','orphan transaction_id','quarantine','quarantined',
        to_json(named_struct('case_id',ct.case_id,'transaction_id',ct.transaction_id)), current_timestamp()
 FROM __CATALOG__.bronze.case_transactions ct
@@ -451,12 +522,15 @@ WHERE t.transaction_id IS NULL;
 -- DQ-TXN-CARD-ACTIVE — transaction must use an active card
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','transactions',t._source_record_id,t.transaction_id,
+SELECT '__DQ_RUN_ID__','transactions',t._source_record_id,t.transaction_id,
        'DQ-TXN-CARD-ACTIVE','transaction must use an active card','uses closed card','quarantine','quarantined',
-       to_json(named_struct('transaction_id',t.transaction_id,'card_id',t.card_id,'amount',t.amount,'card_status',c.status)), current_timestamp()
+       to_json(named_struct('transaction_id',t.transaction_id,'card_id',t.card_id,'amount',t.amount,'card_status','closed')), current_timestamp()
 FROM __CATALOG__.bronze.transactions t
-JOIN __CATALOG__.bronze.cards c ON t.card_id = c.card_id
-WHERE c.status = 'closed';
+WHERE EXISTS (
+  SELECT 1
+  FROM __CATALOG__.bronze.cards c
+  WHERE c.card_id = t.card_id AND lower(trim(c.status)) = 'closed'
+);
 
 -- DQ-AUTH-TS-ORDER — auth_ts must not be later than txn_ts  (cross-table)
 -- NOTE: LEFT JOIN (not inner) so auths whose transaction_id is an orphan
@@ -467,19 +541,24 @@ WHERE c.status = 'closed';
 -- (run_now() = 2026-07-06 00:00:00), so no false positives.
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','auth_attempts',a._source_record_id,a.attempt_id,
+SELECT '__DQ_RUN_ID__','auth_attempts',a._source_record_id,a.attempt_id,
        'DQ-AUTH-TS-ORDER','auth_ts must not be later than txn_ts','auth after transaction','quarantine','quarantined',
        to_json(named_struct('attempt_id',a.attempt_id,'transaction_id',a.transaction_id,'auth_ts',a.auth_ts,'txn_ts',t.txn_ts)), current_timestamp()
 FROM __CATALOG__.bronze.auth_attempts a
-LEFT JOIN __CATALOG__.bronze.transactions t ON a.transaction_id = t.transaction_id
+LEFT JOIN (
+  SELECT
+    transaction_id,
+    max(try_to_timestamp(replace(replace(txn_ts,'T',' '),'Z',''))) AS txn_ts
+  FROM __CATALOG__.bronze.transactions
+  GROUP BY transaction_id
+) t ON a.transaction_id = t.transaction_id
 WHERE try_to_timestamp(replace(replace(a.auth_ts,'T',' '),'Z',''))
-    > COALESCE(try_to_timestamp(replace(replace(t.txn_ts,'T',' '),'Z','')),
-               TIMESTAMP '2026-07-06 00:00:00');
+    > COALESCE(t.txn_ts, TIMESTAMP '2026-07-06 00:00:00');
 
 -- DQ-CASEPARTY-RESOLVE — party_id must resolve per party_type  (conditional FK; composite record_key)
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','case_parties',cp._source_record_id,concat_ws('|',cp.case_id,cp.party_type,cp.party_id),
+SELECT '__DQ_RUN_ID__','case_parties',cp._source_record_id,concat_ws('|',cp.case_id,cp.party_type,cp.party_id),
        'DQ-CASEPARTY-RESOLVE','party_id must resolve per party_type','unresolvable party_id for party_type','quarantine','quarantined',
        to_json(named_struct('case_id',cp.case_id,'party_type',cp.party_type,'party_id',cp.party_id,'role',cp.role)), current_timestamp()
 FROM __CATALOG__.bronze.case_parties cp
@@ -489,7 +568,7 @@ WHERE (cp.party_type = 'customer' AND cp.party_id NOT IN (SELECT customer_id FRO
 -- DQ-CASEPARTY-TYPE-ENUM — party_type must be in {customer,merchant,third_party}  (composite record_key)
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','case_parties',cp._source_record_id,concat_ws('|',cp.case_id,cp.party_type,cp.party_id),
+SELECT '__DQ_RUN_ID__','case_parties',cp._source_record_id,concat_ws('|',cp.case_id,cp.party_type,cp.party_id),
        'DQ-CASEPARTY-TYPE-ENUM','party_type must be in {customer,merchant,third_party}','invalid party_type','quarantine','quarantined',
        to_json(named_struct('case_id',cp.case_id,'party_type',cp.party_type,'party_id',cp.party_id)), current_timestamp()
 FROM __CATALOG__.bronze.case_parties cp
@@ -498,7 +577,7 @@ WHERE cp.party_type NOT IN ('customer','merchant','third_party');
 -- DQ-CTL-DNC-VIOLATION — no outbound contact when do_not_contact=true
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','customer_contact_logs',cl._source_record_id,cl.contact_id,
+SELECT '__DQ_RUN_ID__','customer_contact_logs',cl._source_record_id,cl.contact_id,
        'DQ-CTL-DNC-VIOLATION','no outbound contact when do_not_contact=true','DNC business-rule break','quarantine','quarantined',
        to_json(named_struct('contact_id',cl.contact_id,'customer_id',cl.customer_id,'direction',cl.direction,'do_not_contact',cl.do_not_contact)), current_timestamp()
 FROM __CATALOG__.bronze.customer_contact_logs cl
@@ -512,7 +591,7 @@ WHERE cl.direction = 'outbound' AND cl.do_not_contact = 'true';
 -- DQ-NOTE-PII-LEAK — note_text must not contain raw PII/PAN
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','investigation_notes',_source_record_id,note_id,
+SELECT '__DQ_RUN_ID__','investigation_notes',_source_record_id,note_id,
        'DQ-NOTE-PII-LEAK','note_text must not contain raw PII/PAN','leaked PII and PAN in free text','quarantine','quarantined',
        to_json(named_struct('note_id',note_id,'case_id',case_id,'note_text',note_text)), current_timestamp()
 FROM __CATALOG__.bronze.investigation_notes
@@ -521,7 +600,7 @@ WHERE note_text RLIKE '([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})|(\\+\\d
 -- DQ-CTL-NOTE-PII — note must not contain raw PII/PAN
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','customer_contact_logs',_source_record_id,contact_id,
+SELECT '__DQ_RUN_ID__','customer_contact_logs',_source_record_id,contact_id,
        'DQ-CTL-NOTE-PII','note must not contain raw PII/PAN','leaked PII in contact note','quarantine','quarantined',
        to_json(named_struct('contact_id',contact_id,'customer_id',customer_id,'note',note)), current_timestamp()
 FROM __CATALOG__.bronze.customer_contact_logs
@@ -535,7 +614,7 @@ WHERE note RLIKE '([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})|(\\+\\d{6,15
 -- DQ-CASE-LEGALHOLD — legal_hold cases excluded from AI output
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','investigation_cases',_source_record_id,case_id,
+SELECT '__DQ_RUN_ID__','investigation_cases',_source_record_id,case_id,
        'DQ-CASE-LEGALHOLD','legal_hold cases excluded from AI output','legal_hold=true (must-not-expose)','quarantine','allowed_with_warning',
        to_json(named_struct('case_id',case_id,'status_code',status_code,'fraud_type_code',fraud_type_code,'legal_hold',legal_hold)), current_timestamp()
 FROM __CATALOG__.bronze.investigation_cases
@@ -544,12 +623,15 @@ WHERE legal_hold = 'true';
 -- DQ-NOTE-LEGALHOLD — notes on legal_hold cases must not reach AI  (cross-table)
 INSERT INTO __CATALOG__.silver.quarantine_records
   (run_id, source_table, source_record_id, record_key, rule_id, rule_name, failure_reason, severity, disposition, raw_record, detected_at)
-SELECT 'RUN-20260708-DQ1','investigation_notes',n._source_record_id,n.note_id,
+SELECT '__DQ_RUN_ID__','investigation_notes',n._source_record_id,n.note_id,
        'DQ-NOTE-LEGALHOLD','notes on legal_hold cases must not reach AI','note on legal_hold case','quarantine','allowed_with_warning',
        to_json(named_struct('note_id',n.note_id,'case_id',n.case_id,'note_text',n.note_text)), current_timestamp()
 FROM __CATALOG__.bronze.investigation_notes n
-JOIN __CATALOG__.bronze.investigation_cases c ON n.case_id = c.case_id
-WHERE c.legal_hold = 'true';
+WHERE EXISTS (
+  SELECT 1
+  FROM __CATALOG__.bronze.investigation_cases c
+  WHERE c.case_id = n.case_id AND c.legal_hold = 'true'
+);
 
 
 -- ============================================================================
@@ -569,7 +651,7 @@ FROM (
 LEFT JOIN (
   SELECT rule_id, COUNT(DISTINCT record_key) AS caught_keys
   FROM __CATALOG__.silver.quarantine_records
-  WHERE run_id = 'RUN-20260708-DQ1'
+  WHERE run_id = '__DQ_RUN_ID__'
   GROUP BY rule_id
 ) q ON m.rule_id = q.rule_id
 ORDER BY m.rule_id;
@@ -579,13 +661,28 @@ ORDER BY m.rule_id;
 
 def _run(stmt):
     """Execute one statement with the __CATALOG__ token replaced by the selected catalog."""
-    return spark.sql(stmt.replace("__CATALOG__", catalog))
+    return spark.sql(
+        stmt.replace("__CATALOG__", catalog).replace("__DQ_RUN_ID__", DQ_RUN_ID)
+    )
 
 
-for _stmt in _statements(SQL):
+SNAPSHOT_BATCH_ID, SNAPSHOT_RUN_ID = _prepare_current_source_views()
+DQ_RUN_ID = f"{SNAPSHOT_RUN_ID}-DQ"
+print(f"Validated DQ source snapshot: batch {SNAPSHOT_BATCH_ID}, run {SNAPSHOT_RUN_ID}")
+_statements_to_run = _statements(_use_current_source_views(SQL))
+
+# The final statement is the manifest reconciliation query. Run it only after
+# every quarantine run has been reduced to one row per natural key.
+for _stmt in _statements_to_run[:-1]:
     _df = _run(_stmt)
     if _is_query(_stmt):
         _df.show(truncate=False)
     else:
         _df.collect()                       # force eager DDL/DML execution
         print("  ran: " + _head(_stmt))
+
+_deduplicate_quarantine_records()
+
+for _stmt in _statements_to_run[-1:]:
+    _df = _run(_stmt)
+    _df.show(truncate=False)
