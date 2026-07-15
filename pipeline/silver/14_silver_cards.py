@@ -17,6 +17,7 @@ from pyspark.sql.types import (
 )
 from pyspark.sql.window import Window
 from pyspark.dbutils import DBUtils
+from pipeline.silver.snapshot import latest_batch_snapshot
 
 # In a Databricks environment, `spark` is pre-initialized.
 # This line gets the existing session or initializes one.
@@ -50,7 +51,7 @@ RUN_ID = "RUN-20260706-1"  # Run ID used to track this execution batch
 # ---------------------------------------------------------------------------
 # Load raw conformed data from Bronze
 print(f"Reading from Bronze table: {BRONZE_TABLE_NAME}")
-df = spark.read.table(BRONZE_TABLE_NAME)
+df = latest_batch_snapshot(spark.read.table(BRONZE_TABLE_NAME))
 
 # ---------------------------------------------------------------------------
 # 2. RUN DQ RULES & IDENTIFY FAILURES (QUARANTINE)

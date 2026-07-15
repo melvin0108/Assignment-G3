@@ -4,6 +4,7 @@
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.dbutils import DBUtils
+from pipeline.silver.snapshot import latest_batch_snapshot
 
 spark = SparkSession.builder.getOrCreate()
 dbutils = DBUtils(spark)
@@ -27,14 +28,15 @@ bronze_table = f"{CATALOG}.bronze.{TABLE_NAME}"
 silver_table = f"{CATALOG}.silver.{TABLE_NAME}"
 quarantine_table = f"{CATALOG}.silver.quarantine_records"
 
-checked_df = (spark.read.table(bronze_table)
+checked_df = (latest_batch_snapshot(spark.read.table(bronze_table))
     .withColumn("opened_at_typed", F.to_timestamp("opened_at"))
     .withColumn("closed_at_typed", F.to_timestamp("closed_at"))
     .withColumn("legal_hold_typed", F.col("legal_hold").cast("boolean")))
 
 def failures(condition, rule_id, rule_name, reason, disposition="quarantined"):
     return checked_df.filter(condition).select(
-        F.lit(RUN_ID).alias("run_id"), F.lit(TABLE_NAME).alias("source_table"), "_source_record_id",
+        F.lit(RUN_ID).alias("run_id"), F.lit(TABLE_NAME).alias("source_table"),
+        F.col("_source_record_id").alias("source_record_id"),
         F.col("case_id").alias("record_key"), F.lit(rule_id).alias("rule_id"), F.lit(rule_name).alias("rule_name"),
         F.lit(reason).alias("failure_reason"), F.lit("quarantine").alias("severity"), F.lit(disposition).alias("disposition"),
         F.to_json(F.struct("case_id", "status_code", "fraud_type_code", "legal_hold")).alias("raw_record"),

@@ -4,6 +4,7 @@
 from pyspark.sql import SparkSession, Window
 from pyspark.sql import functions as F
 from pyspark.dbutils import DBUtils
+from pipeline.silver.snapshot import latest_batch_snapshot
 
 spark = SparkSession.builder.getOrCreate()
 dbutils = DBUtils(spark)
@@ -27,12 +28,15 @@ bronze_table = f"{CATALOG}.bronze.{TABLE_NAME}"
 silver_table = f"{CATALOG}.silver.{TABLE_NAME}"
 quarantine_table = f"{CATALOG}.silver.quarantine_records"
 
-checked_df = spark.read.table(bronze_table).withColumn("risk_rating_normalized", F.lower(F.trim("risk_rating")))
+checked_df = (
+    latest_batch_snapshot(spark.read.table(bronze_table))
+    .withColumn("risk_rating_normalized", F.lower(F.trim("risk_rating")))
+)
 invalid_risk = ~F.col("risk_rating").isin("low", "medium", "high")
 
 quarantine_df = checked_df.filter(invalid_risk).select(
     F.lit(RUN_ID).alias("run_id"), F.lit(TABLE_NAME).alias("source_table"),
-    "_source_record_id", F.col("merchant_id").alias("record_key"),
+    F.col("_source_record_id").alias("source_record_id"), F.col("merchant_id").alias("record_key"),
     F.lit("DQ-MERCH-RISK-CASING").alias("rule_id"),
     F.lit("risk_rating must be in {low,medium,high}").alias("rule_name"),
     F.lit("inconsistent casing").alias("failure_reason"), F.lit("quarantine").alias("severity"),
@@ -50,8 +54,8 @@ spark.sql(f"DELETE FROM {quarantine_table} WHERE source_table = '{TABLE_NAME}' A
 if not quarantine_df.isEmpty():
     quarantine_df.write.format("delta").mode("append").saveAsTable(quarantine_table)
 
-# Keep SCD history while removing repeated ingestion copies of the same version.
-dedupe_window = Window.partitionBy("merchant_id", "effective_at", "_record_hash").orderBy(F.col("_ingest_ts").desc())
+# SCD Type 1: retain one current merchant row from the latest full snapshot.
+dedupe_window = Window.partitionBy("merchant_id").orderBy(F.col("_ingest_ts").desc(), F.col("_record_hash").desc())
 silver_df = (checked_df.filter(~invalid_risk).withColumn("_row_num", F.row_number().over(dedupe_window))
     .filter(F.col("_row_num") == 1).select(
         "merchant_id", "name", "mcc", "country", "risk_rating_normalized", "status",

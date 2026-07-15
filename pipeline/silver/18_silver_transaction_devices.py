@@ -15,6 +15,7 @@ from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.types import StructType, StructField, StringType
 from pyspark.dbutils import DBUtils
+from pipeline.silver.snapshot import latest_batch_snapshot
 
 # In a Databricks environment, `spark` is pre-initialized.
 # This line gets the existing session or initializes one.
@@ -53,9 +54,8 @@ SALT = "NAB_SALT_2026"
 # ---------------------------------------------------------------------------
 print(f"Reading from Bronze table: {BRONZE_TABLE_NAME}")
 devices_all_df = spark.read.table(BRONZE_TABLE_NAME)
-latest_batch_id = devices_all_df.select(F.max("_batch_id").alias("batch_id")).first()["batch_id"]
-print(f"Using latest transaction_devices batch: {latest_batch_id}")
-devices_df = devices_all_df.filter(F.col("_batch_id") == latest_batch_id).alias("d")
+print("Using latest transaction_devices batch snapshot")
+devices_df = latest_batch_snapshot(devices_all_df).alias("d")
 
 print(f"Reading Silver transactions for FK validation: {TRANSACTIONS_TABLE_NAME}")
 transactions_df = spark.read.table(TRANSACTIONS_TABLE_NAME).select("transaction_id").distinct().alias("t")
