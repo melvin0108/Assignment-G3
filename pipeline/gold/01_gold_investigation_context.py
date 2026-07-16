@@ -33,7 +33,7 @@ source_frames = [
     *supporting["sources"],
 ]
 collections = [*transaction["collections"], *supporting["collections"], warnings, source_references(source_frames)]
-gold_df = assemble_context(case_base, collections, pipeline_run_id).cache()
+gold_df = assemble_context(case_base, collections, pipeline_run_id)
 
 row_count = gold_df.count()
 if row_count == 0:
