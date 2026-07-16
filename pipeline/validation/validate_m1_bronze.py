@@ -158,6 +158,66 @@ for table_name in ["transactions", "customers", "accounts", "cards"]:
     )
 
 fail_if_rows(
+    "latest Bronze cards have one account owner per card_id",
+    f"""
+    WITH latest_cards AS (
+      SELECT card_id, account_id
+      FROM {catalog}.bronze.cards
+      WHERE _batch_id = (SELECT MAX(_batch_id) FROM {catalog}.bronze.cards)
+    )
+    SELECT card_id, COUNT(DISTINCT account_id) AS account_count
+    FROM latest_cards
+    GROUP BY card_id
+    HAVING COUNT(DISTINCT account_id) > 1
+    LIMIT 20
+    """,
+)
+
+fail_if_rows(
+    "latest Bronze transactions use the account owned by their card",
+    f"""
+    WITH latest_transactions AS (
+      SELECT transaction_id, account_id, card_id
+      FROM {catalog}.bronze.transactions
+      WHERE _batch_id = (SELECT MAX(_batch_id) FROM {catalog}.bronze.transactions)
+    ),
+    latest_cards AS (
+      SELECT DISTINCT card_id, account_id
+      FROM {catalog}.bronze.cards
+      WHERE _batch_id = (SELECT MAX(_batch_id) FROM {catalog}.bronze.cards)
+    )
+    SELECT t.transaction_id, t.card_id, t.account_id AS transaction_account_id,
+           c.account_id AS card_account_id
+    FROM latest_transactions t
+    JOIN latest_cards c ON t.card_id = c.card_id
+    WHERE t.account_id <> c.account_id
+    LIMIT 20
+    """,
+)
+
+fail_if_rows(
+    "latest Bronze unknown cards use only the intentional orphan pair",
+    f"""
+    WITH latest_transactions AS (
+      SELECT transaction_id, account_id, card_id
+      FROM {catalog}.bronze.transactions
+      WHERE _batch_id = (SELECT MAX(_batch_id) FROM {catalog}.bronze.transactions)
+    ),
+    latest_cards AS (
+      SELECT DISTINCT card_id
+      FROM {catalog}.bronze.cards
+      WHERE _batch_id = (SELECT MAX(_batch_id) FROM {catalog}.bronze.cards)
+    )
+    SELECT t.*
+    FROM latest_transactions t
+    LEFT JOIN latest_cards c ON t.card_id = c.card_id
+    WHERE c.card_id IS NULL
+      AND NOT (t.card_id = 'CARD-9999' AND t.account_id = 'ACC-9999')
+    LIMIT 20
+    """,
+)
+
+fail_if_rows(
     "defects manifest has no null/blank rule_id or record_key",
     f"""
     SELECT *

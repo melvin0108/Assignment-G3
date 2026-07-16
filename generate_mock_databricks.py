@@ -181,6 +181,14 @@ try:
         scd_manifest.write(os.path.join(staging_dir, "scd_changes_manifest.csv"))
         print(f"Applied {mutations:,} SCD2 changes as of {as_of.isoformat()}")
 
+    corrected_links, removed_stale_defects = (
+        mock.scd.repair_transaction_account_links(staging_dir)
+    )
+    print(
+        f"Normalized {corrected_links:,} transaction card/account links; "
+        f"removed {removed_stale_defects:,} stale orphan manifest rows"
+    )
+
     published_files = publish_csvs(staging_dir, OUT_DIR, batch_number)
 finally:
     shutil.rmtree(work_dir, ignore_errors=True)
