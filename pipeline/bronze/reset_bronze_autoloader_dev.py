@@ -1,4 +1,8 @@
 # Databricks notebook source
+dbutils.widgets.text("confirm_reset", "RESET g3_dev")
+
+# COMMAND ----------
+
 """One-time guarded reset for a clean DEV Auto Loader migration."""
 
 from pipeline.bronze.autoloader_common import TABLE_CONFIG

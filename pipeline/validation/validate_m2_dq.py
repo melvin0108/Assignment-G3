@@ -187,3 +187,7 @@ else:
     print("PASS: manifest/quarantine keys match")
 
 print("\nPASS: M2 DQ/quarantine validation completed with no blocking failures.")
+
+# COMMAND ----------
+
+
