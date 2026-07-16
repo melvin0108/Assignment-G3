@@ -152,8 +152,8 @@ Defects: inconsistent casing (low/HIGH/Medium); closed merchant referenced.
 | field | type | req/opt | accepted / pattern | example | key | PII | quality rule |
 |---|---|---|---|---|---|---|---|
 | transaction_id | string | req | `^TXN-\d{6}$` | TXN-500001 | PK | — | not null; unique |
-| account_id | string | req | exists in accounts | ACC-2001 | FK→accounts | — | RI |
-| card_id | string | opt | exists in cards if present | CARD-3001 | FK→cards | — | RI |
+| account_id | string | req | exists in accounts; equals the matched `cards.account_id` | ACC-2001 | FK→accounts | — | derived from the matched card in Silver |
+| card_id | string | req | exists in cards; not closed | CARD-3001 | FK→cards | — | required to resolve `account_id` in Silver |
 | merchant_id | string | req | exists in merchants | MCH-4001 | FK→merchants | — | RI (required) |
 | channel | string | req | exists in channels | pos | FK→channels | — | RI |
 | amount | decimal(12,2) | req | > 0 | 129.50 | — | — | amount > 0 |
@@ -161,7 +161,7 @@ Defects: inconsistent casing (low/HIGH/Medium); closed merchant referenced.
 | txn_ts | timestamp | req | ISO-8601 UTC; not future | 2026-07-05T10:14:00Z | — | — | not future |
 | status | string | req | {authorized,settled,declined,reversed,refunded} | settled | — | — | in enum (§5) |
 
-Defects: dup `transaction_id`; negative amount; missing `merchant_id`; orphan account+card; future `txn_ts`; use of closed card.
+Defects: dup `transaction_id`; negative amount; missing `merchant_id`; orphan account+card; source `account_id` that disagrees with the card owner; future `txn_ts`; use of closed card. Silver resolves the canonical `account_id` from the matched card.
 
 ### 4.7 `disputes` — grain: one row per dispute
 | field | type | req/opt | accepted / pattern | example | key | PII | quality rule |
@@ -359,12 +359,14 @@ Physically populated in Silver, but **defined here** so invalid records are gene
 
 ## 10. Key relationships
 
+**Silver transaction-account rule:** `cards.account_id` is the canonical account for a transaction. Bronze retains the source `transactions.account_id` unchanged; Silver resolves `transactions.account_id` from the matched `card_id` and excludes transactions with a missing or closed card.
+
 ```mermaid
 erDiagram
   customers ||--o{ accounts : owns
   accounts ||--o{ cards : has
-  accounts ||--o{ transactions : posts
-  cards    ||--o{ transactions : used_in
+  accounts ||--o{ transactions : posts_via_card
+  cards    ||--o{ transactions : resolves_account_for
   merchants ||--o{ transactions : accepts
   transactions ||--o{ auth_attempts : tries
   transactions ||--o{ transaction_devices : has
