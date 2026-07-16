@@ -1,0 +1,186 @@
+model:
+  name: gold.investigation_context
+  description: Safe, current-state transaction-investigation context documents for internal AI retrieval.
+  grain: One document per eligible case_id.
+  owner: G3 Data Engineering
+  storage_format: Delta
+  refresh_mode: Batch overwrite from one consistent Silver snapshot.
+  context_version: "1.0.0"
+  usage_restrictions: internal_only
+  source_models:
+    - silver.investigation_cases
+    - silver.case_transactions
+    - silver.case_parties
+    - silver.transactions
+    - silver.auth_attempts
+    - silver.accounts
+    - silver.cards
+    - silver.merchants
+    - silver.merchant_categories
+    - silver.fraud_alerts
+    - silver.disputes
+    - silver.chargebacks
+    - silver.investigation_notes
+    - silver.channels
+    - silver.fraud_types
+    - silver.dispute_reason_codes
+  quality:
+    exclusion: Cases are excluded when case_id is null, legal_hold is true, or the case is quarantined for the current run.
+    partial_flags:
+      partial_data: No clean linked transaction remains.
+      redacted_notes: A note for the case was quarantined.
+      transaction_link_removed: A case-transaction link was quarantined.
+      party_link_removed: A case-party link was quarantined.
+  limitations:
+    - Customer, employee, device, contact-log, and direct account/card/party identifiers are excluded.
+    - The deterministic case summary describes case metadata only; it does not summarize notes or infer a fraud conclusion.
+    - A changed contract requires a new context_version.
+fields:
+  case_id:
+    type: string
+    required: true
+    ai_allowed: true
+    pii_classification: none
+    transformation: Eligible Silver case key.
+  context_category:
+    type: string
+    required: true
+    ai_allowed: true
+    pii_classification: none
+    transformation: Constant transaction_investigation.
+  case_context:
+    type: struct
+    required: true
+    ai_allowed: true
+    pii_classification: none
+    fields:
+      priority: {type: string, required: true, ai_allowed: true, pii_classification: none}
+      status_code: {type: string, required: true, ai_allowed: true, pii_classification: none}
+      fraud_type_code: {type: string, required: false, ai_allowed: true, pii_classification: none}
+      fraud_type_description: {type: string, required: false, ai_allowed: true, pii_classification: none}
+      opened_at: {type: timestamp, required: true, ai_allowed: true, pii_classification: none}
+      closed_at: {type: timestamp, required: false, ai_allowed: true, pii_classification: none}
+  case_summary:
+    type: string
+    required: true
+    ai_allowed: true
+    pii_classification: none
+    transformation: Deterministic sentence from priority, fraud type description, opened_at, and status_code.
+  linked_transactions:
+    type: array<struct>
+    required: true
+    ai_allowed: true
+    pii_classification: none
+    fields:
+      transaction_id: {type: string, required: true, ai_allowed: true, pii_classification: none}
+      amount: {type: decimal(18,2), required: true, ai_allowed: true, pii_classification: none}
+      currency: {type: string, required: true, ai_allowed: true, pii_classification: none}
+      channel_code: {type: string, required: false, ai_allowed: true, pii_classification: none}
+      channel_name: {type: string, required: false, ai_allowed: true, pii_classification: none}
+      txn_ts: {type: timestamp, required: true, ai_allowed: true, pii_classification: none}
+      status: {type: string, required: true, ai_allowed: true, pii_classification: none}
+  payment_instrument_context:
+    type: array<struct>
+    required: true
+    ai_allowed: true
+    pii_classification: masked_payment
+    fields:
+      transaction_id: {type: string, required: true, ai_allowed: true, pii_classification: none}
+      account_product_type: {type: string, required: false, ai_allowed: true, pii_classification: none}
+      account_status: {type: string, required: false, ai_allowed: true, pii_classification: none}
+      card_type: {type: string, required: false, ai_allowed: true, pii_classification: none}
+      card_last4: {type: string, required: false, ai_allowed: true, pii_classification: masked_payment}
+      card_status: {type: string, required: false, ai_allowed: true, pii_classification: none}
+  merchant_context:
+    type: array<struct>
+    required: true
+    ai_allowed: true
+    pii_classification: none
+    fields:
+      merchant_id: {type: string, required: true, ai_allowed: true, pii_classification: none}
+      merchant_name: {type: string, required: true, ai_allowed: true, pii_classification: none}
+      mcc: {type: string, required: false, ai_allowed: true, pii_classification: none}
+      category_name: {type: string, required: false, ai_allowed: true, pii_classification: none}
+      category_group: {type: string, required: false, ai_allowed: true, pii_classification: none}
+      country: {type: string, required: false, ai_allowed: true, pii_classification: none}
+      risk_rating: {type: string, required: false, ai_allowed: true, pii_classification: none}
+      merchant_status: {type: string, required: false, ai_allowed: true, pii_classification: none}
+  authorization_context:
+    type: array<struct>
+    required: true
+    ai_allowed: true
+    pii_classification: none
+    fields:
+      attempt_id: {type: string, required: true, ai_allowed: true, pii_classification: none}
+      transaction_id: {type: string, required: true, ai_allowed: true, pii_classification: none}
+      decision: {type: string, required: true, ai_allowed: true, pii_classification: none}
+      decline_reason: {type: string, required: false, ai_allowed: true, pii_classification: none}
+      auth_ts: {type: timestamp, required: true, ai_allowed: true, pii_classification: none}
+  dispute_context:
+    type: array<struct>
+    required: true
+    ai_allowed: true
+    pii_classification: none
+    fields:
+      dispute_id: {type: string, required: true, ai_allowed: true, pii_classification: none}
+      transaction_id: {type: string, required: true, ai_allowed: true, pii_classification: none}
+      reason_code: {type: string, required: true, ai_allowed: true, pii_classification: none}
+      reason_description: {type: string, required: false, ai_allowed: true, pii_classification: none}
+      amount: {type: decimal(18,2), required: true, ai_allowed: true, pii_classification: none}
+      status: {type: string, required: true, ai_allowed: true, pii_classification: none}
+      raised_at: {type: timestamp, required: true, ai_allowed: true, pii_classification: none}
+      chargebacks:
+        type: array<struct>
+        required: true
+        ai_allowed: true
+        pii_classification: none
+        fields:
+          chargeback_id: {type: string, required: true, ai_allowed: true, pii_classification: none}
+          scheme: {type: string, required: true, ai_allowed: true, pii_classification: none}
+          amount: {type: double, required: true, ai_allowed: true, pii_classification: none}
+          stage: {type: string, required: true, ai_allowed: true, pii_classification: none}
+          processed_at: {type: timestamp, required: false, ai_allowed: true, pii_classification: none}
+  fraud_alerts:
+    type: array<struct>
+    required: true
+    ai_allowed: true
+    pii_classification: none
+    fields:
+      alert_id: {type: string, required: true, ai_allowed: true, pii_classification: none}
+      transaction_id: {type: string, required: true, ai_allowed: true, pii_classification: none}
+      rule_name: {type: string, required: true, ai_allowed: true, pii_classification: none}
+      score: {type: double, required: true, ai_allowed: true, pii_classification: none}
+      triggered_at: {type: timestamp, required: true, ai_allowed: true, pii_classification: none}
+      disposition: {type: string, required: true, ai_allowed: true, pii_classification: none}
+  party_context:
+    type: array<struct>
+    required: true
+    ai_allowed: true
+    pii_classification: none
+    fields:
+      party_type: {type: string, required: true, ai_allowed: true, pii_classification: none}
+      role: {type: string, required: true, ai_allowed: true, pii_classification: none}
+  safe_notes:
+    type: array<struct>
+    required: true
+    ai_allowed: true
+    pii_classification: screened_free_text
+    fields:
+      note_id: {type: string, required: true, ai_allowed: true, pii_classification: none}
+      note_text: {type: string, required: true, ai_allowed: true, pii_classification: screened_free_text}
+      created_at: {type: timestamp, required: true, ai_allowed: true, pii_classification: none}
+  quality_status: {type: string, required: true, ai_allowed: true, pii_classification: none, allowed_values: [pass, partial]}
+  masking_status: {type: string, required: true, ai_allowed: true, pii_classification: none, allowed_values: [masked]}
+  warning_flags: {type: array<string>, required: true, ai_allowed: true, pii_classification: none}
+  source_references:
+    type: array<struct>
+    required: true
+    ai_allowed: true
+    pii_classification: none
+    fields:
+      source_table: {type: string, required: true, ai_allowed: true, pii_classification: none}
+      source_record_id: {type: string, required: true, ai_allowed: true, pii_classification: none}
+  usage_restrictions: {type: string, required: true, ai_allowed: true, pii_classification: none, allowed_values: [internal_only]}
+  pipeline_run_id: {type: string, required: true, ai_allowed: true, pii_classification: none}
+  context_version: {type: string, required: true, ai_allowed: true, pii_classification: none}
+  last_refreshed_at: {type: timestamp, required: true, ai_allowed: true, pii_classification: none}
