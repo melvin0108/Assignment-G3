@@ -1,0 +1,80 @@
+resources:
+  jobs:
+    ai_ready_context_pipeline:
+      name: AI-ready transaction investigation context
+      parameters:
+        - name: catalog
+          default: g3_catalog
+      tasks:
+        - task_key: bronze_all_tables
+          notebook_task:
+            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_all_tables
+            source: WORKSPACE
+          environment_key: Default
+        - task_key: validate_m1_bronze
+          depends_on:
+            - task_key: bronze_all_tables
+          notebook_task:
+            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/validation/validate_m1_bronze
+            source: WORKSPACE
+          environment_key: Default
+        - task_key: dq_setup
+          depends_on:
+            - task_key: bronze_all_tables
+          notebook_task:
+            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/dq/dq_01_setup
+            source: WORKSPACE
+          environment_key: Default
+        - task_key: dq_load_rules
+          depends_on:
+            - task_key: dq_setup
+          notebook_task:
+            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/dq/dq_02_load_dq_rules
+            source: WORKSPACE
+          environment_key: Default
+        - task_key: dq_failures
+          depends_on:
+            - task_key: dq_load_rules
+          notebook_task:
+            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/dq/dq_03_failures_all_rules
+            source: WORKSPACE
+          environment_key: Default
+        - task_key: validate_m2_dq
+          depends_on:
+            - task_key: dq_failures
+          notebook_task:
+            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/validation/validate_m2_dq
+            source: WORKSPACE
+          environment_key: Default
+        - task_key: silver_all_tables
+          depends_on:
+            - task_key: dq_failures
+          notebook_task:
+            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_all_tables
+            source: WORKSPACE
+          environment_key: Default
+        - task_key: gold_all_tables
+          depends_on:
+            - task_key: silver_all_tables
+          notebook_task:
+            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/gold_all_tables
+            source: WORKSPACE
+            base_parameters:
+              catalog: "{{job.parameters.catalog}}"
+          environment_key: Default
+        - task_key: validate_m3_gold
+          depends_on:
+            - task_key: gold_all_tables
+          notebook_task:
+            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/validation/validate_m3_gold
+            source: WORKSPACE
+            base_parameters:
+              catalog: "{{job.parameters.catalog}}"
+          environment_key: Default
+      queue:
+        enabled: true
+      environments:
+        - environment_key: Default
+          spec:
+            environment_version: "5"
+      performance_target: PERFORMANCE_OPTIMIZED

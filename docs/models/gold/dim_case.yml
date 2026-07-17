@@ -1,0 +1,8 @@
+model: dim_case
+type: dimension
+grain: one eligible investigation case
+source_models: [silver.investigation_cases, silver.case_status_types, silver.fraud_types]
+keys: [case_key, case_id]
+exclusions: [legal_hold, failed_cases]
+ai_allowed: true
+usage_restrictions: internal_only

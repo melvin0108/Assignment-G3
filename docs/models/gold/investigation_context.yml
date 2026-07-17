@@ -1,0 +1,9 @@
+model: investigation_context
+type: materialized_context
+grain: one dim_case record
+source_models: [gold.dim_case, gold.fact_case_transaction, gold.fact_authorization_attempt, gold.fact_dispute, gold.fact_chargeback, gold.fact_fraud_alert, gold.fact_investigation_note, gold.fact_case_party_summary]
+keys: [case_id]
+context_version: 2.0.0
+ai_allowed: true
+usage_restrictions: internal_only
+limitations: [deterministic_summary_only, no_surrogate_keys, no_guilt_or_fraud_inference]

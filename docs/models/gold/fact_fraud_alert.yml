@@ -1,0 +1,8 @@
+model: fact_fraud_alert
+type: fact
+grain: one fraud alert linked to an eligible case transaction
+source_models: [silver.fraud_alerts, silver.case_transactions]
+keys: [fraud_alert_key]
+relationships: [case_key, triggered_date_key]
+ai_allowed: true
+usage_restrictions: internal_only

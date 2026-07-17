@@ -1,0 +1,8 @@
+model: fact_dispute
+type: fact
+grain: one dispute linked to an eligible case transaction
+source_models: [silver.disputes, silver.case_transactions, silver.transactions]
+keys: [dispute_key]
+relationships: [case_key, dispute_reason_key, currency_key, raised_date_key]
+ai_allowed: true
+usage_restrictions: internal_only

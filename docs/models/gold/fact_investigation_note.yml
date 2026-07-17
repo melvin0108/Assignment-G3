@@ -1,0 +1,9 @@
+model: fact_investigation_note
+type: fact
+grain: one PII-screened note linked to an eligible case
+source_models: [silver.investigation_notes]
+keys: [investigation_note_key]
+relationships: [case_key, created_date_key]
+excluded_columns: [author_employee_id]
+ai_allowed: true
+usage_restrictions: internal_only

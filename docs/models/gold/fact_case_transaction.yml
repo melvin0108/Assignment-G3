@@ -1,0 +1,8 @@
+model: fact_case_transaction
+type: fact
+grain: one eligible case-transaction link
+source_models: [silver.case_transactions, silver.transactions]
+keys: [case_transaction_key]
+relationships: [case_key, merchant_key, channel_key, currency_key, transaction_date_key]
+ai_allowed: true
+usage_restrictions: internal_only

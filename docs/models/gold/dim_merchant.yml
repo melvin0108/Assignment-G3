@@ -1,0 +1,7 @@
+model: dim_merchant
+type: dimension
+grain: one merchant; UNKNOWN member included
+source_models: [silver.merchants, silver.merchant_categories]
+keys: [merchant_key, merchant_id]
+ai_allowed: true
+usage_restrictions: internal_only

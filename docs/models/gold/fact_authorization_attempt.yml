@@ -1,0 +1,8 @@
+model: fact_authorization_attempt
+type: fact
+grain: one authorization attempt linked to an eligible case transaction
+source_models: [silver.auth_attempts, silver.case_transactions]
+keys: [authorization_attempt_key]
+relationships: [case_key, authorization_date_key]
+ai_allowed: true
+usage_restrictions: internal_only

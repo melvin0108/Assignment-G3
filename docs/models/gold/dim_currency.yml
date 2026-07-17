@@ -1,0 +1,7 @@
+model: dim_currency
+type: dimension
+grain: one currency; UNKNOWN member included
+source_models: [silver.currencies]
+keys: [currency_key, currency_code]
+ai_allowed: true
+usage_restrictions: internal_only
