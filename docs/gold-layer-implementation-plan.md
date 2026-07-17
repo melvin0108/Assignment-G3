@@ -80,11 +80,7 @@ Collections use typed `ARRAY<STRUCT>` values and typed empty arrays rather than 
 6. Build `investigation_context` only after every Gold dimension and fact reports the same run and batch.
 7. Execute Gold notebooks through an ordered `gold_all_tables.py` runner, following the existing Silver runner pattern. Replace the stale single-context job task with `gold_all_tables`, then run `validate_m3_gold`.
 8. Add a job-level `catalog` parameter defaulting to `g3_catalog` and pass it explicitly to Gold and validation tasks.
-9. After validation, apply idempotent Unity Catalog grants for the existing `g3_ai_consumers` account group:
-   - `USE CATALOG` on `g3_catalog`
-   - `USE SCHEMA` on `g3_catalog.gold`
-   - `SELECT` on `g3_catalog.gold`
-   - No Bronze or Silver grants
+9. Label `investigation_context` as `ai_allowed` and supporting Gold models as `internal_only`. Document Bronze, Silver, and quarantine as non-AI operational outputs; do not provision users, groups, or Unity Catalog grants in this prototype.
 
 ### Failure Policy
 
@@ -154,7 +150,7 @@ Update the Gold architecture documentation and data model to show the constellat
 
 - `g3_catalog` is the catalog; `bronze`, `silver`, `gold`, and `gov` are schemas beneath it.
 - Gold remains current-state Type 1 because Silver does not preserve SCD2 history.
-- All Gold models are safe for the internal AI group; restricted models stay in Bronze/Silver.
+- `investigation_context` is AI-allowed; supporting Gold models are internal-only, while restricted operational models stay in Bronze/Silver.
 - No chatbot, vector database, semantic search index, LLM summary, dashboard, or full enterprise warehouse is added.
 - Gold tables are not partitioned because only case-linked investigation records are published.
 - Rebuilds are batch operations with no supported concurrent-reader atomicity guarantee.
