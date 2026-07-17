@@ -25,7 +25,7 @@ class GoldContractTests(unittest.TestCase):
         "investigation_context",
         })
 
-    def test_gold_metadata_contract_is_uniform_and_ai_restricted(self):
+    def test_gold_metadata_contract_distinguishes_internal_and_ai_outputs(self):
         self.assertEqual(gold_common.STANDARD_METADATA_COLUMNS, {
         "pipeline_run_id",
         "batch_id",
@@ -36,6 +36,7 @@ class GoldContractTests(unittest.TestCase):
         "usage_restrictions",
         })
         self.assertEqual(gold_common.USAGE_RESTRICTIONS, "internal_only")
+        self.assertEqual(gold_common.AI_ALLOWED_RESTRICTIONS, "ai_allowed")
 
     def test_surrogate_keys_are_deterministic_and_model_scoped(self):
         case_key = gold_common.stable_key_value("dim_case", "CASE-001")
@@ -55,7 +56,9 @@ class GoldContractTests(unittest.TestCase):
         self.assertNotIn("isinstance(field.dataType, ArrayType)", source)
         self.assertIn("return df.limit(1).select(*expressions)", source)
 
-    def test_gold_grants_target_the_existing_workspace_users_group(self):
-        source = (Path(__file__).parents[1] / "pipeline" / "gold" / "gold_all_tables.py").read_text(encoding="utf-8")
-        self.assertIn("TO `users`", source)
-        self.assertNotIn("g3_ai_consumers", source)
+    def test_gold_uses_output_policy_labels_without_workspace_grants(self):
+        root = Path(__file__).parents[1]
+        models = (root / "pipeline" / "gold" / "gold_models.py").read_text(encoding="utf-8")
+        runner = (root / "pipeline" / "gold" / "gold_all_tables.py").read_text(encoding="utf-8")
+        self.assertIn("usage_restrictions=AI_ALLOWED_RESTRICTIONS", models)
+        self.assertNotIn("GRANT ", runner)

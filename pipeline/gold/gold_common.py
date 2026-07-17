@@ -37,6 +37,7 @@ STANDARD_METADATA_COLUMNS = {
 }
 
 USAGE_RESTRICTIONS = "internal_only"
+AI_ALLOWED_RESTRICTIONS = "ai_allowed"
 FORBIDDEN_AI_COLUMNS = {
     "customer_id", "employee_id", "owner_employee_id", "author_employee_id",
     "account_id", "card_id", "party_id", "device_id", "ip_address", "pan",
@@ -91,7 +92,7 @@ def matching_silver_snapshot(spark, catalog: str):
     return next(iter(identities.values()))
 
 
-def add_standard_metadata(df, pipeline_run_id: str, batch_id: int, quality_status_col, warning_flags_col):
+def add_standard_metadata(df, pipeline_run_id: str, batch_id: int, quality_status_col, warning_flags_col, usage_restrictions: str = USAGE_RESTRICTIONS):
     """Attach the uniform Gold metadata contract to a Spark DataFrame."""
     from pyspark.sql import functions as F
 
@@ -101,7 +102,7 @@ def add_standard_metadata(df, pipeline_run_id: str, batch_id: int, quality_statu
         .withColumn("last_refreshed_at", F.current_timestamp())
         .withColumn("quality_status", quality_status_col)
         .withColumn("warning_flags", warning_flags_col)
-        .withColumn("usage_restrictions", F.lit(USAGE_RESTRICTIONS)))
+        .withColumn("usage_restrictions", F.lit(usage_restrictions)))
 
 
 def write_gold_table(df, catalog: str, table_name: str) -> None:

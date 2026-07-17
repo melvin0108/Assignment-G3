@@ -6,7 +6,7 @@ validates the shared Silver snapshot before these functions are called.
 
 from pyspark.sql import functions as F
 
-from pipeline.gold.gold_common import add_standard_metadata, stable_key_value, write_gold_table
+from pipeline.gold.gold_common import AI_ALLOWED_RESTRICTIONS, USAGE_RESTRICTIONS, add_standard_metadata, stable_key_value, write_gold_table
 
 
 def _key(model, *columns):
@@ -21,11 +21,11 @@ def _empty_string_array():
     return F.slice(F.array(F.lit("")), 1, 0)
 
 
-def _metadata(df, run_id, batch_id, source_table, record_id, quality=F.lit("pass"), warnings=None):
+def _metadata(df, run_id, batch_id, source_table, record_id, quality=F.lit("pass"), warnings=None, usage_restrictions=USAGE_RESTRICTIONS):
     if warnings is None:
         warnings = _empty_string_array()
     return add_standard_metadata(
-        df.withColumn("source_references", _refs(source_table, record_id)), run_id, batch_id, quality, warnings
+        df.withColumn("source_references", _refs(source_table, record_id)), run_id, batch_id, quality, warnings, usage_restrictions
     )
 
 
@@ -154,5 +154,5 @@ def build_investigation_context(spark, catalog, run_id, batch_id):
     context = cases.join(tx_items, "case_key", "left").join(dispute_items, "case_key", "left").join(alert_items, "case_key", "left").join(authorization_items, "case_key", "left").join(note_items, "case_key", "left").join(party_items, "case_key", "left").select("case_key", "case_id", F.lit("investigation_case").alias("context_category"), F.struct("priority", "status_code", "status_description", "fraud_type_code", "fraud_type_severity", "opened_at", "closed_at").alias("case_detail"), F.concat_ws(" ", F.lit("Case"), F.col("case_id"), F.lit("is"), F.col("status_code"), F.lit("with priority"), F.col("priority"), F.lit("and fraud type"), F.col("fraud_type_code")).alias("case_summary"), "transactions", "disputes", "fraud_alerts", "authorization_attempts", "safe_notes", "party_summaries", "quality_status", "warning_flags", "source_references", "usage_restrictions")
     context = context.withColumn("masking_status", F.lit("masked")).withColumn("context_version", F.lit("2.0.0"))
     context = context.withColumn("transactions", F.coalesce("transactions", F.array())).withColumn("disputes", F.coalesce("disputes", F.array())).withColumn("fraud_alerts", F.coalesce("fraud_alerts", F.array())).withColumn("authorization_attempts", F.coalesce("authorization_attempts", F.array())).withColumn("safe_notes", F.coalesce("safe_notes", F.array())).withColumn("party_summaries", F.coalesce("party_summaries", F.array()))
-    context = _metadata(context.drop("pipeline_run_id", "batch_id", "last_refreshed_at"), run_id, batch_id, "investigation_cases", "case_id", F.col("quality_status"), F.col("warning_flags"))
+    context = _metadata(context.drop("pipeline_run_id", "batch_id", "last_refreshed_at"), run_id, batch_id, "investigation_cases", "case_id", F.col("quality_status"), F.col("warning_flags"), usage_restrictions=AI_ALLOWED_RESTRICTIONS)
     _write(context, catalog, "investigation_context")
