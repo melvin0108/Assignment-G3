@@ -18,9 +18,13 @@ def _refs(source_table, record_id):
     return F.array(F.struct(F.lit(source_table).alias("source_table"), F.col(record_id).cast("string").alias("source_record_id")))
 
 
+def _empty_string_array():
+    return F.slice(F.array(F.lit("")), 1, 0)
+
+
 def _metadata(df, run_id, batch_id, source_table, record_id, quality=F.lit("pass"), warnings=None):
     if warnings is None:
-        warnings = F.array().cast("array<string>")
+        warnings = _empty_string_array()
     return add_standard_metadata(
         df.withColumn("source_references", _refs(source_table, record_id)), run_id, batch_id, quality, warnings
     )
@@ -30,13 +34,16 @@ def _unknown_from(df, values):
     """Return a typed one-row unknown member matching ``df``'s complete schema."""
     expressions = []
     for field in df.schema.fields:
-        value = values.get(field.name)
-        if isinstance(field.dataType, ArrayType) and value is not None:
-            expression = F.array(*[F.lit(item).cast(field.dataType.elementType) for item in value])
+        if field.name not in values:
+            expression = F.col(field.name) if field.name in {"pipeline_run_id", "batch_id", "last_refreshed_at", "source_references"} else F.lit(None)
+        elif values[field.name] is None:
+            expression = F.lit(None)
+        elif isinstance(field.dataType, ArrayType):
+            expression = F.array(*[F.lit(item) for item in values[field.name]])
         else:
-            expression = F.lit(value).cast(field.dataType)
+            expression = F.lit(values[field.name]).cast(field.dataType)
         expressions.append(expression.alias(field.name))
-    return df.limit(0).select(*expressions)
+    return df.limit(1).select(*expressions)
 
 
 def _write(df, catalog, model):
