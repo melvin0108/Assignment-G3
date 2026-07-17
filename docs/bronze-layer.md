@@ -202,7 +202,7 @@ Bronze stores the source columns **unchanged**, plus traceability columns. Examp
 | … | … | … | … | … | … | … | … | … | … | `{extra_col:"x"}` |
 
 - All 7 source rows are present (Bronze keeps the dirty ones).
-- `_rescued_data` captures any column that didn't match the declared schema (schema-drift safety net).
+- Auto Loader adds newly observed header columns to Bronze as `STRING`; `_rescued_data` is reserved for incomplete or malformed CSV records.
 - All columns are stored as **strings** in Bronze (typing is deferred to Silver) — this is intentional: it preserves the raw shape and lets Silver own type coercion + the resulting quarantine decisions.
 
 ---
@@ -284,7 +284,7 @@ SELECT
 FROM cloud_files(
   '/Volumes/tx_inv/landing/transactions',
   'csv',
-  map('header', 'true', 'rescueDataColumn', '_rescued_data'));
+  map('header', 'true', 'rescuedDataColumn', '_rescued_data'));
 ```
 
 ### Option C — Auto Loader (near-real-time / micro-batch)
@@ -292,11 +292,14 @@ FROM cloud_files(
 (spark.readStream.format("cloudFiles")
      .option("cloudFiles.format", "csv")
      .option("cloudFiles.schemaLocation", "/Volumes/tx_inv/_schema/transactions")
-     .option("cloudFiles.rescueDataColumn", "_rescued_data")
+     .option("cloudFiles.schemaEvolutionMode", "addNewColumns")
+     .option("cloudFiles.inferColumnTypes", "false")
+     .option("rescuedDataColumn", "_rescued_data")
      .option("header", "true")
      .load("/Volumes/tx_inv/landing/transactions")
      .writeStream.format("delta")
      .option("checkpointLocation", "/Volumes/tx_inv/_checkpoints/bronze_transactions")
+     .option("mergeSchema", "true")
      .trigger(availableNow=True)                 # batch-style: process new files then stop
      .toTable("tx_inv.bronze.transactions"))
 ```
@@ -331,7 +334,7 @@ FROM cloud_files(
 
 - **Namespace:** `tx_inv.bronze.<table>` (table name = source file stem, singular).
 - **All bronze columns are `STRING`** — type coercion is Silver's responsibility, with failures → quarantine.
-- **Mandatory metadata columns on every bronze table:** `_source_file`, `_source_file_mod_time`, `_ingest_ts`, `_run_id`, `_batch_id`, `_source_record_id`, `_record_hash`, plus `_rescued_data` for schema drift.
+- **Mandatory metadata columns on every bronze table:** `_source_file`, `_source_file_mod_time`, `_ingest_ts`, `_run_id`, `_batch_id`, `_source_record_id`, `_record_hash`, plus `_rescued_data` for malformed CSV preservation.
 - **Append-only:** never `UPDATE`/`DELETE`/`OVERWRITE` a bronze table.
 - **Idempotent reruns:** use `COPY INTO` or checkpointed Auto Loader so re-running the pipeline from a clean state reproduces the same bronze content.
 - **Deterministic mock data:** the generator is seeded, so re-generating source files reproduces the same defects (required for reproducible tests).

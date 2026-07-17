@@ -5,6 +5,7 @@ from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.dbutils import DBUtils
 from pipeline.silver.snapshot import deduplicate_quarantine_rows, latest_batch_snapshot, snapshot_run_id
+from pipeline.silver.type_cast import TypeCastRule, any_cast_failure, apply_type_casts, type_cast_quarantine_rows
 
 spark = SparkSession.builder.getOrCreate()
 dbutils = DBUtils(spark)
@@ -32,15 +33,19 @@ transactions_df = spark.read.table(f"{CATALOG}.silver.transactions") \
     .select(F.col("transaction_id").alias("silver_transaction_id")).distinct()
 checked_df = (
     latest_batch_snapshot(source_df)
-    .withColumn("score_typed", F.expr("try_cast(score AS DOUBLE)"))
     .join(
         transactions_df,
         F.col("transaction_id") == F.col("silver_transaction_id"),
         "left",
     )
 )
+CAST_RULES = [
+    TypeCastRule("score", "score_typed", "DOUBLE", "DQ-ALT-SCORE-TYPE"),
+    TypeCastRule("triggered_at", "triggered_at_typed", "TIMESTAMP", "DQ-ALT-TRIGGERED-TYPE"),
+]
+checked_df = apply_type_casts(checked_df, CAST_RULES)
 RUN_ID = snapshot_run_id(checked_df)
-invalid_score = (F.col("score_typed") < 0) | (F.col("score_typed") > 1)
+invalid_score = F.col("score_typed").isNotNull() & ((F.col("score_typed") < 0) | (F.col("score_typed") > 1))
 missing_transaction = F.col("silver_transaction_id").isNull()
 
 
@@ -62,6 +67,7 @@ quarantine_df = deduplicate_quarantine_rows(
         "transaction_id must exist in Silver transactions",
         "transaction_id does not resolve to Silver transactions",
     ))
+    .unionByName(type_cast_quarantine_rows(checked_df, CAST_RULES, TABLE_NAME, "alert_id", RUN_ID))
 )
 
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.silver")
@@ -73,9 +79,9 @@ spark.sql(f"DELETE FROM {quarantine_table} WHERE source_table = '{TABLE_NAME}' A
 if not quarantine_df.isEmpty():
     quarantine_df.write.format("delta").mode("append").saveAsTable(quarantine_table)
 
-silver_df = checked_df.filter(~invalid_score & ~missing_transaction).select(
+silver_df = checked_df.filter(~invalid_score & ~missing_transaction & ~any_cast_failure(CAST_RULES)).select(
     "alert_id", "transaction_id", "rule_name", F.col("score_typed").alias("score"),
-    F.to_timestamp("triggered_at").alias("triggered_at"), "disposition", "_source_file",
+    F.col("triggered_at_typed").alias("triggered_at"), "disposition", "_source_file",
     F.col("_source_file_mod_time").cast("timestamp").alias("_source_file_mod_time"),
     F.col("_ingest_ts").cast("timestamp").alias("_ingest_ts"), "_run_id",
     F.col("_batch_id").cast("long").alias("_batch_id"), "_source_record_id", "_record_hash",

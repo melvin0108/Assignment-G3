@@ -7,6 +7,7 @@
 #   2. pipeline/dq/01_setup.sql or dq_01_setup.py
 #   3. pipeline/dq/02_load_dq_rules.sql or dq_02_load_dq_rules.py
 #   4. pipeline/dq/04_failures_all_rules.sql or dq_03_failures_all_rules.py
+#   5. pipeline/silver/silver_all_tables.py
 #
 # A failed check raises an exception so the output can be used as executable
 # validation evidence, not only a manual inspection screenshot.
@@ -23,7 +24,8 @@ manifest_snapshot = latest_batch_snapshot(
     spark.read.table(f"{catalog}.bronze.defects_manifest")
 )
 SNAPSHOT_BATCH_ID = manifest_snapshot.select("_batch_id").first()["_batch_id"]
-DQ_RUN_ID = f"{snapshot_run_id(manifest_snapshot)}-DQ"
+SILVER_RUN_ID = snapshot_run_id(manifest_snapshot)
+DQ_RUN_ID = f"{SILVER_RUN_ID}-DQ"
 
 
 def sql(query):
@@ -122,6 +124,38 @@ fail_if_rows(
     LIMIT 20
     """,
 )
+
+fail_if_rows(
+    "quarantine rule IDs exist in DQ registry",
+    f"""
+    SELECT DISTINCT q.rule_id
+    FROM {catalog}.silver.quarantine_records q
+    LEFT JOIN {catalog}.gov.dq_rules r ON q.rule_id = r.rule_id AND r.enabled = true
+    WHERE q.run_id IN ('{DQ_RUN_ID}', '{SILVER_RUN_ID}')
+      AND r.rule_id IS NULL
+    """,
+)
+
+TYPE_CAST_TABLES = [
+    "date_dim", "currencies", "customers", "accounts", "merchants",
+    "transactions", "auth_attempts", "disputes", "chargebacks",
+    "fraud_alerts", "investigation_cases", "investigation_notes",
+    "case_transactions", "customer_contact_logs",
+]
+for table_name in TYPE_CAST_TABLES:
+    fail_if_rows(
+        f"silver.{table_name} excludes type-cast failures",
+        f"""
+        SELECT q.rule_id, q.record_key, q.source_record_id
+        FROM {catalog}.silver.quarantine_records q
+        JOIN {catalog}.silver.{table_name} s
+          ON q.source_record_id = s._source_record_id
+        WHERE q.run_id = '{SILVER_RUN_ID}'
+          AND q.source_table = '{table_name}'
+          AND q.rule_id LIKE '%-TYPE'
+        LIMIT 20
+        """,
+    )
 
 print("\nManifest vs quarantine summary:")
 summary = sql(

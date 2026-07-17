@@ -17,6 +17,7 @@ from pyspark.sql.types import (
 )
 from pyspark.dbutils import DBUtils
 from pipeline.silver.snapshot import deduplicate_quarantine_rows, latest_batch_snapshot, snapshot_run_id
+from pipeline.silver.type_cast import TypeCastRule, any_cast_failure, apply_type_casts, type_cast_quarantine_rows
 
 # In a Databricks environment, `spark` is pre-initialized.
 # This line gets the existing session or initializes one.
@@ -50,6 +51,10 @@ QUARANTINE_TABLE_NAME = f"{CATALOG}.{SCHEMA}.quarantine_records"
 # Load raw conformed data from Bronze
 print(f"Reading from Bronze table: {BRONZE_TABLE_NAME}")
 df = latest_batch_snapshot(spark.read.table(BRONZE_TABLE_NAME))
+CAST_RULES = [TypeCastRule(
+    "open_date", "open_date_typed", "DATE", "DQ-ACC-OPENDATE-TYPE"
+)]
+df = apply_type_casts(df, CAST_RULES)
 RUN_ID = snapshot_run_id(df)
 
 # Load clean customers from Silver to perform referential integrity (FK) check
@@ -68,7 +73,7 @@ df_joined = df.join(
 
 # DQ conditions
 is_future_date = (F.col("open_date").isNotNull()) & (F.col("open_date") != "") & (
-            F.col("open_date").cast("date") > F.lit("2026-07-06").cast("date"))
+            F.col("open_date_typed") > F.lit("2026-07-06").cast("date"))
 is_missing_fk = F.col("customer_id").isNotNull() & F.col("cust_exists").isNull()
 
 # DQ failure expressions aligning with gov.dq_rules
@@ -101,6 +106,9 @@ quarantine_df = failed_df.select(
     )).alias("raw_record"),
     F.current_timestamp().alias("detected_at")
 )
+quarantine_df = quarantine_df.unionByName(type_cast_quarantine_rows(
+    df_joined, CAST_RULES, TABLE_NAME, "account_id", RUN_ID
+))
 quarantine_df = deduplicate_quarantine_rows(quarantine_df)
 
 # ---------------------------------------------------------------------------
@@ -120,8 +128,8 @@ except Exception as e:
     print(f"Quarantine delete skipped (table might not exist yet): {e}")
 
 # Append new failures to quarantine
-if failed_df.count() > 0:
-    print(f"Writing {failed_df.count()} failed records to quarantine...")
+if not quarantine_df.isEmpty():
+    print(f"Writing {quarantine_df.count()} failed records to quarantine...")
     quarantine_df.write \
         .format("delta") \
         .mode("append") \
@@ -137,14 +145,14 @@ clean_df = df_joined.join(
     failed_df,
     on="_source_record_id",
     how="left_anti"
-)
+).filter(~any_cast_failure(CAST_RULES))
 
 # Construct Silver DataFrame
 silver_accounts_df = clean_df.select(
     F.col("account_id"),
     F.col("customer_id"),
     F.col("product_type"),
-    F.col("open_date").cast("date").alias("open_date"),
+    F.col("open_date_typed").alias("open_date"),
     F.col("status"),
     F.col("currency"),
     F.col("_source_file"),

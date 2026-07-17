@@ -15,6 +15,7 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import StructType, StructField, StringType
 from pyspark.dbutils import DBUtils
 from pipeline.silver.snapshot import deduplicate_quarantine_rows, latest_batch_snapshot, snapshot_run_id
+from pipeline.silver.type_cast import TypeCastRule, any_cast_failure, apply_type_casts, type_cast_quarantine_rows
 
 # In a Databricks environment, `spark` is pre-initialized.
 # This line gets the existing session or initializes one.
@@ -60,9 +61,12 @@ transactions_df = spark.read.table(TRANSACTIONS_TABLE_NAME).select("transaction_
 # ---------------------------------------------------------------------------
 # 2. RUN DQ RULES & IDENTIFY FAILURES (QUARANTINE)
 # ---------------------------------------------------------------------------
+CAST_RULES = [TypeCastRule(
+    "auth_ts", "auth_ts_typed", "TIMESTAMP", "DQ-AUTH-TS-TYPE",
+    "try_to_timestamp(replace(replace(auth_ts, 'T', ' '), 'Z', ''))",
+)]
 checked_df = (
-    auth_attempts_df
-    .withColumn("auth_ts_typed", F.expr("try_to_timestamp(replace(replace(auth_ts, 'T', ' '), 'Z', ''))"))
+    apply_type_casts(auth_attempts_df, CAST_RULES)
     .join(transactions_df, F.col("a.transaction_id") == F.col("t.transaction_id"), "left")
     .select(
         "a.*",
@@ -110,6 +114,9 @@ quarantine_df = (
         "auth_ts must not be later than txn_ts",
         "auth_ts is missing, invalid, or after linked transaction timestamp",
     ))
+    .unionByName(type_cast_quarantine_rows(
+        checked_df, CAST_RULES, TABLE_NAME, "attempt_id", RUN_ID
+    ))
 )
 quarantine_df = deduplicate_quarantine_rows(quarantine_df)
 
@@ -156,6 +163,7 @@ silver_auth_attempts_df = checked_df.filter(
     F.col("silver_transaction_id").isNotNull() &
     F.col("auth_ts_typed").isNotNull() &
     (F.col("auth_ts_typed") <= F.col("silver_txn_ts"))
+    & ~any_cast_failure(CAST_RULES)
 ).select(
     F.col("attempt_id"),
     F.col("transaction_id"),

@@ -16,6 +16,7 @@ from pyspark.sql.types import (
 )
 from pyspark.dbutils import DBUtils
 from pipeline.silver.snapshot import deduplicate_quarantine_rows, latest_batch_snapshot, snapshot_run_id
+from pipeline.silver.type_cast import TypeCastRule, any_cast_failure, apply_type_casts, type_cast_quarantine_rows
 
 # In a Databricks environment, `spark` is pre-initialized.
 # This line gets the existing session or initializes one.
@@ -48,6 +49,11 @@ QUARANTINE_TABLE_NAME = f"{CATALOG}.{SCHEMA}.quarantine_records"
 # ---------------------------------------------------------------------------
 print(f"Reading from Bronze table: {BRONZE_TABLE_NAME}")
 df = latest_batch_snapshot(spark.read.table(BRONZE_TABLE_NAME))
+CAST_RULES = [
+    TypeCastRule("do_not_contact", "do_not_contact_typed", "BOOLEAN", "DQ-CTL-DNC-TYPE"),
+    TypeCastRule("contacted_at", "contacted_at_typed", "TIMESTAMP", "DQ-CTL-CONTACTED-TYPE"),
+]
+df = apply_type_casts(df, CAST_RULES)
 RUN_ID = snapshot_run_id(df)
 
 print("Loading Silver customer and employee references...")
@@ -115,6 +121,9 @@ quarantine_df = failed_df.select(
     )).alias("raw_record"),
     F.current_timestamp().alias("detected_at")
 )
+quarantine_df = quarantine_df.unionByName(type_cast_quarantine_rows(
+    df_joined, CAST_RULES, TABLE_NAME, "contact_id", RUN_ID
+))
 quarantine_df = deduplicate_quarantine_rows(quarantine_df)
 
 # ---------------------------------------------------------------------------
@@ -134,8 +143,8 @@ except Exception as e:
     print(f"Quarantine delete skipped (table might not exist yet): {e}")
 
 # Append new failures to quarantine
-if failed_df.count() > 0:
-    print(f"Writing {failed_df.count()} failed records to quarantine...")
+if not quarantine_df.isEmpty():
+    print(f"Writing {quarantine_df.count()} failed records to quarantine...")
     quarantine_df.write \
         .format("delta") \
         .mode("append") \
@@ -151,7 +160,7 @@ clean_df = df_joined.join(
     failed_df,
     on="_source_record_id",
     how="left_anti"
-)
+).filter(~any_cast_failure(CAST_RULES))
 
 # Construct Silver DataFrame
 silver_customer_contact_logs_df = clean_df.select(
@@ -159,8 +168,8 @@ silver_customer_contact_logs_df = clean_df.select(
     F.col("customer_id"),
     F.col("direction"),
     F.col("contact_method"),
-    F.col("do_not_contact").cast("boolean").alias("do_not_contact"),
-    F.col("contacted_at").cast("timestamp").alias("contacted_at"),
+    F.col("do_not_contact_typed").alias("do_not_contact"),
+    F.col("contacted_at_typed").alias("contacted_at"),
     F.col("employee_id"),
     F.col("note"),
     F.col("_source_file"),

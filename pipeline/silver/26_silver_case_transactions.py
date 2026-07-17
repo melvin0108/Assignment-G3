@@ -17,6 +17,7 @@ from pyspark.sql.types import (
 )
 from pyspark.dbutils import DBUtils
 from pipeline.silver.snapshot import deduplicate_quarantine_rows, latest_batch_snapshot, snapshot_run_id
+from pipeline.silver.type_cast import TypeCastRule, any_cast_failure, apply_type_casts, type_cast_quarantine_rows
 
 # In a Databricks environment, `spark` is pre-initialized.
 # This line gets the existing session or initializes one.
@@ -49,6 +50,10 @@ QUARANTINE_TABLE_NAME = f"{CATALOG}.{SCHEMA}.quarantine_records"
 # ---------------------------------------------------------------------------
 print(f"Reading from Bronze table: {BRONZE_TABLE_NAME}")
 df = latest_batch_snapshot(spark.read.table(BRONZE_TABLE_NAME))
+CAST_RULES = [TypeCastRule(
+    "linked_at", "linked_at_typed", "TIMESTAMP", "DQ-CASETXN-LINKED-TYPE"
+)]
+df = apply_type_casts(df, CAST_RULES)
 RUN_ID = snapshot_run_id(df)
 
 # Load clean parents for referential integrity checks.
@@ -70,6 +75,8 @@ df_joined = df.join(
     cases_df.withColumn("case_exists", F.lit(True)),
     on="case_id",
     how="left",
+).withColumn(
+    "_type_record_key", F.concat_ws("|", F.col("case_id"), F.col("transaction_id"))
 )
 
 # DQ conditions
@@ -104,6 +111,9 @@ quarantine_df = failed_df.select(
     )).alias("raw_record"),
     F.current_timestamp().alias("detected_at")
 )
+quarantine_df = quarantine_df.unionByName(type_cast_quarantine_rows(
+    df_joined, CAST_RULES, TABLE_NAME, "_type_record_key", RUN_ID
+))
 quarantine_df = deduplicate_quarantine_rows(quarantine_df)
 
 # ---------------------------------------------------------------------------
@@ -123,8 +133,8 @@ except Exception as e:
     print(f"Quarantine delete skipped (table might not exist yet): {e}")
 
 # Append new failures to quarantine
-if failed_df.count() > 0:
-    print(f"Writing {failed_df.count()} failed records to quarantine...")
+if not quarantine_df.isEmpty():
+    print(f"Writing {quarantine_df.count()} failed records to quarantine...")
     quarantine_df.write \
         .format("delta") \
         .mode("append") \
@@ -140,13 +150,13 @@ clean_df = df_joined.join(
     failed_df,
     on="_source_record_id",
     how="left_anti"
-)
+).filter(~any_cast_failure(CAST_RULES))
 
 # Construct Silver DataFrame
 silver_case_transactions_df = clean_df.select(
     F.col("case_id"),
     F.col("transaction_id"),
-    F.col("linked_at").cast("timestamp").alias("linked_at"),
+    F.col("linked_at_typed").alias("linked_at"),
     F.col("_source_file"),
     F.col("_source_file_mod_time").cast("timestamp").alias("_source_file_mod_time"),
     F.col("_ingest_ts").cast("timestamp").alias("_ingest_ts"),

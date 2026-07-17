@@ -18,6 +18,7 @@ from pyspark.sql.types import (
 from pyspark.sql.window import Window
 from pyspark.dbutils import DBUtils
 from pipeline.silver.snapshot import deduplicate_quarantine_rows, latest_batch_snapshot, snapshot_run_id
+from pipeline.silver.type_cast import TypeCastRule, any_cast_failure, apply_type_casts, type_cast_quarantine_rows
 
 # In a Databricks environment, `spark` is pre-initialized.
 # This line gets the existing session or initializes one.
@@ -51,6 +52,11 @@ QUARANTINE_TABLE_NAME = f"{CATALOG}.{SCHEMA}.quarantine_records"
 # Load raw conformed data from Bronze
 print(f"Reading from Bronze table: {BRONZE_TABLE_NAME}")
 df = latest_batch_snapshot(spark.read.table(BRONZE_TABLE_NAME))
+CAST_RULES = [
+    TypeCastRule("dob", "dob_typed", "DATE", "DQ-CUST-DOB-TYPE"),
+    TypeCastRule("created_at", "created_at_typed", "TIMESTAMP", "DQ-CUST-CREATED-TYPE"),
+]
+df = apply_type_casts(df, CAST_RULES)
 RUN_ID = snapshot_run_id(df)
 
 # ---------------------------------------------------------------------------
@@ -110,6 +116,9 @@ quarantine_df = failed_df.select(
     )).alias("raw_record"),
     F.current_timestamp().alias("detected_at")
 )
+quarantine_df = quarantine_df.unionByName(type_cast_quarantine_rows(
+    df_ranked, CAST_RULES, TABLE_NAME, "customer_id", RUN_ID
+))
 quarantine_df = deduplicate_quarantine_rows(quarantine_df)
 
 # ---------------------------------------------------------------------------
@@ -129,8 +138,8 @@ except Exception as e:
     print(f"Quarantine delete skipped (table might not exist yet): {e}")
 
 # Append new failures to quarantine
-if failed_df.count() > 0:
-    print(f"Writing {failed_df.count()} failed records to quarantine...")
+if not quarantine_df.isEmpty():
+    print(f"Writing {quarantine_df.count()} failed records to quarantine...")
     quarantine_df.write \
         .format("delta") \
         .mode("append") \
@@ -146,14 +155,14 @@ clean_df = df_ranked.join(
     failed_df,
     on="_source_record_id",
     how="left_anti"
-)
+).filter(~any_cast_failure(CAST_RULES))
 
 # PII Masking/Hashing parameters
 salt = "NAB_SALT_2026"
 run_date_lit = F.lit("2026-07-06").cast("date")  # Pinned run date for age bands
 
 # DOB Age-banding expression
-age_expr = F.floor(F.months_between(run_date_lit, F.col("dob").cast("date")) / 12)
+age_expr = F.floor(F.months_between(run_date_lit, F.col("dob_typed")) / 12)
 dob_masked = F.when(F.col("dob").isNull() | (F.col("dob") == ""), "UNKNOWN") \
     .otherwise(
     F.when(age_expr < 18, "Under 18") \
@@ -203,7 +212,7 @@ silver_customers_df = clean_df.select(
         .otherwise(F.sha2(F.concat(F.lower(F.trim(F.col("address"))), F.lit(salt)), 256)).alias("address"),
     F.when(F.col("tax_id").isNull() | (F.col("tax_id") == ""), F.lit(None).cast("string")) \
         .otherwise(F.sha2(F.concat(F.lower(F.trim(F.col("tax_id"))), F.lit(salt)), 256)).alias("tax_id"),
-    F.col("created_at").cast("timestamp").alias("created_at"),
+    F.col("created_at_typed").alias("created_at"),
     F.col("_source_file"),
     F.col("_source_file_mod_time").cast("timestamp").alias("_source_file_mod_time"),
     F.col("_ingest_ts").cast("timestamp").alias("_ingest_ts"),
