@@ -62,3 +62,8 @@ class GoldContractTests(unittest.TestCase):
         runner = (root / "pipeline" / "gold" / "gold_all_tables.py").read_text(encoding="utf-8")
         self.assertIn("usage_restrictions=AI_ALLOWED_RESTRICTIONS", models)
         self.assertNotIn("GRANT ", runner)
+
+    def test_gold_validation_allows_empty_optional_facts_and_reconciles_chargebacks(self):
+        source = (Path(__file__).parents[1] / "pipeline" / "validation" / "validate_m3_gold.py").read_text(encoding="utf-8")
+        self.assertIn('OPTIONAL_FACT_MODELS = {model for model in GOLD_MODELS if model.startswith("fact_")}', source)
+        self.assertIn("fact_chargeback does not reconcile to case-scoped disputes", source)
