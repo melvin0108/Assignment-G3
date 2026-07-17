@@ -1,6 +1,7 @@
 """Local contract checks for the Databricks-only Gold implementation."""
 
 import unittest
+from pathlib import Path
 
 from pipeline.gold import gold_common
 
@@ -45,3 +46,9 @@ class GoldContractTests(unittest.TestCase):
         forbidden = gold_common.FORBIDDEN_AI_COLUMNS
         for column in {"customer_id", "employee_id", "account_id", "card_id", "party_id", "pan", "email", "phone", "address", "ip_address"}:
             self.assertIn(column, forbidden)
+
+    def test_unknown_members_build_array_values_without_an_array_cast(self):
+        source = (Path(__file__).parents[1] / "pipeline" / "gold" / "gold_models.py").read_text(encoding="utf-8")
+        self.assertIn("warnings=None", source)
+        self.assertIn('F.array().cast("array<string>")', source)
+        self.assertIn("if isinstance(field.dataType, ArrayType) and value is not None:", source)
