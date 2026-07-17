@@ -54,3 +54,8 @@ class GoldContractTests(unittest.TestCase):
         self.assertIn('field.dataType.typeName() == "array"', source)
         self.assertNotIn("isinstance(field.dataType, ArrayType)", source)
         self.assertIn("return df.limit(1).select(*expressions)", source)
+
+    def test_gold_grants_target_the_existing_workspace_users_group(self):
+        source = (Path(__file__).parents[1] / "pipeline" / "gold" / "gold_all_tables.py").read_text(encoding="utf-8")
+        self.assertIn("TO `users`", source)
+        self.assertNotIn("g3_ai_consumers", source)

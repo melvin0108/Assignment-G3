@@ -19,12 +19,12 @@ build_dimensions(spark, CATALOG, RUN_ID, BATCH_ID)
 build_case_and_facts(spark, CATALOG, RUN_ID, BATCH_ID)
 build_investigation_context(spark, CATALOG, RUN_ID, BATCH_ID)
 
-# Grants are deliberately limited to the internal AI consumer group.
+# Free Edition exposes the built-in workspace users group for Gold access.
 for statement in (
-    f"GRANT USE CATALOG ON CATALOG {CATALOG} TO `g3_ai_consumers`",
-    f"GRANT USE SCHEMA ON SCHEMA {CATALOG}.gold TO `g3_ai_consumers`",
-    f"GRANT SELECT ON SCHEMA {CATALOG}.gold TO `g3_ai_consumers`",
+    f"GRANT USE CATALOG ON CATALOG {CATALOG} TO `users`",
+    f"GRANT USE SCHEMA ON SCHEMA {CATALOG}.gold TO `users`",
+    f"GRANT SELECT ON SCHEMA {CATALOG}.gold TO `users`",
 ):
     spark.sql(statement)
 
-print("Completed Gold models and g3_ai_consumers Gold-only grants")
+print("Completed Gold models and users-group Gold-only grants")
