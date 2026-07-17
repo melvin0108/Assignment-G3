@@ -1,0 +1,7 @@
+model: dim_date
+type: dimension
+grain: one calendar date; key 0 is UNKNOWN
+source_models: [silver.date_dim]
+keys: [date_key]
+ai_allowed: true
+usage_restrictions: internal_only

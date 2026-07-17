@@ -1,0 +1,7 @@
+model: dim_dispute_reason
+type: dimension
+grain: one dispute reason; UNKNOWN member included
+source_models: [silver.dispute_reason_codes]
+keys: [dispute_reason_key, reason_code]
+ai_allowed: true
+usage_restrictions: internal_only

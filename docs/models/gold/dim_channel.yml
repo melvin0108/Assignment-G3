@@ -1,0 +1,7 @@
+model: dim_channel
+type: dimension
+grain: one transaction channel; UNKNOWN member included
+source_models: [silver.channels]
+keys: [channel_key, channel_code]
+ai_allowed: true
+usage_restrictions: internal_only

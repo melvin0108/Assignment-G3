@@ -1,0 +1,8 @@
+model: fact_chargeback
+type: fact
+grain: one chargeback linked to an eligible case dispute
+source_models: [silver.chargebacks, gold.fact_dispute]
+keys: [chargeback_key]
+relationships: [case_key, currency_key, processed_date_key]
+ai_allowed: true
+usage_restrictions: internal_only

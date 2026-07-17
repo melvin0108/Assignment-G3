@@ -1,0 +1,9 @@
+model: fact_case_party_summary
+type: fact
+grain: one case, party type, and role summary
+source_models: [silver.case_parties]
+keys: [case_party_summary_key]
+relationships: [case_key]
+excluded_columns: [party_id]
+ai_allowed: true
+usage_restrictions: internal_only
