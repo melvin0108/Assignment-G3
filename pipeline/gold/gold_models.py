@@ -5,7 +5,6 @@ validates the shared Silver snapshot before these functions are called.
 """
 
 from pyspark.sql import functions as F
-from pyspark.sql.types import ArrayType
 
 from pipeline.gold.gold_common import add_standard_metadata, stable_key_value, write_gold_table
 
@@ -38,7 +37,7 @@ def _unknown_from(df, values):
             expression = F.col(field.name) if field.name in {"pipeline_run_id", "batch_id", "last_refreshed_at", "source_references"} else F.lit(None)
         elif values[field.name] is None:
             expression = F.lit(None)
-        elif isinstance(field.dataType, ArrayType):
+        elif field.dataType.typeName() == "array":
             expression = F.array(*[F.lit(item) for item in values[field.name]])
         else:
             expression = F.lit(values[field.name]).cast(field.dataType)

@@ -51,4 +51,6 @@ class GoldContractTests(unittest.TestCase):
         source = (Path(__file__).parents[1] / "pipeline" / "gold" / "gold_models.py").read_text(encoding="utf-8")
         self.assertNotIn('F.array().cast("array<string>")', source)
         self.assertIn("elif values[field.name] is None:", source)
+        self.assertIn('field.dataType.typeName() == "array"', source)
+        self.assertNotIn("isinstance(field.dataType, ArrayType)", source)
         self.assertIn("return df.limit(1).select(*expressions)", source)
