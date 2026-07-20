@@ -52,11 +52,14 @@ class DQExecutionContractTests(unittest.TestCase):
             len(set(re.findall(r"'(DQ-[A-Z0-9-]+)'", combined_query))),
         )
 
-    def test_current_snapshots_are_cached_and_released(self):
+    def test_current_snapshots_use_serverless_safe_temp_views(self):
         source = DQ_PATH.read_text(encoding="utf-8")
-        self.assertIn("StorageLevel.MEMORY_AND_DISK", source)
         self.assertIn('.groupBy("_source_table")', source)
-        self.assertIn("_snapshot_df.unpersist()", source)
+        self.assertIn("createOrReplaceTempView", source)
+        self.assertNotIn("StorageLevel", source)
+        self.assertNotIn(".persist(", source)
+        self.assertNotIn(".cache(", source)
+        self.assertNotIn(".unpersist(", source)
 
     def test_quarantine_uses_one_current_run_append_without_history_rewrite(self):
         source = DQ_PATH.read_text(encoding="utf-8")

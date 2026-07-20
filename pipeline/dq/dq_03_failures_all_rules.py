@@ -7,7 +7,6 @@
 # UNION ALL DataFrame and written in a single Delta transaction.
 # ============================================================================
 
-from pyspark import StorageLevel
 from pyspark.sql import SparkSession, functions as F
 from pipeline.silver.snapshot import deduplicate_quarantine_rows
 
@@ -68,7 +67,7 @@ SOURCE_TABLES = (
 
 
 def _prepare_current_source_views():
-    """Cache aligned latest-batch Bronze snapshots and expose DQ temp views."""
+    """Resolve aligned latest-batch Bronze snapshots and expose DQ temp views."""
     source_frames = {
         table_name: spark.read.table(f"{catalog}.bronze.{table_name}")
         for table_name in SOURCE_TABLES
@@ -102,58 +101,53 @@ def _prepare_current_source_views():
         )
 
     snapshots = {}
-    try:
-        run_identity_frames = []
-        for table_name, source_df in source_frames.items():
-            snapshot_df = source_df.filter(
-                F.col("_batch_id") == latest_batches[table_name]
-            ).persist(StorageLevel.MEMORY_AND_DISK)
-            snapshots[table_name] = snapshot_df
-            run_identity_frames.append(snapshot_df.select(
-                F.lit(table_name).alias("_source_table"),
-                F.col("_run_id").cast("string").alias("_run_id"),
-            ))
-
-        identity_rows = (
-            _union_all(run_identity_frames)
-            .groupBy("_source_table", "_run_id")
-            .count()
-            .collect()
+    run_identity_frames = []
+    for table_name, source_df in source_frames.items():
+        snapshot_df = source_df.filter(
+            F.col("_batch_id") == latest_batches[table_name]
         )
-        identities_by_table = {table_name: [] for table_name in SOURCE_TABLES}
-        for row in identity_rows:
-            identities_by_table[row["_source_table"]].append(row["_run_id"])
+        snapshots[table_name] = snapshot_df
+        run_identity_frames.append(snapshot_df.select(
+            F.lit(table_name).alias("_source_table"),
+            F.col("_run_id").cast("string").alias("_run_id"),
+        ))
 
-        identities = {}
-        for table_name, run_ids in identities_by_table.items():
-            if len(run_ids) != 1 or run_ids[0] is None:
-                raise ValueError(
-                    f"Latest Bronze snapshot for {table_name} must contain "
-                    "exactly one non-null _run_id"
-                )
-            identities[table_name] = (
-                latest_batches[table_name],
-                run_ids[0],
-            )
+    identity_rows = (
+        _union_all(run_identity_frames)
+        .groupBy("_source_table", "_run_id")
+        .count()
+        .collect()
+    )
+    identities_by_table = {table_name: [] for table_name in SOURCE_TABLES}
+    for row in identity_rows:
+        identities_by_table[row["_source_table"]].append(row["_run_id"])
 
-        distinct_identities = set(identities.values())
-        if len(distinct_identities) != 1:
-            details = ", ".join(
-                f"{table_name}={batch_id}/{run_id}"
-                for table_name, (batch_id, run_id) in sorted(identities.items())
-            )
+    identities = {}
+    for table_name, run_ids in identities_by_table.items():
+        if len(run_ids) != 1 or run_ids[0] is None:
             raise ValueError(
-                "Bronze sources do not share one latest complete snapshot: "
-                + details
+                f"Latest Bronze snapshot for {table_name} must contain "
+                "exactly one non-null _run_id"
             )
+        identities[table_name] = (
+            latest_batches[table_name],
+            run_ids[0],
+        )
 
-        for table_name, snapshot_df in snapshots.items():
-            snapshot_df.createOrReplaceTempView(f"dq_current_{table_name}")
-        return distinct_identities.pop(), snapshots
-    except Exception:
-        for snapshot_df in snapshots.values():
-            snapshot_df.unpersist()
-        raise
+    distinct_identities = set(identities.values())
+    if len(distinct_identities) != 1:
+        details = ", ".join(
+            f"{table_name}={batch_id}/{run_id}"
+            for table_name, (batch_id, run_id) in sorted(identities.items())
+        )
+        raise ValueError(
+            "Bronze sources do not share one latest complete snapshot: "
+            + details
+        )
+
+    for table_name, snapshot_df in snapshots.items():
+        snapshot_df.createOrReplaceTempView(f"dq_current_{table_name}")
+    return distinct_identities.pop()
 
 
 def _union_all(dataframes):
@@ -739,50 +733,43 @@ def _run(stmt):
     )
 
 
-(
-    (SNAPSHOT_BATCH_ID, SNAPSHOT_RUN_ID),
-    _cached_snapshots,
-) = _prepare_current_source_views()
+SNAPSHOT_BATCH_ID, SNAPSHOT_RUN_ID = _prepare_current_source_views()
 DQ_RUN_ID = f"{SNAPSHOT_RUN_ID}-DQ"
 print(f"Validated DQ source snapshot: batch {SNAPSHOT_BATCH_ID}, run {SNAPSHOT_RUN_ID}")
 _statements_to_run = _statements(_use_current_source_views(SQL))
 
-try:
-    _delete_statements = [
-        stmt for stmt in _statements_to_run if _head(stmt).upper().startswith("DELETE ")
-    ]
-    _insert_statements = [
-        stmt for stmt in _statements_to_run if _head(stmt).upper().startswith("INSERT ")
-    ]
-    _verification_statements = [
-        stmt for stmt in _statements_to_run if _head(stmt).upper().startswith("SELECT ")
-    ]
-    if (
-        len(_delete_statements) != 1
-        or len(_insert_statements) != 35
-        or len(_verification_statements) != 1
-    ):
-        raise ValueError(
-            "Expected one DELETE, 35 quarantine INSERTs, and one verification SELECT"
-        )
-
-    _run(_delete_statements[0]).collect()
-    print("  ran: " + _head(_delete_statements[0]))
-
-    _combined_rule_query = "\nUNION ALL\n".join(
-        _insert_select(stmt) for stmt in _insert_statements
+_delete_statements = [
+    stmt for stmt in _statements_to_run if _head(stmt).upper().startswith("DELETE ")
+]
+_insert_statements = [
+    stmt for stmt in _statements_to_run if _head(stmt).upper().startswith("INSERT ")
+]
+_verification_statements = [
+    stmt for stmt in _statements_to_run if _head(stmt).upper().startswith("SELECT ")
+]
+if (
+    len(_delete_statements) != 1
+    or len(_insert_statements) != 35
+    or len(_verification_statements) != 1
+):
+    raise ValueError(
+        "Expected one DELETE, 35 quarantine INSERTs, and one verification SELECT"
     )
-    _current_quarantine_rows = deduplicate_quarantine_rows(
-        _run(_combined_rule_query).toDF(*QUARANTINE_COLUMNS)
-    )
-    (
-        _current_quarantine_rows.write.format("delta")
-        .mode("append")
-        .saveAsTable(QUARANTINE_TABLE_NAME)
-    )
-    print("  evaluated 35 DQ rules and appended one deduplicated quarantine batch")
 
-    _run(_verification_statements[0]).show(truncate=False)
-finally:
-    for _snapshot_df in _cached_snapshots.values():
-        _snapshot_df.unpersist()
+_run(_delete_statements[0]).collect()
+print("  ran: " + _head(_delete_statements[0]))
+
+_combined_rule_query = "\nUNION ALL\n".join(
+    _insert_select(stmt) for stmt in _insert_statements
+)
+_current_quarantine_rows = deduplicate_quarantine_rows(
+    _run(_combined_rule_query).toDF(*QUARANTINE_COLUMNS)
+)
+(
+    _current_quarantine_rows.write.format("delta")
+    .mode("append")
+    .saveAsTable(QUARANTINE_TABLE_NAME)
+)
+print("  evaluated 35 DQ rules and appended one deduplicated quarantine batch")
+
+_run(_verification_statements[0]).show(truncate=False)
