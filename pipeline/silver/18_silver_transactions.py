@@ -16,7 +16,10 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import StructType, StructField, StringType
 from pyspark.sql.window import Window
 from pyspark.dbutils import DBUtils
-from pipeline.silver.snapshot import deduplicate_quarantine_rows, latest_batch_snapshot, snapshot_run_id
+from pipeline.silver.snapshot import (
+    deduplicate_quarantine_rows, exclude_dq_quarantined_rows,
+    latest_batch_snapshot, snapshot_run_id,
+)
 from pipeline.silver.type_cast import TypeCastRule, any_cast_failure, apply_type_casts, type_cast_quarantine_rows
 
 # In a Databricks environment, `spark` is pre-initialized.
@@ -71,7 +74,9 @@ merchants_df = spark.read.table(f"{CATALOG}.{SCHEMA}.merchants") \
 # ---------------------------------------------------------------------------
 # 2. RUN DQ RULES & IDENTIFY FAILURES (QUARANTINE)
 # ---------------------------------------------------------------------------
-txn_window = Window.partitionBy("transaction_id").orderBy("_ingest_ts", "_record_hash")
+# Match the authoritative Bronze DQ query so it and Silver retain the same
+# physical transaction when a business key is duplicated.
+txn_window = Window.partitionBy("transaction_id").orderBy(F.col("_source_record_id").asc())
 CAST_RULES = [
     TypeCastRule("amount", "amount_typed", "DECIMAL(12,2)", "DQ-TXN-AMOUNT-TYPE"),
     TypeCastRule(
@@ -215,6 +220,9 @@ silver_transactions_df = checked_df.filter(
     F.col("_batch_id").cast("long").alias("_batch_id"),
     F.col("_source_record_id"),
     F.col("_record_hash"),
+)
+silver_transactions_df = exclude_dq_quarantined_rows(
+    silver_transactions_df, spark, CATALOG, TABLE_NAME, RUN_ID
 )
 
 # ---------------------------------------------------------------------------

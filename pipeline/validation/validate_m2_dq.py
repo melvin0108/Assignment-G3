@@ -136,6 +136,48 @@ fail_if_rows(
     """,
 )
 
+SILVER_DATA_TABLES = [
+    "date_dim", "defects_manifest", "countries", "currencies", "branches",
+    "channels", "merchant_categories", "dispute_reason_codes", "fraud_types",
+    "case_status_types", "customers", "employees", "accounts", "cards",
+    "merchants", "transactions", "auth_attempts", "transaction_devices",
+    "disputes", "chargebacks", "fraud_alerts", "investigation_cases",
+    "investigation_notes", "case_transactions", "case_parties",
+    "customer_contact_logs",
+]
+for table_name in SILVER_DATA_TABLES:
+    fail_if_rows(
+        f"silver.{table_name} contains only the current Bronze snapshot",
+        f"""
+        SELECT _batch_id, _run_id, COUNT(*) AS row_count
+        FROM {catalog}.silver.{table_name}
+        WHERE _batch_id IS NULL OR _batch_id <> {SNAPSHOT_BATCH_ID}
+           OR _run_id IS NULL OR _run_id <> '{SILVER_RUN_ID}'
+        GROUP BY _batch_id, _run_id
+        LIMIT 20
+        """,
+    )
+
+QUARANTINED_SOURCE_TABLES = [
+    "accounts", "auth_attempts", "cards", "case_parties", "case_transactions",
+    "chargebacks", "customer_contact_logs", "customers", "disputes", "employees",
+    "fraud_alerts", "investigation_cases", "investigation_notes", "merchants",
+    "transaction_devices", "transactions",
+]
+for table_name in QUARANTINED_SOURCE_TABLES:
+    fail_if_rows(
+        f"silver.{table_name} excludes quarantined source rows",
+        f"""
+        SELECT q.rule_id, q.record_key, q.source_record_id
+        FROM {catalog}.silver.quarantine_records q
+        JOIN {catalog}.silver.{table_name} s
+          ON q.source_record_id = s._source_record_id
+        WHERE q.run_id IN ('{DQ_RUN_ID}', '{SILVER_RUN_ID}')
+          AND q.source_table = '{table_name}'
+        LIMIT 20
+        """,
+    )
+
 TYPE_CAST_TABLES = [
     "date_dim", "currencies", "customers", "accounts", "merchants",
     "transactions", "auth_attempts", "disputes", "chargebacks",
@@ -223,5 +265,3 @@ else:
 print("\nPASS: M2 DQ/quarantine validation completed with no blocking failures.")
 
 # COMMAND ----------
-
-

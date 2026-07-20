@@ -17,7 +17,10 @@ from pyspark.sql.types import (
 )
 from pyspark.sql.window import Window
 from pyspark.dbutils import DBUtils
-from pipeline.silver.snapshot import deduplicate_quarantine_rows, latest_batch_snapshot, snapshot_run_id
+from pipeline.silver.snapshot import (
+    deduplicate_quarantine_rows, exclude_dq_quarantined_rows,
+    latest_batch_snapshot, snapshot_run_id,
+)
 
 # In a Databricks environment, `spark` is pre-initialized.
 # This line gets the existing session or initializes one.
@@ -60,9 +63,12 @@ accounts_df = spark.read.table(f"{CATALOG}.{SCHEMA}.accounts") \
 # ---------------------------------------------------------------------------
 # 2. RUN DQ RULES & IDENTIFY FAILURES (QUARANTINE)
 # ---------------------------------------------------------------------------
-# Window function for card_id duplicates:
-# - rn_pk: Detects exact card_id duplicates (keeps first by _ingest_ts)
-pk_window = Window.partitionBy("card_id").orderBy("_ingest_ts")
+# Window function for card_id duplicates. Keep the same physical row as the
+# authoritative Bronze DQ query: the latest effective card version.
+pk_window = Window.partitionBy("card_id").orderBy(
+    F.expr("try_to_timestamp(replace(replace(effective_at, 'T', ' '), 'Z', ''))").desc_nulls_last(),
+    F.col("_source_record_id").desc(),
+)
 
 # Rank the records to detect duplicates and validate the clean parent key.
 df_ranked = (
@@ -176,6 +182,9 @@ silver_cards_df = clean_df.select(
     F.col("_batch_id").cast("long").alias("_batch_id"),
     F.col("_source_record_id"),
     F.col("_record_hash")
+)
+silver_cards_df = exclude_dq_quarantined_rows(
+    silver_cards_df, spark, CATALOG, TABLE_NAME, RUN_ID
 )
 
 # ---------------------------------------------------------------------------

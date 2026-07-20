@@ -15,7 +15,10 @@ from pyspark.sql.types import (
     StructType, StructField, StringType, IntegerType, TimestampType, DoubleType
 )
 from pyspark.dbutils import DBUtils
-from pipeline.silver.snapshot import deduplicate_quarantine_rows, latest_batch_snapshot, snapshot_run_id
+from pipeline.silver.snapshot import (
+    deduplicate_quarantine_rows, exclude_dq_quarantined_rows,
+    latest_batch_snapshot, snapshot_run_id,
+)
 from pipeline.silver.type_cast import TypeCastRule, any_cast_failure, apply_type_casts, type_cast_quarantine_rows
 
 # In a Databricks environment, `spark` is pre-initialized.
@@ -179,6 +182,9 @@ silver_customer_contact_logs_df = clean_df.select(
     F.col("_batch_id").cast("long").alias("_batch_id"),
     F.col("_source_record_id"),
     F.col("_record_hash")
+)
+silver_customer_contact_logs_df = exclude_dq_quarantined_rows(
+    silver_customer_contact_logs_df, spark, CATALOG, TABLE_NAME, RUN_ID
 )
 
 # ---------------------------------------------------------------------------

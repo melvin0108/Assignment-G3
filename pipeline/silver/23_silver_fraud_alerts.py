@@ -4,7 +4,10 @@
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.dbutils import DBUtils
-from pipeline.silver.snapshot import deduplicate_quarantine_rows, latest_batch_snapshot, snapshot_run_id
+from pipeline.silver.snapshot import (
+    deduplicate_quarantine_rows, exclude_dq_quarantined_rows,
+    latest_batch_snapshot, snapshot_run_id,
+)
 from pipeline.silver.type_cast import TypeCastRule, any_cast_failure, apply_type_casts, type_cast_quarantine_rows
 
 spark = SparkSession.builder.getOrCreate()
@@ -85,6 +88,9 @@ silver_df = checked_df.filter(~invalid_score & ~missing_transaction & ~any_cast_
     F.col("_source_file_mod_time").cast("timestamp").alias("_source_file_mod_time"),
     F.col("_ingest_ts").cast("timestamp").alias("_ingest_ts"), "_run_id",
     F.col("_batch_id").cast("long").alias("_batch_id"), "_source_record_id", "_record_hash",
+)
+silver_df = exclude_dq_quarantined_rows(
+    silver_df, spark, CATALOG, TABLE_NAME, RUN_ID
 )
 silver_df.write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable(silver_table)
 print(f"Table created/updated successfully: {silver_table}")

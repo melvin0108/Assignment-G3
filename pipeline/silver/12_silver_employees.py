@@ -17,7 +17,10 @@ from pyspark.sql.types import (
 )
 from pyspark.sql.window import Window
 from pyspark.dbutils import DBUtils
-from pipeline.silver.snapshot import deduplicate_quarantine_rows, latest_batch_snapshot, snapshot_run_id
+from pipeline.silver.snapshot import (
+    deduplicate_quarantine_rows, exclude_dq_quarantined_rows,
+    latest_batch_snapshot, snapshot_run_id,
+)
 
 # In a Databricks environment, `spark` is pre-initialized.
 # This line gets the existing session or initializes one.
@@ -56,12 +59,13 @@ RUN_ID = snapshot_run_id(df)
 # ---------------------------------------------------------------------------
 # 2. RUN DQ RULES & IDENTIFY FAILURES (QUARANTINE)
 # ---------------------------------------------------------------------------
-# Window functions for uniqueness checks:
-# - rn_email: Detects duplicate email (keeps first by employee_id & _ingest_ts)
-email_window = Window.partitionBy("email").orderBy("employee_id", "_ingest_ts")
+# Window functions for uniqueness checks. Use the same physical-row ordering as
+# the authoritative Bronze DQ queries.
+# - rn_email: Detects duplicate email.
+email_window = Window.partitionBy("email").orderBy(F.col("_source_record_id").asc())
 
-# - rn_name: Detects duplicate names (keeps first by employee_id & _ingest_ts)
-name_window = Window.partitionBy("full_name").orderBy("employee_id", "_ingest_ts")
+# - rn_name: Detects duplicate names.
+name_window = Window.partitionBy("full_name").orderBy(F.col("_source_record_id").asc())
 
 # Rank the records to detect duplicates
 df_ranked = df \
@@ -155,6 +159,9 @@ silver_employees_df = clean_df.select(
     F.col("_batch_id").cast("long").alias("_batch_id"),
     F.col("_source_record_id"),
     F.col("_record_hash")
+)
+silver_employees_df = exclude_dq_quarantined_rows(
+    silver_employees_df, spark, CATALOG, TABLE_NAME, RUN_ID
 )
 
 # ---------------------------------------------------------------------------
