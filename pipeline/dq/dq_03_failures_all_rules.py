@@ -237,6 +237,12 @@ def _head(stmt):
     return ""
 
 
+def _statement_keyword(stmt):
+    """Return the first SQL keyword without assuming same-line arguments."""
+    head = _head(stmt)
+    return head.split(maxsplit=1)[0].upper() if head else ""
+
+
 def _insert_select(stmt):
     """Return the outer SELECT body from one quarantine INSERT statement."""
     insert_seen = False
@@ -738,29 +744,31 @@ DQ_RUN_ID = f"{SNAPSHOT_RUN_ID}-DQ"
 print(f"Validated DQ source snapshot: batch {SNAPSHOT_BATCH_ID}, run {SNAPSHOT_RUN_ID}")
 _statements_to_run = _statements(_use_current_source_views(SQL))
 
-_delete_statements = [
-    stmt for stmt in _statements_to_run if _head(stmt).upper().startswith("DELETE ")
+_cleanup_statements = [
+    stmt for stmt in _statements_to_run if _statement_keyword(stmt) == "DELETE"
 ]
-_insert_statements = [
-    stmt for stmt in _statements_to_run if _head(stmt).upper().startswith("INSERT ")
+_rule_statements = [
+    stmt for stmt in _statements_to_run if _statement_keyword(stmt) == "INSERT"
 ]
 _verification_statements = [
-    stmt for stmt in _statements_to_run if _head(stmt).upper().startswith("SELECT ")
+    stmt for stmt in _statements_to_run if _statement_keyword(stmt) == "SELECT"
 ]
 if (
-    len(_delete_statements) != 1
-    or len(_insert_statements) != 35
+    len(_cleanup_statements) != 1
+    or len(_rule_statements) != 35
     or len(_verification_statements) != 1
 ):
     raise ValueError(
-        "Expected one DELETE, 35 quarantine INSERTs, and one verification SELECT"
+        "Expected one DELETE, 35 quarantine INSERTs, and one verification SELECT; "
+        f"found DELETE={len(_cleanup_statements)}, "
+        f"INSERT={len(_rule_statements)}, SELECT={len(_verification_statements)}"
     )
 
-_run(_delete_statements[0]).collect()
-print("  ran: " + _head(_delete_statements[0]))
+_run(_cleanup_statements[0]).collect()
+print("  ran: " + _head(_cleanup_statements[0]))
 
 _combined_rule_query = "\nUNION ALL\n".join(
-    _insert_select(stmt) for stmt in _insert_statements
+    _insert_select(stmt) for stmt in _rule_statements
 )
 _current_quarantine_rows = deduplicate_quarantine_rows(
     _run(_combined_rule_query).toDF(*QUARANTINE_COLUMNS)
