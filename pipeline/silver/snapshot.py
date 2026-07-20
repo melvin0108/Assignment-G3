@@ -73,3 +73,23 @@ def assert_matching_latest_snapshots(spark, catalog, source_tables):
 def deduplicate_quarantine_rows(df):
     """Keep one quarantine record per run, source record, and failed rule."""
     return df.dropDuplicates(QUARANTINE_KEY_COLUMNS)
+
+
+def exclude_dq_quarantined_rows(df, spark, catalog, source_table, run_id):
+    """Remove physical source rows rejected by the authoritative DQ stage."""
+    if "_source_record_id" not in df.columns:
+        raise ValueError("Silver output is missing required _source_record_id metadata")
+
+    rejected_source_rows = (
+        spark.read.table(f"{catalog}.silver.quarantine_records")
+        .filter(
+            (F.col("run_id") == f"{run_id}-DQ")
+            & (F.col("source_table") == source_table)
+        )
+        .select(F.col("source_record_id").alias("_source_record_id"))
+        .distinct()
+    )
+    return (
+        df.join(rejected_source_rows, on="_source_record_id", how="left_anti")
+        .select(*df.columns)
+    )
