@@ -26,14 +26,14 @@ class SilverDQContractTests(unittest.TestCase):
         self.assertIn('how="left_anti"', snapshot)
 
         dq_filtered_tables = [
-            "11_silver_customers.py", "12_silver_employees.py",
-            "13_silver_accounts.py", "14_silver_cards.py", "15_silver_merchants.py",
-            "18_silver_transactions.py", "19_silver_auth_attempts.py",
-            "20_silver_transaction_devices.py", "21_silver_disputes.py",
-            "22_silver_chargebacks.py", "23_silver_fraud_alerts.py",
-            "24_silver_investigation_cases.py", "25_silver_investigation_notes.py",
-            "26_silver_case_transactions.py", "27_silver_case_parties.py",
-            "28_silver_customer_contact_logs.py",
+            "silver_customers.py", "silver_employees.py",
+            "silver_accounts.py", "silver_cards.py", "silver_merchants.py",
+            "silver_transactions.py", "silver_auth_attempts.py",
+            "silver_transaction_devices.py", "silver_disputes.py",
+            "silver_chargebacks.py", "silver_fraud_alerts.py",
+            "silver_investigation_cases.py", "silver_investigation_notes.py",
+            "silver_case_transactions.py", "silver_case_parties.py",
+            "silver_customer_contact_logs.py",
         ]
         for filename in dq_filtered_tables:
             with self.subTest(filename=filename):
@@ -45,10 +45,10 @@ class SilverDQContractTests(unittest.TestCase):
 
     def test_duplicate_rankings_match_authoritative_dq_order(self):
         dq = source("pipeline/dq/dq_03_failures_all_rules.py")
-        customers = source("pipeline/silver/11_silver_customers.py")
-        employees = source("pipeline/silver/12_silver_employees.py")
-        cards = source("pipeline/silver/14_silver_cards.py")
-        transactions = source("pipeline/silver/18_silver_transactions.py")
+        customers = source("pipeline/silver/silver_customers.py")
+        employees = source("pipeline/silver/silver_employees.py")
+        cards = source("pipeline/silver/silver_cards.py")
+        transactions = source("pipeline/silver/silver_transactions.py")
 
         effective_order = (
             "F.expr(\"try_to_timestamp(replace(replace(effective_at, 'T', ' '), 'Z', ''))\")"
