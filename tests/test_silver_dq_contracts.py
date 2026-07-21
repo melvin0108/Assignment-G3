@@ -86,13 +86,14 @@ class SilverDQContractTests(unittest.TestCase):
     def test_m2_validation_runs_after_silver_and_gates_gold(self):
         jobs = source("pipeline/jobs.yaml")
         self.assertIn(
-            "- task_key: silver_all_tables",
+            "- task_key: silver_date_dim",
             task_block(jobs, "validate_m2_dq"),
         )
         self.assertIn(
             "- task_key: validate_m2_dq",
-            task_block(jobs, "gold_all_tables"),
+            task_block(jobs, "dim_date"),
         )
+
 
 
 if __name__ == "__main__":
