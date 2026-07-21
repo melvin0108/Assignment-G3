@@ -16,20 +16,20 @@ spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.gold")
 print(f"Validated Silver snapshot: batch {BATCH_ID}, run {RUN_ID}")
 
 GOLD_NOTEBOOKS = [
-    "01_gold_dim_date",
-    "02_gold_dim_merchant",
-    "03_gold_dim_channel",
-    "04_gold_dim_dispute_reason",
-    "05_gold_dim_currency",
-    "06_gold_fact_case_transaction",
-    "07_gold_fact_authorization_attempt",
-    "08_gold_fact_dispute",
-    "09_gold_fact_chargeback",
-    "10_gold_fact_fraud_alert",
-    "11_gold_fact_investigation_note",
-    "12_gold_fact_case_party_summary",
-    "13_gold_dim_case",
-    "14_gold_investigation_context",
+    "dim_date",
+    "dim_merchant",
+    "dim_channel",
+    "dim_dispute_reason",
+    "dim_currency",
+    "fact_case_transaction",
+    "fact_authorization_attempt",
+    "fact_dispute",
+    "fact_chargeback",
+    "fact_fraud_alert",
+    "fact_investigation_note",
+    "fact_case_party_summary",
+    "dim_case",
+    "investigation_context",
 ]
 
 for position, notebook_name in enumerate(GOLD_NOTEBOOKS, start=1):
