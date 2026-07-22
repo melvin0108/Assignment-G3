@@ -1,7 +1,27 @@
+schema_version: "1.0.0"
 model: dim_channel
+table: gold.dim_channel
+description: Transaction channel reference with an UNKNOWN member for unresolved enrichment.
+domain: transaction_investigation
 type: dimension
-grain: one transaction channel; UNKNOWN member included
-source_models: [silver.channels]
-keys: [channel_key, channel_code]
-ai_allowed: true
-usage_restrictions: internal_only
+grain: one row per channel_code, plus the UNKNOWN member
+tags: [gold, channel, ai_safe]
+synonyms: [transaction channel, kênh giao dịch]
+sources: [silver.channels]
+ai_access: {classification: internal_only, pii_safe: true}
+primary_key: [channel_code]
+relationships: []
+columns:
+  - {name: channel_code, physical_type: string, description: Natural channel code; UNKNOWN represents unresolved enrichment., semantic_role: primary_key, tags: [identifier], synonyms: [channel, mã kênh]}
+  - {name: channel_name, physical_type: string, description: Business-facing channel name., semantic_role: attribute, tags: [channel], synonyms: [channel name, tên kênh]}
+  - {name: is_unknown, physical_type: boolean, description: Whether this is the UNKNOWN channel member., semantic_role: quality_flag, tags: [unknown_member], synonyms: [unknown channel], allowed_values: [true, false]}
+  - {name: pipeline_run_id, physical_type: string, description: Gold pipeline run identifier., semantic_role: lineage, tags: [metadata], synonyms: [run id]}
+  - {name: batch_id, physical_type: bigint, description: Source snapshot batch identifier., semantic_role: lineage, tags: [metadata], synonyms: [batch]}
+  - {name: last_refreshed_at, physical_type: timestamp, description: Time the Gold row was refreshed., semantic_role: time, tags: [metadata], synonyms: [refresh time]}
+  - {name: quality_status, physical_type: string, description: Row quality outcome., semantic_role: quality_flag, tags: [metadata], synonyms: [data quality], allowed_values: [pass, partial]}
+  - {name: warning_flags, physical_type: "array<string>", description: Machine-readable data quality warnings., semantic_role: quality_flag, tags: [metadata], synonyms: [warnings]}
+  - {name: source_references, physical_type: "array<struct<source_table:string,source_record_id:string>>", description: Source records used to build the row., semantic_role: lineage, tags: [metadata], synonyms: [lineage]}
+  - {name: usage_restrictions, physical_type: string, description: Consumer access classification., semantic_role: access_policy, tags: [metadata], synonyms: [AI access], allowed_values: [internal_only]}
+dimensions:
+  - {id: channel_code, column: channel_code, description: Transaction channel., synonyms: [channel, kênh]}
+metrics: []

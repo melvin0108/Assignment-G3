@@ -1,7 +1,27 @@
+schema_version: "1.0.0"
 model: dim_dispute_reason
+table: gold.dim_dispute_reason
+description: Dispute reason reference with an UNKNOWN member for unresolved enrichment.
+domain: transaction_investigation
 type: dimension
-grain: one dispute reason; UNKNOWN member included
-source_models: [silver.dispute_reason_codes]
-keys: [dispute_reason_key, reason_code]
-ai_allowed: true
-usage_restrictions: internal_only
+grain: one row per reason_code, plus the UNKNOWN member
+tags: [gold, dispute, ai_safe]
+synonyms: [dispute reason, lý do tranh chấp]
+sources: [silver.dispute_reason_codes]
+ai_access: {classification: internal_only, pii_safe: true}
+primary_key: [reason_code]
+relationships: []
+columns:
+  - {name: reason_code, physical_type: string, description: Natural dispute reason code; UNKNOWN represents unresolved enrichment., semantic_role: primary_key, tags: [identifier], synonyms: [reason, mã lý do]}
+  - {name: description, physical_type: string, description: Business description of the dispute reason., semantic_role: attribute, tags: [dispute], synonyms: [reason description]}
+  - {name: is_unknown, physical_type: boolean, description: Whether this is the UNKNOWN reason member., semantic_role: quality_flag, tags: [unknown_member], synonyms: [unknown reason], allowed_values: [true, false]}
+  - {name: pipeline_run_id, physical_type: string, description: Gold pipeline run identifier., semantic_role: lineage, tags: [metadata], synonyms: [run id]}
+  - {name: batch_id, physical_type: bigint, description: Source snapshot batch identifier., semantic_role: lineage, tags: [metadata], synonyms: [batch]}
+  - {name: last_refreshed_at, physical_type: timestamp, description: Time the Gold row was refreshed., semantic_role: time, tags: [metadata], synonyms: [refresh time]}
+  - {name: quality_status, physical_type: string, description: Row quality outcome., semantic_role: quality_flag, tags: [metadata], synonyms: [data quality], allowed_values: [pass, partial]}
+  - {name: warning_flags, physical_type: "array<string>", description: Machine-readable data quality warnings., semantic_role: quality_flag, tags: [metadata], synonyms: [warnings]}
+  - {name: source_references, physical_type: "array<struct<source_table:string,source_record_id:string>>", description: Source records used to build the row., semantic_role: lineage, tags: [metadata], synonyms: [lineage]}
+  - {name: usage_restrictions, physical_type: string, description: Consumer access classification., semantic_role: access_policy, tags: [metadata], synonyms: [AI access], allowed_values: [internal_only]}
+dimensions:
+  - {id: reason_code, column: reason_code, description: Dispute reason., synonyms: [reason, lý do]}
+metrics: []

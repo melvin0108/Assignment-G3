@@ -1,8 +1,52 @@
+schema_version: "1.0.0"
 model: dim_case
+table: gold.dim_case
+description: Eligible investigation cases with status, fraud type and case-level quality semantics.
+domain: transaction_investigation
 type: dimension
-grain: one eligible investigation case
-source_models: [silver.investigation_cases, silver.case_status_types, silver.fraud_types]
-keys: [case_key, case_id]
-exclusions: [legal_hold, failed_cases]
-ai_allowed: true
-usage_restrictions: internal_only
+grain: one row per eligible case_id
+tags: [gold, case, ai_safe]
+synonyms: [investigation case, hồ sơ điều tra]
+sources: [silver.investigation_cases, silver.case_status_types, silver.fraud_types, gold.fact_case_transaction]
+ai_access: {classification: internal_only, pii_safe: true}
+primary_key: [case_id]
+relationships:
+  - target_model: gold.dim_date
+    cardinality: many_to_one
+    join_columns: [{from: opened_date_key, to: date_key}]
+  - target_model: gold.dim_date
+    cardinality: many_to_one
+    join_columns: [{from: closed_date_key, to: date_key}]
+columns:
+  - {name: case_id, physical_type: string, description: Natural investigation case identifier., semantic_role: primary_key, tags: [identifier], synonyms: [case number, mã hồ sơ]}
+  - {name: priority, physical_type: string, description: Operational case priority., semantic_role: dimension, tags: [case], synonyms: [mức ưu tiên], allowed_values: [low, medium, high, critical]}
+  - {name: status_code, physical_type: string, description: Current case workflow status., semantic_role: dimension, tags: [case], synonyms: [case status, trạng thái], allowed_values: [open, in_progress, suspended, closed]}
+  - {name: status_description, physical_type: string, description: Business description of the case status., semantic_role: attribute, tags: [case], synonyms: [status meaning]}
+  - {name: fraud_type_code, physical_type: string, description: Classified fraud-type code recorded on the case., semantic_role: dimension, tags: [fraud], synonyms: [fraud type, loại gian lận]}
+  - {name: fraud_type_severity, physical_type: string, description: Severity associated with the recorded fraud type., semantic_role: dimension, tags: [fraud], synonyms: [fraud severity]}
+  - {name: opened_at, physical_type: timestamp, description: Time the case was opened., semantic_role: time, tags: [case], synonyms: [open time, ngày mở]}
+  - {name: closed_at, physical_type: timestamp, description: Time the case was closed when applicable., semantic_role: time, tags: [case], synonyms: [close time, ngày đóng]}
+  - {name: opened_date_key, physical_type: int, description: yyyyMMdd key for the opening date; 0 means UNKNOWN., semantic_role: foreign_key, tags: [date], synonyms: [opening date]}
+  - {name: closed_date_key, physical_type: int, description: yyyyMMdd key for the closing date; 0 means UNKNOWN., semantic_role: foreign_key, tags: [date], synonyms: [closing date]}
+  - {name: pipeline_run_id, physical_type: string, description: Gold pipeline run identifier., semantic_role: lineage, tags: [metadata], synonyms: [run id]}
+  - {name: batch_id, physical_type: bigint, description: Source snapshot batch identifier., semantic_role: lineage, tags: [metadata], synonyms: [batch]}
+  - {name: last_refreshed_at, physical_type: timestamp, description: Time the Gold row was refreshed., semantic_role: time, tags: [metadata], synonyms: [refresh time]}
+  - {name: quality_status, physical_type: string, description: Case quality outcome including fact warnings., semantic_role: quality_flag, tags: [metadata], synonyms: [data quality], allowed_values: [pass, partial]}
+  - {name: warning_flags, physical_type: "array<string>", description: Machine-readable case and fact warnings., semantic_role: quality_flag, tags: [metadata], synonyms: [warnings]}
+  - {name: source_references, physical_type: "array<struct<source_table:string,source_record_id:string>>", description: Source records used to build the row., semantic_role: lineage, tags: [metadata], synonyms: [lineage]}
+  - {name: usage_restrictions, physical_type: string, description: Consumer access classification., semantic_role: access_policy, tags: [metadata], synonyms: [AI access], allowed_values: [internal_only]}
+dimensions:
+  - {id: case_id, column: case_id, description: Investigation case identifier., synonyms: [case, hồ sơ]}
+  - {id: priority, column: priority, description: Case priority., synonyms: [mức ưu tiên]}
+  - {id: status_code, column: status_code, description: Current case status., synonyms: [status, trạng thái]}
+  - {id: fraud_type_code, column: fraud_type_code, description: Recorded fraud classification., synonyms: [fraud type, loại gian lận]}
+  - {id: opened_date_key, column: opened_date_key, description: Case opening date., synonyms: [opened date, ngày mở]}
+  - {id: closed_date_key, column: closed_date_key, description: Case closing date., synonyms: [closed date, ngày đóng]}
+metrics:
+  - id: case_count
+    description: Distinct number of eligible investigation cases.
+    expression: COUNT(DISTINCT case_id)
+    aggregation: count_distinct
+    format: integer
+    supported_dimensions: [priority, status_code, fraud_type_code, opened_date_key, closed_date_key]
+    time_field: opened_at

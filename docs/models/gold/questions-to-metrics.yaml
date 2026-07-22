@@ -1,0 +1,195 @@
+schema_version: "1.0.0"
+supported_languages: [vi, en]
+patterns:
+  - id: case_overview
+    intent: case_overview
+    query_mode: analytics
+    examples:
+      vi: ["Có bao nhiêu hồ sơ theo trạng thái?", "Tổng quan hồ sơ điều tra theo mức ưu tiên"]
+      en: ["How many cases are there by status?", "Show an overview of cases by priority"]
+    keywords:
+      vi: [hồ sơ, tổng quan, trạng thái, ưu tiên]
+      en: [case, overview, status, priority]
+    synonyms:
+      vi: [vụ việc, hồ sơ điều tra]
+      en: [investigation, investigation case]
+    metric_ids: [case_count]
+    dimensions: [priority, status_code, fraud_type_code, opened_date_key]
+    filters:
+      - {dimension: priority, operators: [equals, in]}
+      - {dimension: status_code, operators: [equals, in]}
+      - {dimension: opened_date_key, operators: [between, equals]}
+    time_dimension: opened_date_key
+    primary_table: gold.dim_case
+    supporting_tables: [gold.dim_date]
+
+  - id: transaction_activity
+    intent: transaction_activity
+    query_mode: analytics
+    examples:
+      vi: ["Tổng số giao dịch và số tiền theo loại tiền là bao nhiêu?", "Giao dịch theo kênh và người bán"]
+      en: ["What are transaction count and amount by currency?", "Show transactions by channel and merchant"]
+    keywords:
+      vi: [giao dịch, số tiền, kênh, người bán]
+      en: [transaction, amount, channel, merchant]
+    synonyms:
+      vi: [hoạt động giao dịch, giá trị giao dịch]
+      en: [transaction activity, transaction value]
+    metric_ids: [transaction_count, transaction_amount_total, transaction_amount_average]
+    dimensions: [case_id, merchant_id, channel_code, currency_code, transaction_status, transaction_date_key]
+    filters:
+      - {dimension: currency_code, operators: [equals, in]}
+      - {dimension: channel_code, operators: [equals, in]}
+      - {dimension: transaction_date_key, operators: [between, equals]}
+    time_dimension: transaction_date_key
+    primary_table: gold.fact_case_transaction
+    supporting_tables: [gold.dim_merchant, gold.dim_channel, gold.dim_currency, gold.dim_date]
+
+  - id: authorization_outcomes
+    intent: authorization_outcomes
+    query_mode: analytics
+    examples:
+      vi: ["Tỷ lệ phê duyệt cấp phép là bao nhiêu?", "Các lần từ chối theo lý do"]
+      en: ["What is the authorization approval rate?", "Show declines by reason"]
+    keywords:
+      vi: [cấp phép, phê duyệt, từ chối]
+      en: [authorization, approval, decline]
+    synonyms:
+      vi: [kết quả cấp phép, lần thử cấp phép]
+      en: [auth outcome, authorization attempt]
+    metric_ids: [authorization_attempt_count, authorization_approval_rate, authorization_decline_rate]
+    dimensions: [case_id, decision, decline_reason, authorization_date_key]
+    filters:
+      - {dimension: decision, operators: [equals, in]}
+      - {dimension: authorization_date_key, operators: [between, equals]}
+    time_dimension: authorization_date_key
+    primary_table: gold.fact_authorization_attempt
+    supporting_tables: [gold.dim_date]
+
+  - id: dispute_activity
+    intent: dispute_activity
+    query_mode: analytics
+    examples:
+      vi: ["Có bao nhiêu tranh chấp theo lý do?", "Tổng số tiền tranh chấp theo loại tiền"]
+      en: ["How many disputes are there by reason?", "Total disputed amount by currency"]
+    keywords:
+      vi: [tranh chấp, lý do, số tiền]
+      en: [dispute, reason, amount]
+    synonyms:
+      vi: [khiếu nại giao dịch, hoạt động tranh chấp]
+      en: [transaction dispute, dispute activity]
+    metric_ids: [dispute_count, dispute_amount_total]
+    dimensions: [case_id, reason_code, currency_code, dispute_status, raised_date_key]
+    filters:
+      - {dimension: currency_code, operators: [equals, in]}
+      - {dimension: reason_code, operators: [equals, in]}
+      - {dimension: raised_date_key, operators: [between, equals]}
+    time_dimension: raised_date_key
+    primary_table: gold.fact_dispute
+    supporting_tables: [gold.dim_dispute_reason, gold.dim_currency, gold.dim_date]
+
+  - id: chargeback_activity
+    intent: chargeback_activity
+    query_mode: analytics
+    examples:
+      vi: ["Có bao nhiêu chargeback theo giai đoạn?", "Tổng số tiền chargeback theo loại tiền"]
+      en: ["How many chargebacks are there by stage?", "Total chargeback amount by currency"]
+    keywords:
+      vi: [chargeback, hoàn trả, giai đoạn, số tiền]
+      en: [chargeback, stage, amount]
+    synonyms:
+      vi: [hoàn trả bắt buộc, truy thu ngược]
+      en: [reversal, card chargeback]
+    metric_ids: [chargeback_count, chargeback_amount_total]
+    dimensions: [case_id, currency_code, scheme, chargeback_stage, processed_date_key]
+    filters:
+      - {dimension: currency_code, operators: [equals, in]}
+      - {dimension: chargeback_stage, operators: [equals, in]}
+      - {dimension: processed_date_key, operators: [between, equals]}
+    time_dimension: processed_date_key
+    primary_table: gold.fact_chargeback
+    supporting_tables: [gold.dim_currency, gold.dim_date]
+
+  - id: fraud_alert_activity
+    intent: fraud_alert_activity
+    query_mode: analytics
+    examples:
+      vi: ["Có bao nhiêu cảnh báo gian lận?", "Điểm cảnh báo trung bình theo quy tắc"]
+      en: ["How many fraud alerts are there?", "Average alert score by rule"]
+    keywords:
+      vi: [cảnh báo, gian lận, điểm, quy tắc]
+      en: [fraud alert, score, rule]
+    synonyms:
+      vi: [tín hiệu gian lận, cảnh báo rủi ro]
+      en: [risk alert, fraud signal]
+    metric_ids: [fraud_alert_count, fraud_alert_score_average]
+    dimensions: [case_id, rule_name, disposition, triggered_date_key]
+    filters:
+      - {dimension: rule_name, operators: [equals, in]}
+      - {dimension: disposition, operators: [equals, in]}
+      - {dimension: triggered_date_key, operators: [between, equals]}
+    time_dimension: triggered_date_key
+    primary_table: gold.fact_fraud_alert
+    supporting_tables: [gold.dim_date]
+
+  - id: safe_notes
+    intent: safe_notes
+    query_mode: analytics
+    examples:
+      vi: ["Có bao nhiêu ghi chú an toàn theo hồ sơ?", "Số ghi chú đã sàng lọc theo ngày"]
+      en: ["How many safe notes are there by case?", "Count screened notes by date"]
+    keywords:
+      vi: [ghi chú, an toàn, sàng lọc]
+      en: [safe note, screened note]
+    synonyms:
+      vi: [ghi chú điều tra, ghi chú đã che PII]
+      en: [investigation note, PII-safe note]
+    metric_ids: [safe_note_count]
+    dimensions: [case_id, created_date_key]
+    filters:
+      - {dimension: case_id, operators: [equals, in]}
+      - {dimension: created_date_key, operators: [between, equals]}
+    time_dimension: created_date_key
+    primary_table: gold.fact_investigation_note
+    supporting_tables: [gold.dim_date]
+
+  - id: party_composition
+    intent: party_composition
+    query_mode: analytics
+    examples:
+      vi: ["Thành phần các bên trong hồ sơ là gì?", "Đếm các bên theo loại và vai trò"]
+      en: ["What is the party composition of cases?", "Count parties by type and role"]
+    keywords:
+      vi: [các bên, loại bên, vai trò, thành phần]
+      en: [party, type, role, composition]
+    synonyms:
+      vi: [bên liên quan, thành phần hồ sơ]
+      en: [case parties, involved parties]
+    metric_ids: [party_count]
+    dimensions: [case_id, party_type, role]
+    filters:
+      - {dimension: party_type, operators: [equals, in]}
+      - {dimension: role, operators: [equals, in]}
+    time_dimension: null
+    primary_table: gold.fact_case_party_summary
+    supporting_tables: [gold.dim_case]
+
+  - id: case_detail_lookup
+    intent: case_detail_lookup
+    query_mode: detail
+    examples:
+      vi: ["Cho tôi chi tiết hồ sơ CASE-0001", "Tóm tắt toàn bộ ngữ cảnh của hồ sơ này"]
+      en: ["Show me the details for case CASE-0001", "Summarize the complete context for this case"]
+    keywords:
+      vi: [chi tiết hồ sơ, ngữ cảnh, tóm tắt]
+      en: [case detail, context, summary]
+    synonyms:
+      vi: [tra cứu hồ sơ, hồ sơ đầy đủ]
+      en: [case lookup, full case]
+    metric_ids: []
+    dimensions: [case_id, context_category]
+    filters:
+      - {dimension: case_id, operators: [equals]}
+    time_dimension: null
+    primary_table: gold.investigation_context
+    supporting_tables: []

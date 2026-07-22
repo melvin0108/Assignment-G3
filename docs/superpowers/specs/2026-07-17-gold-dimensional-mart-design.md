@@ -35,9 +35,10 @@ records exist.
 ## Execution and Verification
 
 The job runs Bronze, DQ, Silver, Gold, then M3 validation with a catalog
-parameter. The Gold task applies idempotent `g3_ai_consumers` catalog/schema/
-select grants only for Gold. Local tests cover static contracts and pure helper
-logic; Databricks validation supplies the data-level and grant evidence.
+parameter. The Gold task publishes policy labels: facts and dimensions are
+`internal_only`, while `investigation_context` is `ai_allowed`. It does not
+provision principals or grants. Local tests cover static contracts and pure
+helper logic; Databricks validation supplies the data-level and policy evidence.
 
 ## Non-goals
 
