@@ -8,10 +8,14 @@ Run order after Bronze and DQ notebooks:
 1. Run all M1 Bronze ingestion notebooks.
 2. Run `validate_m1_bronze.py`.
 3. Run M2 DQ setup, rule load, and failure generation notebooks.
-4. Run `validate_m2_dq.py`.
+4. Run `pipeline/silver/silver_all_tables.py`.
+5. Run `validate_m2_dq.py`.
 
 `validate_m1_bronze.py` checks:
 
+- All contract fields remain present and all source/evolved Bronze fields are `STRING`.
+- Required Bronze metadata is present and file/batch lineage is valid.
+- Rows with `_rescued_data` are reported as malformed CSV warnings.
 - M1 Bronze tables exist.
 - Required Bronze metadata columns exist on ingested Bronze source tables.
 - Important Bronze tables have rows.
@@ -20,6 +24,8 @@ Run order after Bronze and DQ notebooks:
 
 `validate_m2_dq.py` checks:
 
+- Every quarantine rule, including `DQ-*-TYPE`, exists in `gov.dq_rules`.
+- Type-cast failures are absent from the corresponding clean Silver table.
 - M2 DQ rule registry has enabled rules loaded.
 - Manifest rule IDs exist in the DQ registry; registry rules without manifest seeds are reported as warnings.
 - `silver.quarantine_records` has required fields populated.

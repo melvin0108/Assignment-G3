@@ -1,21 +1,24 @@
 # Databricks notebook source
 # ============================================================================
-# SILVER TRANSFORMATION & DATA QUALITY PIPELINE: transaction_devices
+# SILVER TRANSFORMATION & DATA QUALITY PIPELINE: auth_attempts
 # ============================================================================
-# Implements Bronze -> Silver transformation for transaction device activity:
-#   1. Reads the latest bronze.transaction_devices snapshot
-#   2. Checks transaction FK and required device type
+# Implements Bronze -> Silver transformation for authorization attempts:
+#   1. Reads the latest bronze.auth_attempts snapshot
+#   2. Checks transaction FK and timestamp ordering
 #   3. Quarantines failed records to silver.quarantine_records
-#   4. Tokenizes device_id and protects IP values
-#   5. Writes clean records to silver.transaction_devices
-#   6. Appends governance rows for masking policies and lineage
+#   4. Writes clean records to silver.auth_attempts
+#   5. Appends lineage rows to gov.metadata_lineage
 # ============================================================================
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.types import StructType, StructField, StringType
 from pyspark.dbutils import DBUtils
-from pipeline.silver.snapshot import deduplicate_quarantine_rows, latest_batch_snapshot, snapshot_run_id
+from pipeline.silver.snapshot import (
+    deduplicate_quarantine_rows, exclude_dq_quarantined_rows,
+    latest_batch_snapshot, snapshot_run_id,
+)
+from pipeline.silver.type_cast import TypeCastRule, any_cast_failure, apply_type_casts, type_cast_quarantine_rows
 
 # In a Databricks environment, `spark` is pre-initialized.
 # This line gets the existing session or initializes one.
@@ -39,41 +42,48 @@ def _catalog_widget():
 
 CATALOG = _catalog_widget()
 SCHEMA = "silver"
-TABLE_NAME = "transaction_devices"
+TABLE_NAME = "auth_attempts"
 FULL_TABLE_NAME = f"{CATALOG}.{SCHEMA}.{TABLE_NAME}"
 BRONZE_TABLE_NAME = f"{CATALOG}.bronze.{TABLE_NAME}"
 TRANSACTIONS_TABLE_NAME = f"{CATALOG}.{SCHEMA}.transactions"
 QUARANTINE_TABLE_NAME = f"{CATALOG}.{SCHEMA}.quarantine_records"
-MASKING_POLICIES_TABLE_NAME = f"{CATALOG}.gov.masking_policies"
 LINEAGE_TABLE_NAME = f"{CATALOG}.gov.metadata_lineage"
-SALT = "NAB_SALT_2026"
 
 # ---------------------------------------------------------------------------
 # 1. LOAD BRONZE AND REFERENCE DATA
 # ---------------------------------------------------------------------------
 print(f"Reading from Bronze table: {BRONZE_TABLE_NAME}")
-devices_all_df = spark.read.table(BRONZE_TABLE_NAME)
-print("Using latest transaction_devices batch snapshot")
-devices_df = latest_batch_snapshot(devices_all_df).alias("d")
-RUN_ID = snapshot_run_id(devices_df)
+auth_attempts_all_df = spark.read.table(BRONZE_TABLE_NAME)
+print("Using latest auth_attempts batch snapshot")
+auth_attempts_df = latest_batch_snapshot(auth_attempts_all_df).alias("a")
+RUN_ID = snapshot_run_id(auth_attempts_df)
 
 print(f"Reading Silver transactions for FK validation: {TRANSACTIONS_TABLE_NAME}")
-transactions_df = spark.read.table(TRANSACTIONS_TABLE_NAME).select("transaction_id").distinct().alias("t")
+transactions_df = spark.read.table(TRANSACTIONS_TABLE_NAME).select("transaction_id", "txn_ts").alias("t")
 
 # ---------------------------------------------------------------------------
 # 2. RUN DQ RULES & IDENTIFY FAILURES (QUARANTINE)
 # ---------------------------------------------------------------------------
+CAST_RULES = [TypeCastRule(
+    "auth_ts", "auth_ts_typed", "TIMESTAMP", "DQ-AUTH-TS-TYPE",
+    "try_to_timestamp(replace(replace(auth_ts, 'T', ' '), 'Z', ''))",
+)]
 checked_df = (
-    devices_df
-    .join(transactions_df, F.col("d.transaction_id") == F.col("t.transaction_id"), "left")
+    apply_type_casts(auth_attempts_df, CAST_RULES)
+    .join(transactions_df, F.col("a.transaction_id") == F.col("t.transaction_id"), "left")
     .select(
-        "d.*",
+        "a.*",
+        "auth_ts_typed",
         F.col("t.transaction_id").alias("silver_transaction_id"),
+        F.col("t.txn_ts").alias("silver_txn_ts"),
     )
 )
 
 fk_missing = F.col("silver_transaction_id").isNull()
-device_type_missing = F.col("device_type").isNull() | (F.trim(F.col("device_type")) == "")
+auth_ts_invalid = F.col("auth_ts_typed").isNull() | (
+    F.col("silver_transaction_id").isNotNull() &
+    (F.col("auth_ts_typed") > F.col("silver_txn_ts"))
+)
 
 
 def quarantine_rows(condition, rule_id, rule_name, failure_reason):
@@ -81,14 +91,14 @@ def quarantine_rows(condition, rule_id, rule_name, failure_reason):
         F.lit(RUN_ID).alias("run_id"),
         F.lit(TABLE_NAME).alias("source_table"),
         F.col("_source_record_id").alias("source_record_id"),
-        F.col("device_id").alias("record_key"),
+        F.col("attempt_id").alias("record_key"),
         F.lit(rule_id).alias("rule_id"),
         F.lit(rule_name).alias("rule_name"),
         F.lit(failure_reason).alias("failure_reason"),
         F.lit("quarantine").alias("severity"),
         F.lit("quarantined").alias("disposition"),
         F.to_json(F.struct(
-            "device_id", "transaction_id", "device_type", "ip", "geo_country"
+            "attempt_id", "transaction_id", "decision", "decline_reason", "auth_ts"
         )).alias("raw_record"),
         F.current_timestamp().alias("detected_at"),
     )
@@ -97,15 +107,18 @@ def quarantine_rows(condition, rule_id, rule_name, failure_reason):
 quarantine_df = (
     quarantine_rows(
         fk_missing,
-        "DQ-DEV-TXN-FK",
+        "DQ-AUTH-TXN-FK",
         "transaction_id must exist in transactions",
         "transaction_id does not resolve to Silver transactions",
     )
     .unionByName(quarantine_rows(
-        device_type_missing,
-        "DQ-DEV-TYPE-REQ",
-        "device_type is required",
-        "missing device_type",
+        auth_ts_invalid,
+        "DQ-AUTH-TS-ORDER",
+        "auth_ts must not be later than txn_ts",
+        "auth_ts is missing, invalid, or after linked transaction timestamp",
+    ))
+    .unionByName(type_cast_quarantine_rows(
+        checked_df, CAST_RULES, TABLE_NAME, "attempt_id", RUN_ID
     ))
 )
 quarantine_df = deduplicate_quarantine_rows(quarantine_df)
@@ -145,31 +158,23 @@ else:
     print("No failed records found to quarantine.")
 
 # ---------------------------------------------------------------------------
-# 4. FILTER CLEAN RECORDS & APPLY PROTECTION
+# 4. FILTER CLEAN RECORDS
 # ---------------------------------------------------------------------------
-is_ipv4 = F.col("ip").rlike(r"^([0-9]{1,3}\.){3}[0-9]{1,3}$")
-ip_masked = (
-    F.when(is_ipv4, F.regexp_replace(F.col("ip"), r"^(\d+\.\d+\.\d+)\.\d+$", "$1.0/24"))
-    .when(F.col("ip").isNull() | (F.trim(F.col("ip")) == ""), F.lit(None).cast("string"))
-    .otherwise(F.concat(
-        F.lit("IP_HASH_"),
-        F.substring(F.sha2(F.concat(F.lower(F.trim(F.col("ip"))), F.lit(SALT)), 256), 1, 16),
-    ))
-)
+decline_reason_trimmed = F.trim(F.col("decline_reason"))
 
-silver_transaction_devices_df = checked_df.filter(
+silver_auth_attempts_df = checked_df.filter(
     F.col("silver_transaction_id").isNotNull() &
-    F.col("device_type").isNotNull() &
-    (F.trim(F.col("device_type")) != "")
+    F.col("auth_ts_typed").isNotNull() &
+    (F.col("auth_ts_typed") <= F.col("silver_txn_ts"))
+    & ~any_cast_failure(CAST_RULES)
 ).select(
-    F.concat(
-        F.lit("DEV_"),
-        F.substring(F.sha2(F.concat(F.lower(F.trim(F.col("device_id"))), F.lit(SALT)), 256), 1, 16),
-    ).alias("device_id"),
+    F.col("attempt_id"),
     F.col("transaction_id"),
-    F.lower(F.trim(F.col("device_type"))).alias("device_type"),
-    ip_masked.alias("ip"),
-    F.upper(F.trim(F.col("geo_country"))).alias("geo_country"),
+    F.lower(F.trim(F.col("decision"))).alias("decision"),
+    F.when(decline_reason_trimmed == "", F.lit(None).cast("string"))
+        .otherwise(decline_reason_trimmed)
+        .alias("decline_reason"),
+    F.col("auth_ts_typed").alias("auth_ts"),
     F.col("_source_file"),
     F.col("_source_file_mod_time").cast("timestamp").alias("_source_file_mod_time"),
     F.col("_ingest_ts").cast("timestamp").alias("_ingest_ts"),
@@ -178,13 +183,16 @@ silver_transaction_devices_df = checked_df.filter(
     F.col("_source_record_id"),
     F.col("_record_hash"),
 )
+silver_auth_attempts_df = exclude_dq_quarantined_rows(
+    silver_auth_attempts_df, spark, CATALOG, TABLE_NAME, RUN_ID
+)
 
 # ---------------------------------------------------------------------------
-# 5. WRITE CLEAN SILVER TRANSACTION DEVICES TABLE
+# 5. WRITE CLEAN SILVER AUTH ATTEMPTS TABLE
 # ---------------------------------------------------------------------------
 print(f"Writing clean records to Silver table: {FULL_TABLE_NAME}")
 (
-    silver_transaction_devices_df.write
+    silver_auth_attempts_df.write
     .format("delta")
     .mode("overwrite")
     .option("overwriteSchema", "true")
@@ -194,22 +202,8 @@ print(f"Writing clean records to Silver table: {FULL_TABLE_NAME}")
 print(f"Table created/updated successfully: {FULL_TABLE_NAME}")
 
 # ---------------------------------------------------------------------------
-# 6. UPDATE MASKING POLICIES AND METADATA LINEAGE
+# 6. UPDATE METADATA LINEAGE
 # ---------------------------------------------------------------------------
-masking_schema = StructType([
-    StructField("table_name", StringType(), nullable=True),
-    StructField("field_name", StringType(), nullable=True),
-    StructField("classification", StringType(), nullable=True),
-    StructField("protection_method", StringType(), nullable=True),
-    StructField("allowed_role", StringType(), nullable=True),
-    StructField("owner", StringType(), nullable=True),
-])
-
-masking_rows = [
-    (TABLE_NAME, "device_id", "device/session identifier", "tokenize with salted SHA256 prefix", "unprivileged", "M4"),
-    (TABLE_NAME, "ip", "network identifier", "truncate IPv4 to /24 or hash non-IPv4 value", "unprivileged", "M4"),
-]
-
 lineage_schema = StructType([
     StructField("source_catalog", StringType(), nullable=True),
     StructField("source_schema", StringType(), nullable=True),
@@ -223,26 +217,12 @@ lineage_schema = StructType([
 ])
 
 lineage_rows = [
-    (CATALOG, "bronze", TABLE_NAME, "device_id", CATALOG, SCHEMA, TABLE_NAME, "device_id", "Tokenized with salted SHA256 prefix from latest Bronze batch"),
+    (CATALOG, "bronze", TABLE_NAME, "attempt_id", CATALOG, SCHEMA, TABLE_NAME, "attempt_id", "Direct copy from latest Bronze batch"),
     (CATALOG, "bronze", TABLE_NAME, "transaction_id", CATALOG, SCHEMA, TABLE_NAME, "transaction_id", "Direct copy after Silver transaction relationship check"),
-    (CATALOG, "bronze", TABLE_NAME, "device_type", CATALOG, SCHEMA, TABLE_NAME, "device_type", "Lowercased and trimmed; missing values quarantined"),
-    (CATALOG, "bronze", TABLE_NAME, "ip", CATALOG, SCHEMA, TABLE_NAME, "ip", "IPv4 reduced to /24-style network; non-IPv4 hashed"),
-    (CATALOG, "bronze", TABLE_NAME, "geo_country", CATALOG, SCHEMA, TABLE_NAME, "geo_country", "Uppercased and trimmed"),
+    (CATALOG, "bronze", TABLE_NAME, "decision", CATALOG, SCHEMA, TABLE_NAME, "decision", "Lowercased and trimmed"),
+    (CATALOG, "bronze", TABLE_NAME, "decline_reason", CATALOG, SCHEMA, TABLE_NAME, "decline_reason", "Trimmed; empty string converted to NULL"),
+    (CATALOG, "bronze", TABLE_NAME, "auth_ts", CATALOG, SCHEMA, TABLE_NAME, "auth_ts", "Parsed to TIMESTAMP; invalid or after transaction timestamp quarantined"),
 ]
-
-spark.sql(f"""
-    CREATE TABLE IF NOT EXISTS {MASKING_POLICIES_TABLE_NAME} (
-      table_name STRING,
-      field_name STRING,
-      classification STRING,
-      protection_method STRING,
-      allowed_role STRING,
-      owner STRING
-    ) USING DELTA
-""")
-spark.sql(f"DELETE FROM {MASKING_POLICIES_TABLE_NAME} WHERE table_name = '{TABLE_NAME}'")
-spark.createDataFrame(masking_rows, schema=masking_schema) \
-    .write.format("delta").mode("append").saveAsTable(MASKING_POLICIES_TABLE_NAME)
 
 spark.sql(f"""
     CREATE TABLE IF NOT EXISTS {LINEAGE_TABLE_NAME} (
@@ -267,7 +247,7 @@ spark.createDataFrame(lineage_rows, schema=lineage_schema) \
 # ---------------------------------------------------------------------------
 # 7. VERIFY & DESCRIBE
 # ---------------------------------------------------------------------------
-print("\nVerifying Silver Transaction Devices:")
+print("\nVerifying Silver Auth Attempts:")
 spark.sql(f"SELECT * FROM {FULL_TABLE_NAME} LIMIT 10").show(truncate=False)
 spark.sql(f"DESCRIBE TABLE {FULL_TABLE_NAME}").show(truncate=False)
 spark.sql(f"SELECT COUNT(*) AS silver_rows FROM {FULL_TABLE_NAME}").show()

@@ -3,8 +3,8 @@
 # GOVERNANCE PIPELINE: dq_rules  (the DQ rule registry)
 # ----------------------------------------------------------------------------
 # Defines and populates the rule registry under gov.dq_rules — one row per
-# executable data-quality rule (35 injected Bronze rules plus 10 derived
-# Silver reconciliation rules).
+# executable data-quality rule (35 injected Bronze rules, 10 derived Silver
+# reconciliation rules, and explicit Silver type-contract rules).
 # Mirrors silver_masking_policies.py / silver_metadata_lineage.py: build a
 # DataFrame from an explicit schema + a Python list, then saveAsTable(overwrite).
 # The Bronze rows mirror pipeline/dq/02_load_dq_rules.sql; the Silver rows
@@ -56,8 +56,8 @@ schema = StructType([
     StructField("enabled", BooleanType(), nullable=True),
 ])
 
-# The 35 Bronze rules plus 10 Silver reconciliation rules. Bronze-rule severity
-# matches defects_manifest; Silver rules capture descendants of rejected parents.
+# Bronze-rule severity matches defects_manifest; Silver rules capture
+# descendants of rejected parents and Bronze-string conversion failures.
 data = [
     ("DQ-TXN-AMT-POS", "amount must be > 0", "bronze", "transactions", "transaction_id", "single_row", "quarantine", "CAST(amount AS DOUBLE) <= 0", True),
     ("DQ-TXN-MERCH-REQ", "merchant_id is required", "bronze", "transactions", "transaction_id", "single_row", "quarantine", "merchant_id IS NULL OR merchant_id = ''", True),
@@ -106,6 +106,36 @@ data = [
     ("DQ-CTL-EMP-FK", "employee_id must exist in Silver employees", "silver", "customer_contact_logs", "contact_id", "fk_anti_join", "quarantine", "customer_contact_logs.employee_id NOT IN silver.employees.employee_id", True),
 ]
 
+type_cast_rules = [
+    ("DQ-DATE-ID-TYPE", "date_id must cast to DATE", "silver", "date_dim", "date_id", "type_cast", "quarantine", "try_to_timestamp(date_id, 'yyyyMMdd') IS NULL for nonblank input", True),
+    ("DQ-DATE-YEAR-TYPE", "year must cast to INT", "silver", "date_dim", "date_id", "type_cast", "quarantine", "try_cast(year AS INT) IS NULL for nonblank input", True),
+    ("DQ-DATE-MONTH-TYPE", "month must cast to INT", "silver", "date_dim", "date_id", "type_cast", "quarantine", "try_cast(month AS INT) IS NULL for nonblank input", True),
+    ("DQ-DATE-QUARTER-TYPE", "quarter must cast to INT", "silver", "date_dim", "date_id", "type_cast", "quarantine", "try_cast(quarter AS INT) IS NULL for nonblank input", True),
+    ("DQ-DATE-WEEKEND-TYPE", "is_weekend must cast to BOOLEAN", "silver", "date_dim", "date_id", "type_cast", "quarantine", "try_cast(is_weekend AS BOOLEAN) IS NULL for nonblank input", True),
+    ("DQ-CURR-DECIMALS-TYPE", "decimals must cast to INT", "silver", "currencies", "currency_code", "type_cast", "quarantine", "try_cast(decimals AS INT) IS NULL for nonblank input", True),
+    ("DQ-CUST-DOB-TYPE", "dob must cast to DATE", "silver", "customers", "customer_id", "type_cast", "quarantine", "try_cast(dob AS DATE) IS NULL for nonblank input", True),
+    ("DQ-CUST-CREATED-TYPE", "created_at must cast to TIMESTAMP", "silver", "customers", "customer_id", "type_cast", "quarantine", "try_cast(created_at AS TIMESTAMP) IS NULL for nonblank input", True),
+    ("DQ-ACC-OPENDATE-TYPE", "open_date must cast to DATE", "silver", "accounts", "account_id", "type_cast", "quarantine", "try_cast(open_date AS DATE) IS NULL for nonblank input", True),
+    ("DQ-MERCH-EFFECTIVE-TYPE", "effective_at must cast to TIMESTAMP", "silver", "merchants", "merchant_id", "type_cast", "quarantine", "try_cast(effective_at AS TIMESTAMP) IS NULL for nonblank input", True),
+    ("DQ-TXN-AMOUNT-TYPE", "amount must cast to DECIMAL(12,2)", "silver", "transactions", "transaction_id", "type_cast", "quarantine", "try_cast(amount AS DECIMAL(12,2)) IS NULL for nonblank input", True),
+    ("DQ-TXN-TS-TYPE", "txn_ts must cast to TIMESTAMP", "silver", "transactions", "transaction_id", "type_cast", "quarantine", "try_to_timestamp(txn_ts) IS NULL for nonblank input", True),
+    ("DQ-AUTH-TS-TYPE", "auth_ts must cast to TIMESTAMP", "silver", "auth_attempts", "attempt_id", "type_cast", "quarantine", "try_to_timestamp(auth_ts) IS NULL for nonblank input", True),
+    ("DQ-DISP-AMOUNT-TYPE", "amount must cast to DECIMAL(18,2)", "silver", "disputes", "dispute_id", "type_cast", "quarantine", "try_cast(amount AS DECIMAL(18,2)) IS NULL for nonblank input", True),
+    ("DQ-DISP-RAISED-TYPE", "raised_at must cast to TIMESTAMP", "silver", "disputes", "dispute_id", "type_cast", "quarantine", "try_cast(raised_at AS TIMESTAMP) IS NULL for nonblank input", True),
+    ("DQ-CBK-AMOUNT-TYPE", "amount must cast to DOUBLE", "silver", "chargebacks", "chargeback_id", "type_cast", "quarantine", "try_cast(amount AS DOUBLE) IS NULL for nonblank input", True),
+    ("DQ-CBK-PROCESSED-TYPE", "processed_at must cast to TIMESTAMP", "silver", "chargebacks", "chargeback_id", "type_cast", "quarantine", "try_cast(processed_at AS TIMESTAMP) IS NULL for nonblank input", True),
+    ("DQ-ALT-SCORE-TYPE", "score must cast to DOUBLE", "silver", "fraud_alerts", "alert_id", "type_cast", "quarantine", "try_cast(score AS DOUBLE) IS NULL for nonblank input", True),
+    ("DQ-ALT-TRIGGERED-TYPE", "triggered_at must cast to TIMESTAMP", "silver", "fraud_alerts", "alert_id", "type_cast", "quarantine", "try_cast(triggered_at AS TIMESTAMP) IS NULL for nonblank input", True),
+    ("DQ-CASE-OPENED-TYPE", "opened_at must cast to TIMESTAMP", "silver", "investigation_cases", "case_id", "type_cast", "quarantine", "try_cast(opened_at AS TIMESTAMP) IS NULL for nonblank input", True),
+    ("DQ-CASE-CLOSED-TYPE", "closed_at must cast to TIMESTAMP", "silver", "investigation_cases", "case_id", "type_cast", "quarantine", "try_cast(closed_at AS TIMESTAMP) IS NULL for nonblank input", True),
+    ("DQ-CASE-LEGALHOLD-TYPE", "legal_hold must cast to BOOLEAN", "silver", "investigation_cases", "case_id", "type_cast", "quarantine", "try_cast(legal_hold AS BOOLEAN) IS NULL for nonblank input", True),
+    ("DQ-NOTE-CREATED-TYPE", "created_at must cast to TIMESTAMP", "silver", "investigation_notes", "note_id", "type_cast", "quarantine", "try_cast(created_at AS TIMESTAMP) IS NULL for nonblank input", True),
+    ("DQ-CASETXN-LINKED-TYPE", "linked_at must cast to TIMESTAMP", "silver", "case_transactions", "case_id|transaction_id", "type_cast", "quarantine", "try_cast(linked_at AS TIMESTAMP) IS NULL for nonblank input", True),
+    ("DQ-CTL-DNC-TYPE", "do_not_contact must cast to BOOLEAN", "silver", "customer_contact_logs", "contact_id", "type_cast", "quarantine", "try_cast(do_not_contact AS BOOLEAN) IS NULL for nonblank input", True),
+    ("DQ-CTL-CONTACTED-TYPE", "contacted_at must cast to TIMESTAMP", "silver", "customer_contact_logs", "contact_id", "type_cast", "quarantine", "try_cast(contacted_at AS TIMESTAMP) IS NULL for nonblank input", True),
+]
+data.extend(type_cast_rules)
+
 # ---------------------------------------------------------------------------
 # BUILD + WRITE
 # ---------------------------------------------------------------------------
@@ -126,10 +156,10 @@ print(f"Table created/updated successfully: {FULL_TABLE_NAME}")
 # ---------------------------------------------------------------------------
 # VERIFY & DESCRIBE  (mirrors the VERIFY block of 02_load_dq_rules.sql)
 # ---------------------------------------------------------------------------
-print("\nRule count (expected 45: 35 Bronze + 10 Silver):")
+print(f"\nRule count (expected {len(data)} including {len(type_cast_rules)} type-contract rules):")
 spark.sql(f"SELECT COUNT(*) AS rule_count FROM {FULL_TABLE_NAME}").show()
 
-print("Counts per pattern (expected single_row=13, duplicate=6, fk_anti_join=22, text_pii=2, ai_exclusion=2):")
+print("Counts per pattern (including Silver type_cast rules):")
 spark.sql(
     f"SELECT pattern, COUNT(*) AS n FROM {FULL_TABLE_NAME} "
     f"GROUP BY pattern ORDER BY n DESC"

@@ -33,7 +33,7 @@ Derived fact and child-table counts follow the generator ratios in
 | `countries` | 5 | one row per ISO country | `iso_code`, `name`, `region` |
 | `currencies` | 5 | one row per ISO currency | `currency_code`, `name`, `decimals` |
 | `branches` | 4 | one row per branch | `branch_code`, `name`, `country`, `region`, `status` |
-| `date_dim` | 1,283 | one row per calendar day from 2023-01-01 to 2026-07-06 | `date_id`, `year`, `month`, `quarter`, `is_weekend` |
+| `date_dim` | 2,922 | one row per calendar day from 2023-01-01 to 2030-12-31 | `date_id`, `year`, `month`, `quarter`, `is_weekend` |
 | `customers` | 5,000 | one row per customer | `customer_id`, `first_name`, `last_name`, `dob`, `email`, `phone`, `address`, `tax_id`, `created_at` |
 | `employees` | 200 | one row per employee or investigator | `employee_id`, `full_name`, `email`, `team`, `role` |
 | `accounts` | 7,500 | one row per account | `account_id`, `customer_id`, `product_type`, `open_date`, `status`, `currency` |

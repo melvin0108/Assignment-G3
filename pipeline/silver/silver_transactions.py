@@ -16,7 +16,11 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import StructType, StructField, StringType
 from pyspark.sql.window import Window
 from pyspark.dbutils import DBUtils
-from pipeline.silver.snapshot import deduplicate_quarantine_rows, latest_batch_snapshot, snapshot_run_id
+from pipeline.silver.snapshot import (
+    deduplicate_quarantine_rows, exclude_dq_quarantined_rows,
+    latest_batch_snapshot, snapshot_run_id,
+)
+from pipeline.silver.type_cast import TypeCastRule, any_cast_failure, apply_type_casts, type_cast_quarantine_rows
 
 # In a Databricks environment, `spark` is pre-initialized.
 # This line gets the existing session or initializes one.
@@ -70,12 +74,19 @@ merchants_df = spark.read.table(f"{CATALOG}.{SCHEMA}.merchants") \
 # ---------------------------------------------------------------------------
 # 2. RUN DQ RULES & IDENTIFY FAILURES (QUARANTINE)
 # ---------------------------------------------------------------------------
-txn_window = Window.partitionBy("transaction_id").orderBy("_ingest_ts", "_record_hash")
+# Match the authoritative Bronze DQ query so it and Silver retain the same
+# physical transaction when a business key is duplicated.
+txn_window = Window.partitionBy("transaction_id").orderBy(F.col("_source_record_id").asc())
+CAST_RULES = [
+    TypeCastRule("amount", "amount_typed", "DECIMAL(12,2)", "DQ-TXN-AMOUNT-TYPE"),
+    TypeCastRule(
+        "txn_ts", "txn_ts_typed", "TIMESTAMP", "DQ-TXN-TS-TYPE",
+        "try_to_timestamp(replace(replace(txn_ts, 'T', ' '), 'Z', ''))",
+    ),
+]
 
 typed_transactions_df = (
-    transactions_df
-    .withColumn("amount_typed", F.expr("try_cast(amount AS DECIMAL(12,2))"))
-    .withColumn("txn_ts_typed", F.expr("try_to_timestamp(replace(replace(txn_ts, 'T', ' '), 'Z', ''))"))
+    apply_type_casts(transactions_df, CAST_RULES)
     .withColumn("rn_txn", F.row_number().over(txn_window))
 )
 
@@ -131,6 +142,9 @@ quarantine_df = (
     .unionByName(quarantine_rows(card_fk_missing, "DQ-TXN-CARD-FK", "card_id must exist in Silver cards", "card_id does not resolve to Silver cards"))
     .unionByName(quarantine_rows(merchant_fk_missing, "DQ-TXN-MERCH-FK", "merchant_id must exist in Silver merchants", "merchant_id does not resolve to Silver merchants"))
     .unionByName(quarantine_rows(closed_card, "DQ-TXN-CARD-ACTIVE", "transaction must use an active card", "transaction uses a closed card"))
+    .unionByName(type_cast_quarantine_rows(
+        checked_df, CAST_RULES, TABLE_NAME, "transaction_id", RUN_ID
+    ))
 )
 quarantine_df = deduplicate_quarantine_rows(quarantine_df)
 
@@ -188,6 +202,7 @@ silver_transactions_df = checked_df.filter(
     ) &
     F.col("silver_merchant_id").isNotNull() &
     (F.coalesce(F.col("silver_card_status"), F.lit("")) != "closed")
+    & ~any_cast_failure(CAST_RULES)
 ).select(
     F.col("transaction_id"),
     F.col("account_id"),
@@ -205,6 +220,9 @@ silver_transactions_df = checked_df.filter(
     F.col("_batch_id").cast("long").alias("_batch_id"),
     F.col("_source_record_id"),
     F.col("_record_hash"),
+)
+silver_transactions_df = exclude_dq_quarantined_rows(
+    silver_transactions_df, spark, CATALOG, TABLE_NAME, RUN_ID
 )
 
 # ---------------------------------------------------------------------------

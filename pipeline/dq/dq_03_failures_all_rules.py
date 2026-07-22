@@ -2,21 +2,13 @@
 # ============================================================================
 # DQ failures — ALL 35 rules -> silver.quarantine_records
 # ----------------------------------------------------------------------------
-# PySpark port of pipeline/dq/04_failures_all_rules.sql. The SQL is embedded VERBATIM; the
-# only runtime change is replacing the __CATALOG__ token with the selected catalog. The SQL
-# is split into statements with a string/comment-aware splitter and each
-# statement is run via spark.sql. This supersedes the earlier hand-chunked
-# version whose naive ';' split broke on semicolons inside string literals
-# ('Toggle; the failure scripts...', 'exact first pass; fuzzy TODO') and left
-# comment fragments as raw SQL.
+# PySpark port of pipeline/dq/04_failures_all_rules.sql. The SQL is embedded
+# verbatim, then its 35 INSERT...SELECT statements are combined into one
+# UNION ALL DataFrame and written in a single Delta transaction.
 # ============================================================================
 
-from pyspark.sql import SparkSession
-from pipeline.silver.snapshot import (
-    assert_matching_latest_snapshots,
-    deduplicate_quarantine_rows,
-    latest_batch_snapshot,
-)
+from pyspark.sql import SparkSession, functions as F
+from pipeline.silver.snapshot import deduplicate_quarantine_rows
 
 # `spark` is pre-initialized in a Databricks notebook.
 spark = SparkSession.builder.getOrCreate()
@@ -40,6 +32,19 @@ def _catalog_widget():
 
 catalog = _catalog_widget()
 QUARANTINE_TABLE_NAME = f"{catalog}.silver.quarantine_records"
+QUARANTINE_COLUMNS = (
+    "run_id",
+    "source_table",
+    "source_record_id",
+    "record_key",
+    "rule_id",
+    "rule_name",
+    "failure_reason",
+    "severity",
+    "disposition",
+    "raw_record",
+    "detected_at",
+)
 SOURCE_TABLES = (
     "accounts",
     "auth_attempts",
@@ -62,15 +67,95 @@ SOURCE_TABLES = (
 
 
 def _prepare_current_source_views():
-    """Expose one latest-batch view per Bronze source for every DQ rule."""
-    snapshot_identity = assert_matching_latest_snapshots(
-        spark, catalog, SOURCE_TABLES
+    """Resolve aligned latest-batch Bronze snapshots and expose DQ temp views."""
+    source_frames = {
+        table_name: spark.read.table(f"{catalog}.bronze.{table_name}")
+        for table_name in SOURCE_TABLES
+    }
+    metadata_frames = [
+        frame.select(
+            F.lit(table_name).alias("_source_table"),
+            F.col("_batch_id").cast("long").alias("_batch_id"),
+        )
+        for table_name, frame in source_frames.items()
+    ]
+    latest_batch_rows = (
+        _union_all(metadata_frames)
+        .groupBy("_source_table")
+        .agg(F.max("_batch_id").alias("_batch_id"))
+        .collect()
     )
-    for table_name in SOURCE_TABLES:
-        latest_batch_snapshot(
-            spark.read.table(f"{catalog}.bronze.{table_name}")
-        ).createOrReplaceTempView(f"dq_current_{table_name}")
-    return snapshot_identity
+    latest_batches = {
+        row["_source_table"]: row["_batch_id"] for row in latest_batch_rows
+    }
+    missing_tables = set(SOURCE_TABLES) - set(latest_batches)
+    empty_tables = {
+        table_name for table_name, batch_id in latest_batches.items()
+        if batch_id is None
+    }
+    if missing_tables or empty_tables:
+        invalid_tables = sorted(missing_tables | empty_tables)
+        raise ValueError(
+            "Bronze inputs do not contain a complete batch: "
+            + ", ".join(invalid_tables)
+        )
+
+    snapshots = {}
+    run_identity_frames = []
+    for table_name, source_df in source_frames.items():
+        snapshot_df = source_df.filter(
+            F.col("_batch_id") == latest_batches[table_name]
+        )
+        snapshots[table_name] = snapshot_df
+        run_identity_frames.append(snapshot_df.select(
+            F.lit(table_name).alias("_source_table"),
+            F.col("_run_id").cast("string").alias("_run_id"),
+        ))
+
+    identity_rows = (
+        _union_all(run_identity_frames)
+        .groupBy("_source_table", "_run_id")
+        .count()
+        .collect()
+    )
+    identities_by_table = {table_name: [] for table_name in SOURCE_TABLES}
+    for row in identity_rows:
+        identities_by_table[row["_source_table"]].append(row["_run_id"])
+
+    identities = {}
+    for table_name, run_ids in identities_by_table.items():
+        if len(run_ids) != 1 or run_ids[0] is None:
+            raise ValueError(
+                f"Latest Bronze snapshot for {table_name} must contain "
+                "exactly one non-null _run_id"
+            )
+        identities[table_name] = (
+            latest_batches[table_name],
+            run_ids[0],
+        )
+
+    distinct_identities = set(identities.values())
+    if len(distinct_identities) != 1:
+        details = ", ".join(
+            f"{table_name}={batch_id}/{run_id}"
+            for table_name, (batch_id, run_id) in sorted(identities.items())
+        )
+        raise ValueError(
+            "Bronze sources do not share one latest complete snapshot: "
+            + details
+        )
+
+    for table_name, snapshot_df in snapshots.items():
+        snapshot_df.createOrReplaceTempView(f"dq_current_{table_name}")
+    return distinct_identities.pop()
+
+
+def _union_all(dataframes):
+    """Union a non-empty list of schema-compatible DataFrames."""
+    result = dataframes[0]
+    for dataframe in dataframes[1:]:
+        result = result.unionByName(dataframe)
+    return result
 
 
 def _use_current_source_views(sql):
@@ -81,30 +166,6 @@ def _use_current_source_views(sql):
         )
     return sql
 
-
-def _deduplicate_quarantine_records():
-    """Enforce the quarantine natural key across current and historical runs."""
-    current_rows = spark.read.table(QUARANTINE_TABLE_NAME)
-    current_count = current_rows.count()
-    deduplicated_rows = deduplicate_quarantine_rows(current_rows).cache()
-    try:
-        deduplicated_count = deduplicated_rows.count()
-        if deduplicated_count == current_count:
-            print(f"Quarantine rows are already unique: {current_count}")
-            return
-
-        print(
-            f"Deduplicating {current_count - deduplicated_count} excess quarantine rows "
-            "across all runs..."
-        )
-        (
-            deduplicated_rows.write.format("delta")
-            .mode("overwrite")
-            .option("overwriteSchema", "false")
-            .saveAsTable(QUARANTINE_TABLE_NAME)
-        )
-    finally:
-        deduplicated_rows.unpersist()
 
 def _has_code(stmt):
     """True if the chunk has any SQL after stripping -- line comments, so a
@@ -167,16 +228,6 @@ def _statements(sql):
     return out
 
 
-def _is_query(stmt):
-    """True if the statement returns a result set worth showing (SELECT/WITH/
-    SHOW/DESCRIBE/EXPLAIN). DDL/DML are side-effecting."""
-    for line in stmt.split("\n"):
-        code = line.split("--", 1)[0].strip()
-        if code:
-            return code.split()[0].upper() in {"SELECT", "WITH", "SHOW", "DESCRIBE", "EXPLAIN"}
-    return False
-
-
 def _head(stmt):
     """First non-comment code line, trimmed — used for the run log."""
     for line in stmt.split("\n"):
@@ -184,6 +235,28 @@ def _head(stmt):
         if code:
             return code[:90]
     return ""
+
+
+def _statement_keyword(stmt):
+    """Return the first SQL keyword without assuming same-line arguments."""
+    head = _head(stmt)
+    return head.split(maxsplit=1)[0].upper() if head else ""
+
+
+def _insert_select(stmt):
+    """Return the outer SELECT body from one quarantine INSERT statement."""
+    insert_seen = False
+    lines = stmt.splitlines()
+    for position, line in enumerate(lines):
+        code = line.split("--", 1)[0].strip().upper()
+        if code.startswith("INSERT INTO "):
+            insert_seen = True
+            continue
+        if insert_seen and code.startswith("SELECT "):
+            leading_spaces = len(line) - len(line.lstrip())
+            lines[position] = line[leading_spaces:]
+            return "\n".join(lines[position:]).strip()
+    raise ValueError("Quarantine INSERT statement is missing its outer SELECT")
 
 
 SQL = r"""
@@ -671,18 +744,40 @@ DQ_RUN_ID = f"{SNAPSHOT_RUN_ID}-DQ"
 print(f"Validated DQ source snapshot: batch {SNAPSHOT_BATCH_ID}, run {SNAPSHOT_RUN_ID}")
 _statements_to_run = _statements(_use_current_source_views(SQL))
 
-# The final statement is the manifest reconciliation query. Run it only after
-# every quarantine run has been reduced to one row per natural key.
-for _stmt in _statements_to_run[:-1]:
-    _df = _run(_stmt)
-    if _is_query(_stmt):
-        _df.show(truncate=False)
-    else:
-        _df.collect()                       # force eager DDL/DML execution
-        print("  ran: " + _head(_stmt))
+_cleanup_statements = [
+    stmt for stmt in _statements_to_run if _statement_keyword(stmt) == "DELETE"
+]
+_rule_statements = [
+    stmt for stmt in _statements_to_run if _statement_keyword(stmt) == "INSERT"
+]
+_verification_statements = [
+    stmt for stmt in _statements_to_run if _statement_keyword(stmt) == "SELECT"
+]
+if (
+    len(_cleanup_statements) != 1
+    or len(_rule_statements) != 35
+    or len(_verification_statements) != 1
+):
+    raise ValueError(
+        "Expected one DELETE, 35 quarantine INSERTs, and one verification SELECT; "
+        f"found DELETE={len(_cleanup_statements)}, "
+        f"INSERT={len(_rule_statements)}, SELECT={len(_verification_statements)}"
+    )
 
-_deduplicate_quarantine_records()
+_run(_cleanup_statements[0]).collect()
+print("  ran: " + _head(_cleanup_statements[0]))
 
-for _stmt in _statements_to_run[-1:]:
-    _df = _run(_stmt)
-    _df.show(truncate=False)
+_combined_rule_query = "\nUNION ALL\n".join(
+    _insert_select(stmt) for stmt in _rule_statements
+)
+_current_quarantine_rows = deduplicate_quarantine_rows(
+    _run(_combined_rule_query).toDF(*QUARANTINE_COLUMNS)
+)
+(
+    _current_quarantine_rows.write.format("delta")
+    .mode("append")
+    .saveAsTable(QUARANTINE_TABLE_NAME)
+)
+print("  evaluated 35 DQ rules and appended one deduplicated quarantine batch")
+
+_run(_verification_statements[0]).show(truncate=False)

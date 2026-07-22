@@ -4,7 +4,11 @@
 from pyspark.sql import SparkSession, Window
 from pyspark.sql import functions as F
 from pyspark.dbutils import DBUtils
-from pipeline.silver.snapshot import deduplicate_quarantine_rows, latest_batch_snapshot, snapshot_run_id
+from pipeline.silver.snapshot import (
+    deduplicate_quarantine_rows, exclude_dq_quarantined_rows,
+    latest_batch_snapshot, snapshot_run_id,
+)
+from pipeline.silver.type_cast import TypeCastRule, any_cast_failure, apply_type_casts, type_cast_quarantine_rows
 
 spark = SparkSession.builder.getOrCreate()
 dbutils = DBUtils(spark)
@@ -27,10 +31,13 @@ bronze_table = f"{CATALOG}.bronze.{TABLE_NAME}"
 silver_table = f"{CATALOG}.silver.{TABLE_NAME}"
 quarantine_table = f"{CATALOG}.silver.quarantine_records"
 
-checked_df = (
+CAST_RULES = [TypeCastRule(
+    "effective_at", "effective_at_typed", "TIMESTAMP", "DQ-MERCH-EFFECTIVE-TYPE"
+)]
+checked_df = apply_type_casts((
     latest_batch_snapshot(spark.read.table(bronze_table))
     .withColumn("risk_rating_normalized", F.lower(F.trim("risk_rating")))
-)
+), CAST_RULES)
 RUN_ID = snapshot_run_id(checked_df)
 invalid_risk = ~F.col("risk_rating_normalized").isin("low", "medium", "high")
 
@@ -44,6 +51,9 @@ quarantine_df = checked_df.filter(invalid_risk).select(
     F.to_json(F.struct("merchant_id", "risk_rating", "status")).alias("raw_record"),
     F.current_timestamp().alias("detected_at"),
 )
+quarantine_df = quarantine_df.unionByName(type_cast_quarantine_rows(
+    checked_df, CAST_RULES, TABLE_NAME, "merchant_id", RUN_ID
+))
 quarantine_df = deduplicate_quarantine_rows(quarantine_df)
 
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.silver")
@@ -57,13 +67,16 @@ if not quarantine_df.isEmpty():
 
 # SCD Type 1: retain one current merchant row from the latest full snapshot.
 dedupe_window = Window.partitionBy("merchant_id").orderBy(F.col("_ingest_ts").desc(), F.col("_record_hash").desc())
-silver_df = (checked_df.filter(~invalid_risk).withColumn("_row_num", F.row_number().over(dedupe_window))
+silver_df = (checked_df.filter(~invalid_risk & ~any_cast_failure(CAST_RULES)).withColumn("_row_num", F.row_number().over(dedupe_window))
     .filter(F.col("_row_num") == 1).select(
         "merchant_id", "name", "mcc", "country", "risk_rating_normalized", "status",
-        F.to_timestamp("effective_at").alias("effective_at"), "_source_file",
+        F.col("effective_at_typed").alias("effective_at"), "_source_file",
         F.col("_source_file_mod_time").cast("timestamp").alias("_source_file_mod_time"),
         F.col("_ingest_ts").cast("timestamp").alias("_ingest_ts"), "_run_id",
         F.col("_batch_id").cast("long").alias("_batch_id"), "_source_record_id", "_record_hash",
     ).withColumnRenamed("risk_rating_normalized", "risk_rating"))
+silver_df = exclude_dq_quarantined_rows(
+    silver_df, spark, CATALOG, TABLE_NAME, RUN_ID
+)
 silver_df.write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable(silver_table)
 print(f"Table created/updated successfully: {silver_table}")

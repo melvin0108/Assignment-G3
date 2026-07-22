@@ -5,7 +5,6 @@ from pyspark.sql import SparkSession
 from pyspark.dbutils import DBUtils
 
 from pipeline.gold.gold_common import catalog_widget, matching_silver_snapshot
-from pipeline.gold.gold_models import build_case_and_facts, build_dimensions, build_investigation_context
 
 
 spark = SparkSession.builder.getOrCreate()
@@ -15,8 +14,26 @@ BATCH_ID, RUN_ID = matching_silver_snapshot(spark, CATALOG)
 
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.gold")
 print(f"Validated Silver snapshot: batch {BATCH_ID}, run {RUN_ID}")
-build_dimensions(spark, CATALOG, RUN_ID, BATCH_ID)
-build_case_and_facts(spark, CATALOG, RUN_ID, BATCH_ID)
-build_investigation_context(spark, CATALOG, RUN_ID, BATCH_ID)
+
+GOLD_NOTEBOOKS = [
+    "dim_date",
+    "dim_merchant",
+    "dim_channel",
+    "dim_dispute_reason",
+    "dim_currency",
+    "fact_case_transaction",
+    "fact_authorization_attempt",
+    "fact_dispute",
+    "fact_chargeback",
+    "fact_fraud_alert",
+    "fact_investigation_note",
+    "fact_case_party_summary",
+    "dim_case",
+    "investigation_context",
+]
+
+for position, notebook_name in enumerate(GOLD_NOTEBOOKS, start=1):
+    print(f"[{position}/{len(GOLD_NOTEBOOKS)}] Starting gold.{notebook_name}")
+    dbutils.notebook.run(f"./{notebook_name}", 0, {"catalog": CATALOG})
 
 print("Completed Gold models with output-level role policy labels")

@@ -1,12 +1,13 @@
 # Databricks notebook source
 # ============================================================================
-# SILVER TRANSFORMATION & DATA QUALITY PIPELINE: customer_contact_logs
+# SILVER TRANSFORMATION & DATA QUALITY PIPELINE: case_parties
 # ============================================================================
-# Implements Bronze -> Silver transformation for the customer_contact_logs dataset:
-#   1. Reads from bronze.customer_contact_logs
-#   2. Enforces Data Quality (DQ) rules and identifies failures
-#   3. Quarantines failed records to silver.quarantine_records
-#   4. Writes clean records to silver.customer_contact_logs
+# Implements Bronze -> Silver transformation for the case_parties dataset:
+#   1. Reads from bronze.case_parties
+#   2. Performs conditional referential integrity checks (by party_type)
+#   3. Enforces Data Quality (DQ) rules and identifies failures
+#   4. Quarantines failed records to silver.quarantine_records
+#   5. Writes clean records to silver.case_parties
 # ============================================================================
 
 from pyspark.sql import SparkSession
@@ -15,7 +16,10 @@ from pyspark.sql.types import (
     StructType, StructField, StringType, IntegerType, TimestampType, DoubleType
 )
 from pyspark.dbutils import DBUtils
-from pipeline.silver.snapshot import deduplicate_quarantine_rows, latest_batch_snapshot, snapshot_run_id
+from pipeline.silver.snapshot import (
+    deduplicate_quarantine_rows, exclude_dq_quarantined_rows,
+    latest_batch_snapshot, snapshot_run_id,
+)
 
 # In a Databricks environment, `spark` is pre-initialized.
 # This line gets the existing session or initializes one.
@@ -38,80 +42,83 @@ def _catalog_widget():
 
 CATALOG = _catalog_widget()
 SCHEMA = "silver"
-TABLE_NAME = "customer_contact_logs"
+TABLE_NAME = "case_parties"
 FULL_TABLE_NAME = f"{CATALOG}.{SCHEMA}.{TABLE_NAME}"
 BRONZE_TABLE_NAME = f"{CATALOG}.bronze.{TABLE_NAME}"
 QUARANTINE_TABLE_NAME = f"{CATALOG}.{SCHEMA}.quarantine_records"
 
 # ---------------------------------------------------------------------------
-# 1. LOAD BRONZE DATA
+# 1. LOAD BRONZE DATA & REFERENCES
 # ---------------------------------------------------------------------------
 print(f"Reading from Bronze table: {BRONZE_TABLE_NAME}")
 df = latest_batch_snapshot(spark.read.table(BRONZE_TABLE_NAME))
 RUN_ID = snapshot_run_id(df)
 
-print("Loading Silver customer and employee references...")
-customers_df = spark.read.table(f"{CATALOG}.{SCHEMA}.customers") \
-    .select("customer_id").distinct()
-employees_df = spark.read.table(f"{CATALOG}.{SCHEMA}.employees") \
-    .select("employee_id").distinct()
-df_joined = (
-    df.join(
-        customers_df.withColumn("customer_exists", F.lit(True)),
-        on="customer_id",
-        how="left",
-    )
-    .join(
-        employees_df.withColumn("employee_exists", F.lit(True)),
-        on="employee_id",
-        how="left",
-    )
-)
+# Load clean parents for referential integrity checks.
+print("Loading Silver customers, merchants, and investigation cases...")
+customers_df = spark.read.table(f"{CATALOG}.{SCHEMA}.customers").select("customer_id").distinct()
+merchants_df = spark.read.table(f"{CATALOG}.{SCHEMA}.merchants").select("merchant_id").distinct()
+cases_df = spark.read.table(f"{CATALOG}.{SCHEMA}.investigation_cases").select("case_id").distinct()
 
 # ---------------------------------------------------------------------------
 # 2. RUN DQ RULES & IDENTIFY FAILURES (QUARANTINE)
 # ---------------------------------------------------------------------------
-# DQ conditions
-is_dnc_violation = (F.col("direction") == "outbound") & (F.col("do_not_contact") == "true")
+# Left join with customers to check if customer party exists
+df_joined = df.join(
+    customers_df.withColumn("cust_exists", F.lit(True)),
+    on=(df.party_type == "customer") & (df.party_id == customers_df.customer_id),
+    how="left"
+)
 
-# Regex pattern matching email, phone number (+d{6,15}), card/PAN (13-19 digits, or 4 blocks of 4 digits)
-regex_pattern = r'([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})|(\+\d{6,15})|(\b\d{13,19}\b)|(\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b)'
-is_pii_leak = F.col("note").rlike(regex_pattern)
-is_missing_customer = F.col("customer_id").isNull() | F.col("customer_exists").isNull()
-is_missing_employee = F.col("employee_id").isNull() | F.col("employee_exists").isNull()
+# Left join with merchants to check if merchant party exists
+df_joined = df_joined.join(
+    merchants_df.withColumn("merch_exists", F.lit(True)),
+    on=(df_joined.party_type == "merchant") & (df_joined.party_id == merchants_df.merchant_id),
+    how="left"
+).join(
+    cases_df.withColumn("case_exists", F.lit(True)),
+    on="case_id",
+    how="left",
+)
+
+# DQ conditions
+is_invalid_type = ~F.col("party_type").isin("customer", "merchant", "third_party")
+is_unresolved = (
+    ((F.col("party_type") == "customer") & F.col("cust_exists").isNull()) |
+    ((F.col("party_type") == "merchant") & F.col("merch_exists").isNull())
+)
+is_missing_case = F.col("case_id").isNull() | F.col("case_exists").isNull()
 
 # DQ failure expressions aligning with gov.dq_rules / dq_failures SQL
-rule_id_expr = F.when(is_dnc_violation, "DQ-CTL-DNC-VIOLATION") \
-                .when(is_pii_leak, "DQ-CTL-NOTE-PII") \
-                .when(is_missing_customer, "DQ-CTL-CUST-FK") \
-                .when(is_missing_employee, "DQ-CTL-EMP-FK")
+rule_id_expr = F.when(is_invalid_type, "DQ-CASEPARTY-TYPE-ENUM") \
+                .when(is_unresolved, "DQ-CASEPARTY-RESOLVE") \
+                .when(is_missing_case, "DQ-CASEPARTY-CASE-FK")
 
-rule_name_expr = F.when(is_dnc_violation, "no outbound contact when do_not_contact=true") \
-                  .when(is_pii_leak, "note must not contain raw PII/PAN") \
-                  .when(is_missing_customer, "customer_id must exist in Silver customers") \
-                  .when(is_missing_employee, "employee_id must exist in Silver employees")
+rule_name_expr = F.when(is_invalid_type, "party_type must be in {customer,merchant,third_party}") \
+                  .when(is_unresolved, "party_id must resolve per party_type") \
+                  .when(is_missing_case, "case_id must exist in Silver investigation cases")
 
-failure_reason_expr = F.when(is_dnc_violation, F.lit("DNC business-rule break")) \
-                      .when(is_pii_leak, F.lit("leaked PII in contact note")) \
-                      .when(is_missing_customer, F.lit("customer_id does not resolve to Silver customers")) \
-                      .when(is_missing_employee, F.lit("employee_id does not resolve to Silver employees"))
+failure_reason_expr = F.when(is_invalid_type, F.lit("invalid party_type")) \
+                      .when(is_unresolved, F.lit("unresolvable party_id for party_type")) \
+                      .when(is_missing_case, F.lit("case_id does not resolve to Silver investigation cases"))
 
 # Filter out failed records for quarantine
-failed_df = df_joined.filter(is_dnc_violation | is_pii_leak | is_missing_customer | is_missing_employee)
+failed_df = df_joined.filter(is_invalid_type | is_unresolved | is_missing_case)
 
 # Structure the quarantined DataFrame matching silver.quarantine_records schema
+# Note the composite record_key: case_id|party_type|party_id
 quarantine_df = failed_df.select(
     F.lit(RUN_ID).alias("run_id"),
-    F.lit("customer_contact_logs").alias("source_table"),
+    F.lit("case_parties").alias("source_table"),
     F.col("_source_record_id").alias("source_record_id"),
-    F.col("contact_id").alias("record_key"),
+    F.concat_ws("|", F.col("case_id"), F.col("party_type"), F.col("party_id")).alias("record_key"),
     rule_id_expr.alias("rule_id"),
     rule_name_expr.alias("rule_name"),
     failure_reason_expr.alias("failure_reason"),
     F.lit("quarantine").alias("severity"),
     F.lit("quarantined").alias("disposition"),
     F.to_json(F.struct(
-        "contact_id", "customer_id", "direction", "contact_method", "do_not_contact", "contacted_at", "employee_id", "note"
+        "case_id", "party_type", "party_id", "role"
     )).alias("raw_record"),
     F.current_timestamp().alias("detected_at")
 )
@@ -125,10 +132,10 @@ spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SCHEMA}")
 
 # Idempotent write: clean up this run's prior quarantine rows first
 try:
-    print(f"Cleaning prior quarantine records for customer_contact_logs under run {RUN_ID}...")
+    print(f"Cleaning prior quarantine records for case_parties under run {RUN_ID}...")
     spark.sql(f"""
         DELETE FROM {QUARANTINE_TABLE_NAME} 
-        WHERE source_table = 'customer_contact_logs' AND run_id = '{RUN_ID}'
+        WHERE source_table = 'case_parties' AND run_id = '{RUN_ID}'
     """)
 except Exception as e:
     print(f"Quarantine delete skipped (table might not exist yet): {e}")
@@ -154,15 +161,11 @@ clean_df = df_joined.join(
 )
 
 # Construct Silver DataFrame
-silver_customer_contact_logs_df = clean_df.select(
-    F.col("contact_id"),
-    F.col("customer_id"),
-    F.col("direction"),
-    F.col("contact_method"),
-    F.col("do_not_contact").cast("boolean").alias("do_not_contact"),
-    F.col("contacted_at").cast("timestamp").alias("contacted_at"),
-    F.col("employee_id"),
-    F.col("note"),
+silver_case_parties_df = clean_df.select(
+    F.col("case_id"),
+    F.col("party_type"),
+    F.col("party_id"),
+    F.col("role"),
     F.col("_source_file"),
     F.col("_source_file_mod_time").cast("timestamp").alias("_source_file_mod_time"),
     F.col("_ingest_ts").cast("timestamp").alias("_ingest_ts"),
@@ -171,13 +174,16 @@ silver_customer_contact_logs_df = clean_df.select(
     F.col("_source_record_id"),
     F.col("_record_hash")
 )
+silver_case_parties_df = exclude_dq_quarantined_rows(
+    silver_case_parties_df, spark, CATALOG, TABLE_NAME, RUN_ID
+)
 
 # ---------------------------------------------------------------------------
-# 5. WRITE CLEAN SILVER CUSTOMER_CONTACT_LOGS TABLE
+# 5. WRITE CLEAN SILVER CASE_PARTIES TABLE
 # ---------------------------------------------------------------------------
 print(f"Writing clean records to Silver table: {FULL_TABLE_NAME}")
 (
-    silver_customer_contact_logs_df.write
+    silver_case_parties_df.write
     .format("delta")
     .mode("overwrite")
     .option("overwriteSchema", "true")
@@ -189,6 +195,6 @@ print(f"Table created/updated successfully: {FULL_TABLE_NAME}")
 # ---------------------------------------------------------------------------
 # 6. VERIFY & DESCRIBE
 # ---------------------------------------------------------------------------
-print("\nVerifying Silver Customer Contact Logs:")
+print("\nVerifying Silver Case Parties:")
 spark.sql(f"SELECT * FROM {FULL_TABLE_NAME} LIMIT 10").show()
 spark.sql(f"DESCRIBE TABLE {FULL_TABLE_NAME}").show(truncate=False)

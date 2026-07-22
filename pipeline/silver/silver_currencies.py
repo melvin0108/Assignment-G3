@@ -14,7 +14,11 @@ from pyspark.dbutils import DBUtils
 from pyspark.sql.types import (
     StructType, StructField, StringType, IntegerType, TimestampType, DoubleType
 )
-from pipeline.silver.snapshot import latest_batch_snapshot
+from pipeline.silver.snapshot import deduplicate_quarantine_rows, latest_batch_snapshot, snapshot_run_id
+from pipeline.silver.type_cast import (
+    TypeCastRule, any_cast_failure, apply_type_casts,
+    ensure_quarantine_table, type_cast_quarantine_rows,
+)
 
 # In a Databricks environment, `spark` is pre-initialized.
 # This line gets the existing session or initializes one.
@@ -40,29 +44,37 @@ SCHEMA = "silver"
 TABLE_NAME = "currencies"
 FULL_TABLE_NAME = f"{CATALOG}.{SCHEMA}.{TABLE_NAME}"
 BRONZE_TABLE_NAME = f"{CATALOG}.bronze.{TABLE_NAME}"
-QUARANTINE_TABLE_NAME = f"{CATALOG}.{SCHEMA}.quarantine_records"
-RUN_ID = "RUN-20260706-1"  # Run ID used to track this execution batch
 
 # ---------------------------------------------------------------------------
 # 1. LOAD BRONZE DATA
 # ---------------------------------------------------------------------------
 print(f"Reading from Bronze table: {BRONZE_TABLE_NAME}")
 df = latest_batch_snapshot(spark.read.table(BRONZE_TABLE_NAME))
+RUN_ID = snapshot_run_id(df)
+CAST_RULES = [TypeCastRule(
+    "decimals", "decimals_typed", "INT", "DQ-CURR-DECIMALS-TYPE"
+)]
+checked_df = apply_type_casts(df, CAST_RULES)
 
 # ---------------------------------------------------------------------------
 # 2. RUN DQ RULES & IDENTIFY FAILURES (QUARANTINE)
 # ---------------------------------------------------------------------------
-# Currencies is a clean reference lookup table, so there are no failures.
-failed_df = spark.createDataFrame([], df.schema)
+quarantine_df = deduplicate_quarantine_rows(type_cast_quarantine_rows(
+    checked_df, CAST_RULES, TABLE_NAME, "currency_code", RUN_ID
+))
+quarantine_table = ensure_quarantine_table(spark, CATALOG)
+spark.sql(f"DELETE FROM {quarantine_table} WHERE source_table = '{TABLE_NAME}' AND run_id = '{RUN_ID}'")
+if not quarantine_df.isEmpty():
+    quarantine_df.write.format("delta").mode("append").saveAsTable(quarantine_table)
 
 # ---------------------------------------------------------------------------
 # 3. FILTER CLEAN RECORDS
 # ---------------------------------------------------------------------------
 # Construct Silver DataFrame
-silver_currencies_df = df.select(
+silver_currencies_df = checked_df.filter(~any_cast_failure(CAST_RULES)).select(
     F.col("currency_code"),
     F.col("name"),
-    F.col("decimals").cast("integer").alias("decimals"),
+    F.col("decimals_typed").alias("decimals"),
     F.col("_source_file"),
     F.col("_source_file_mod_time").cast("timestamp").alias("_source_file_mod_time"),
     F.col("_ingest_ts").cast("timestamp").alias("_ingest_ts"),

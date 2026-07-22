@@ -4,7 +4,11 @@
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.dbutils import DBUtils
-from pipeline.silver.snapshot import deduplicate_quarantine_rows, latest_batch_snapshot, snapshot_run_id
+from pipeline.silver.snapshot import (
+    deduplicate_quarantine_rows, exclude_dq_quarantined_rows,
+    latest_batch_snapshot, snapshot_run_id,
+)
+from pipeline.silver.type_cast import TypeCastRule, any_cast_failure, apply_type_casts, type_cast_quarantine_rows
 
 spark = SparkSession.builder.getOrCreate()
 dbutils = DBUtils(spark)
@@ -42,6 +46,10 @@ checked_df = (
     .join(cases_df, F.col("case_id") == F.col("silver_case_id"), "left")
     .join(employees_df, F.col("author_employee_id") == F.col("silver_employee_id"), "left")
 )
+CAST_RULES = [TypeCastRule(
+    "created_at", "created_at_typed", "TIMESTAMP", "DQ-NOTE-CREATED-TYPE"
+)]
+checked_df = apply_type_casts(checked_df, CAST_RULES)
 RUN_ID = snapshot_run_id(checked_df)
 
 def failures(condition, rule_id, rule_name, reason, disposition="quarantined"):
@@ -62,6 +70,7 @@ quarantine_df = deduplicate_quarantine_rows(
     .unionByName(failures(legal_hold_note, "DQ-NOTE-LEGALHOLD", "notes on legal_hold cases must not reach AI", "note on legal_hold case", "allowed_with_warning"))
     .unionByName(failures(missing_case, "DQ-NOTE-CASE-FK", "case_id must exist in Silver investigation cases", "case_id does not resolve to Silver investigation cases"))
     .unionByName(failures(missing_employee, "DQ-NOTE-EMP-FK", "author_employee_id must exist in Silver employees", "author_employee_id does not resolve to Silver employees"))
+    .unionByName(type_cast_quarantine_rows(checked_df, CAST_RULES, TABLE_NAME, "note_id", RUN_ID))
 )
 
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.silver")
@@ -74,12 +83,15 @@ if not quarantine_df.isEmpty():
     quarantine_df.write.format("delta").mode("append").saveAsTable(quarantine_table)
 
 silver_df = checked_df.filter(
-    ~contains_pii & ~legal_hold_note & ~missing_case & ~missing_employee
+    ~contains_pii & ~legal_hold_note & ~missing_case & ~missing_employee & ~any_cast_failure(CAST_RULES)
 ).select(
-    "note_id", "case_id", "author_employee_id", "note_text", F.to_timestamp("created_at").alias("created_at"),
+    "note_id", "case_id", "author_employee_id", "note_text", F.col("created_at_typed").alias("created_at"),
     "_source_file", F.col("_source_file_mod_time").cast("timestamp").alias("_source_file_mod_time"),
     F.col("_ingest_ts").cast("timestamp").alias("_ingest_ts"), "_run_id",
     F.col("_batch_id").cast("long").alias("_batch_id"), "_source_record_id", "_record_hash",
+)
+silver_df = exclude_dq_quarantined_rows(
+    silver_df, spark, CATALOG, TABLE_NAME, RUN_ID
 )
 silver_df.write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable(silver_table)
 print(f"Table created/updated successfully: {silver_table}")

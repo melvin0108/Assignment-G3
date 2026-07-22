@@ -101,6 +101,76 @@ def _defective_keys(src_dir):
     return defective
 
 
+def repair_transaction_account_links(snapshot_dir):
+    """Make cards the canonical source of transaction account ownership.
+
+    Later Databricks snapshots normally copy facts from the previous batch.
+    This repair upgrades those existing facts without regenerating transaction
+    timestamps or child-table relationships. Unknown cards are intentionally
+    left untouched so the documented orphan pair remains a DQ fixture.
+    """
+    cards_path = os.path.join(snapshot_dir, "cards.csv")
+    transactions_path = os.path.join(snapshot_dir, "transactions.csv")
+    defects_path = os.path.join(snapshot_dir, "defects_manifest.csv")
+
+    card_accounts = {}
+    with open(cards_path, newline="") as fh:
+        for row in csv.DictReader(fh):
+            card_id = row["card_id"]
+            account_id = row["account_id"]
+            previous = card_accounts.setdefault(card_id, account_id)
+            if previous != account_id:
+                raise ValueError(
+                    f"card {card_id!r} maps to multiple accounts: "
+                    f"{previous!r}, {account_id!r}"
+                )
+
+    corrected = 0
+    unresolved_transaction_ids = set()
+    temp_transactions_path = transactions_path + ".tmp"
+    with open(transactions_path, newline="") as source, open(
+        temp_transactions_path, "w", newline=""
+    ) as destination:
+        reader = csv.DictReader(source)
+        writer = csv.DictWriter(destination, fieldnames=reader.fieldnames)
+        writer.writeheader()
+        for row in reader:
+            canonical_account = card_accounts.get(row["card_id"])
+            if canonical_account is None:
+                unresolved_transaction_ids.add(row["transaction_id"])
+            elif row["account_id"] != canonical_account:
+                row["account_id"] = canonical_account
+                corrected += 1
+            writer.writerow(row)
+    os.replace(temp_transactions_path, transactions_path)
+
+    removed_stale_defects = 0
+    if os.path.exists(defects_path):
+        with open(defects_path, newline="") as fh:
+            reader = csv.DictReader(fh)
+            defect_fieldnames = reader.fieldnames
+            defect_rows = []
+            for row in reader:
+                stale_orphan = (
+                    row["source_table"] == "transactions"
+                    and row["rule_id"] == "DQ-TXN-ACCT-FK"
+                    and row["record_key"] not in unresolved_transaction_ids
+                )
+                if stale_orphan:
+                    removed_stale_defects += 1
+                else:
+                    defect_rows.append(row)
+
+        temp_defects_path = defects_path + ".tmp"
+        with open(temp_defects_path, "w", newline="") as fh:
+            writer = csv.DictWriter(fh, fieldnames=defect_fieldnames)
+            writer.writeheader()
+            writer.writerows(defect_rows)
+        os.replace(temp_defects_path, defects_path)
+
+    return corrected, removed_stale_defects
+
+
 def derive_snapshot(src_dir, snap_dir, snapshot_index, as_of_date, rate, seed, manifest):
     """Copy the previous snapshot verbatim into snap_dir, then mutate the SCD2 dims in place.
 

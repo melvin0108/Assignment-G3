@@ -4,7 +4,11 @@
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.dbutils import DBUtils
-from pipeline.silver.snapshot import deduplicate_quarantine_rows, latest_batch_snapshot, snapshot_run_id
+from pipeline.silver.snapshot import (
+    deduplicate_quarantine_rows, exclude_dq_quarantined_rows,
+    latest_batch_snapshot, snapshot_run_id,
+)
+from pipeline.silver.type_cast import TypeCastRule, any_cast_failure, apply_type_casts, type_cast_quarantine_rows
 
 spark = SparkSession.builder.getOrCreate()
 dbutils = DBUtils(spark)
@@ -27,10 +31,14 @@ bronze_table = f"{CATALOG}.bronze.{TABLE_NAME}"
 silver_table = f"{CATALOG}.silver.{TABLE_NAME}"
 quarantine_table = f"{CATALOG}.silver.quarantine_records"
 
-checked_df = (latest_batch_snapshot(spark.read.table(bronze_table))
-    .withColumn("opened_at_typed", F.to_timestamp("opened_at"))
-    .withColumn("closed_at_typed", F.to_timestamp("closed_at"))
-    .withColumn("legal_hold_typed", F.col("legal_hold").cast("boolean")))
+CAST_RULES = [
+    TypeCastRule("opened_at", "opened_at_typed", "TIMESTAMP", "DQ-CASE-OPENED-TYPE"),
+    TypeCastRule("closed_at", "closed_at_typed", "TIMESTAMP", "DQ-CASE-CLOSED-TYPE"),
+    TypeCastRule("legal_hold", "legal_hold_typed", "BOOLEAN", "DQ-CASE-LEGALHOLD-TYPE"),
+]
+checked_df = apply_type_casts(
+    latest_batch_snapshot(spark.read.table(bronze_table)), CAST_RULES
+)
 RUN_ID = snapshot_run_id(checked_df)
 
 def failures(condition, rule_id, rule_name, reason, disposition="quarantined"):
@@ -48,7 +56,8 @@ stale_open = (F.col("status_code") == "open") & (F.to_date("opened_at_typed") < 
 legal_hold = F.col("legal_hold_typed")
 quarantine_df = (failures(invalid_status, "DQ-CASE-STATUS-ENUM", "status_code must be in case_status enum", "status not in enum")
     .unionByName(failures(stale_open, "DQ-CASE-STALE", "open cases older than 180 days are stale", "stale open case"))
-    .unionByName(failures(legal_hold, "DQ-CASE-LEGALHOLD", "legal_hold cases excluded from AI output", "legal_hold=true (must-not-expose)", "allowed_with_warning")))
+    .unionByName(failures(legal_hold, "DQ-CASE-LEGALHOLD", "legal_hold cases excluded from AI output", "legal_hold=true (must-not-expose)", "allowed_with_warning"))
+    .unionByName(type_cast_quarantine_rows(checked_df, CAST_RULES, TABLE_NAME, "case_id", RUN_ID)))
 quarantine_df = deduplicate_quarantine_rows(quarantine_df)
 
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.silver")
@@ -60,12 +69,15 @@ spark.sql(f"DELETE FROM {quarantine_table} WHERE source_table = '{TABLE_NAME}' A
 if not quarantine_df.isEmpty():
     quarantine_df.write.format("delta").mode("append").saveAsTable(quarantine_table)
 
-silver_df = checked_df.filter(~invalid_status & ~stale_open & ~legal_hold).select(
+silver_df = checked_df.filter(~invalid_status & ~stale_open & ~legal_hold & ~any_cast_failure(CAST_RULES)).select(
     "case_id", "priority", "status_code", "fraud_type_code", "owner_employee_id", F.col("opened_at_typed").alias("opened_at"),
     F.col("closed_at_typed").alias("closed_at"), F.col("legal_hold_typed").alias("legal_hold"), "_source_file",
     F.col("_source_file_mod_time").cast("timestamp").alias("_source_file_mod_time"),
     F.col("_ingest_ts").cast("timestamp").alias("_ingest_ts"), "_run_id",
     F.col("_batch_id").cast("long").alias("_batch_id"), "_source_record_id", "_record_hash",
+)
+silver_df = exclude_dq_quarantined_rows(
+    silver_df, spark, CATALOG, TABLE_NAME, RUN_ID
 )
 silver_df.write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable(silver_table)
 print(f"Table created/updated successfully: {silver_table}")

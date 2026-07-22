@@ -152,8 +152,8 @@ Defects: inconsistent casing (low/HIGH/Medium); closed merchant referenced.
 | field | type | req/opt | accepted / pattern | example | key | PII | quality rule |
 |---|---|---|---|---|---|---|---|
 | transaction_id | string | req | `^TXN-\d{6}$` | TXN-500001 | PK | — | not null; unique |
-| account_id | string | req | exists in accounts | ACC-2001 | FK→accounts | — | RI |
-| card_id | string | opt | exists in cards if present | CARD-3001 | FK→cards | — | RI |
+| account_id | string | req | exists in accounts; equals the matched `cards.account_id` | ACC-2001 | FK→accounts | — | generated from the matched card; validated in Bronze |
+| card_id | string | req | exists in cards; not closed | CARD-3001 | FK→cards | — | canonical source for `account_id` ownership |
 | merchant_id | string | req | exists in merchants | MCH-4001 | FK→merchants | — | RI (required) |
 | channel | string | req | exists in channels | pos | FK→channels | — | RI |
 | amount | decimal(12,2) | req | > 0 | 129.50 | — | — | amount > 0 |
@@ -161,7 +161,7 @@ Defects: inconsistent casing (low/HIGH/Medium); closed merchant referenced.
 | txn_ts | timestamp | req | ISO-8601 UTC; not future | 2026-07-05T10:14:00Z | — | — | not future |
 | status | string | req | {authorized,settled,declined,reversed,refunded} | settled | — | — | in enum (§5) |
 
-Defects: dup `transaction_id`; negative amount; missing `merchant_id`; orphan account+card; future `txn_ts`; use of closed card.
+Defects: dup `transaction_id`; negative amount; missing `merchant_id`; orphan account+card; future `txn_ts`; use of closed card. Except for the explicit orphan pair, the generator always derives `account_id` from the matched card.
 
 ### 4.7 `disputes` — grain: one row per dispute
 | field | type | req/opt | accepted / pattern | example | key | PII | quality rule |
@@ -359,23 +359,140 @@ Physically populated in Silver, but **defined here** so invalid records are gene
 
 ## 10. Key relationships
 
+**Transaction-account rule:** `cards.account_id` is the canonical account for a transaction. The Bronze generator derives `transactions.account_id` from the matched `card_id`; Bronze validation checks the relationship, and Silver excludes transactions with a missing or closed card.
+
 ```mermaid
 erDiagram
+  customers {
+    string customer_id PK
+  }
+  accounts {
+    string account_id PK
+    string customer_id FK
+  }
+  cards {
+    string card_id PK
+    string account_id FK
+  }
+  transactions {
+    string transaction_id PK
+    string account_id FK
+    string card_id FK
+    string merchant_id FK
+    string channel FK
+    string currency FK
+  }
+  merchants {
+    string merchant_id PK
+    string mcc FK
+    string country FK
+  }
+  merchant_categories {
+    string mcc PK
+  }
+  channels {
+    string channel_code PK
+  }
+  currencies {
+    string currency_code PK
+  }
+  countries {
+    string iso_code PK
+  }
+  auth_attempts {
+    string attempt_id PK
+    string transaction_id FK
+  }
+  transaction_devices {
+    string device_id PK
+    string transaction_id FK
+    string geo_country FK
+  }
+  disputes {
+    string dispute_id PK
+    string transaction_id FK
+    string reason_code FK
+  }
+  dispute_reason_codes {
+    string reason_code PK
+  }
+  chargebacks {
+    string chargeback_id PK
+    string dispute_id FK
+  }
+  fraud_alerts {
+    string alert_id PK
+    string transaction_id FK
+  }
+  investigation_cases {
+    string case_id PK
+    string status_code FK
+    string fraud_type_code FK
+    string owner_employee_id FK
+  }
+  case_status_types {
+    string status_code PK
+  }
+  fraud_types {
+    string fraud_type_code PK
+  }
+  employees {
+    string employee_id PK
+  }
+  investigation_notes {
+    string note_id PK
+    string case_id FK
+    string author_employee_id FK
+  }
+  case_transactions {
+    string case_id PK, FK
+    string transaction_id PK, FK
+  }
+  case_parties {
+    string case_id PK, FK
+    string party_type PK
+    string party_id PK
+  }
+  customer_contact_logs {
+    string contact_id PK
+    string customer_id FK
+    string employee_id FK
+  }
+  branches {
+    string branch_code PK
+  }
+  date_dim {
+    string date_id PK
+  }
+
   customers ||--o{ accounts : owns
   accounts ||--o{ cards : has
-  accounts ||--o{ transactions : posts
-  cards    ||--o{ transactions : used_in
+  accounts ||--o{ transactions : posts_via_card
+  cards ||--o{ transactions : resolves_account_id
   merchants ||--o{ transactions : accepts
+  merchant_categories ||--o{ merchants : classifies
+  countries ||--o{ merchants : locates
+  channels ||--o{ transactions : routes
+  currencies ||--o{ transactions : denominates
   transactions ||--o{ auth_attempts : tries
   transactions ||--o{ transaction_devices : has
+  countries ||--o{ transaction_devices : geolocates
   transactions ||--o{ disputes : raises
   disputes ||--o{ chargebacks : escalates
-  transactions }o--o{ investigation_cases : "case_transactions"
+  transactions ||--o{ fraud_alerts : flags
+  investigation_cases ||--o{ case_transactions : links
+  transactions ||--o{ case_transactions : links
   investigation_cases ||--o{ investigation_notes : has
-  investigation_cases }o--o{ case_parties : links
-  fraud_alerts }o--|| transactions : flags
+  employees ||--o{ investigation_notes : authors
+  investigation_cases ||--o{ case_parties : links
+  customers o|--o{ case_parties : customer_party
+  merchants o|--o{ case_parties : merchant_party
   customers ||--o{ customer_contact_logs : contacted
+  employees ||--o{ customer_contact_logs : handles
   employees ||--o{ investigation_cases : owns
+  dispute_reason_codes ||--o{ disputes : categorizes
+  case_status_types ||--o{ investigation_cases : classifies
+  fraud_types ||--o{ investigation_cases : classifies
 ```
 
 ## 11. Suggested volumes (scale per stress-test needs)

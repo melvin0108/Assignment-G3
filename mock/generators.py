@@ -252,6 +252,9 @@ def gen_cards(ctx, n):
             "effective_at": iso(past_ts(rng, now, 1000)),
         })
     ctx.ids["cards"] = [r["card_id"] for r in rows]
+    ctx.pools["card_account_by_id"] = {
+        r["card_id"]: r["account_id"] for r in rows
+    }
     # ensure at least one closed card exists (precondition for transactions defect)
     closed_cards = [r["card_id"] for r in rows if r["status"] == "closed"]
     if not closed_cards:
@@ -317,8 +320,8 @@ TXN_SAMPLE_CAP = 200_000  # cap memory: keep a sample of txn ids/ts for children
 def gen_transactions(ctx, n):
     """Yield transaction rows. Collects a downsampled id/ts pool for children."""
     f, rng, man = ctx.f, ctx.rng, ctx.manifest
-    acct_ids = ctx.ids["accounts"]
     card_ids = ctx.ids["cards"]
+    card_account_by_id = ctx.pools["card_account_by_id"]
     merch_ids = ctx.ids["merchants"]
     closed_cards = ctx.pools.get("closed_cards", [])
     closed_merchants = ctx.pools.get("closed_merchants", [])
@@ -332,8 +335,14 @@ def gen_transactions(ctx, n):
         "MISS_MERCH": set(ctx.sample_indices(n, ctx.defect_count(n, 0.4))),
         "ORPHAN_FK": set(ctx.sample_indices(n, ctx.defect_count(n, 0.4))),
         "FUTURE_TS": set(ctx.sample_indices(n, ctx.defect_count(n, 0.4))),
-        "CLOSED_CARD": set(ctx.sample_indices(n, ctx.defect_count(n, 0.3))),
     }
+    # A card cannot simultaneously be both a known closed card and an orphan.
+    # Keep those intentional defects disjoint so the manifest stays authoritative.
+    closed_count = ctx.defect_count(n, 0.3)
+    closed_candidates = [i for i in range(n) if i not in defects["ORPHAN_FK"]]
+    defects["CLOSED_CARD"] = set(
+        rng.sample(closed_candidates, min(closed_count, len(closed_candidates)))
+    )
     clean_recent = deque(maxlen=200)  # clean rows only, for duplicate injection
     duped_sources = set()             # source ids already duplicated (1 dup each)
     sample_step = max(1, n // TXN_SAMPLE_CAP) if n > TXN_SAMPLE_CAP else 1
@@ -344,8 +353,8 @@ def gen_transactions(ctx, n):
     while produced < n:
         i += 1
         tid = seq_id(C.PFX["transaction"], i, width)
-        acct = rng.choice(acct_ids)
         card = rng.choice(card_ids)
+        acct = card_account_by_id[card]
         merch = rng.choice(merch_ids)
         ts = past_ts(rng, now, 30)
         row = {
@@ -374,6 +383,7 @@ def gen_transactions(ctx, n):
             man.add("transactions", tid, "DQ-TXN-TS-FUTURE", "txn_ts must not be in the future", "future timestamp")
         if idx in defects["CLOSED_CARD"] and closed_cards:
             row["card_id"] = rng.choice(closed_cards)
+            row["account_id"] = card_account_by_id[row["card_id"]]
             man.add("transactions", tid, "DQ-TXN-CARD-ACTIVE", "transaction must use an active card", "uses closed card")
         # closed-merchant reference is a realistic data state, not a row-level defect,
         # but we still link some txns to closed merchants for RI-style business checks.

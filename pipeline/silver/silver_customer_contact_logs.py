@@ -1,13 +1,12 @@
 # Databricks notebook source
 # ============================================================================
-# SILVER TRANSFORMATION & DATA QUALITY PIPELINE: cards
+# SILVER TRANSFORMATION & DATA QUALITY PIPELINE: customer_contact_logs
 # ============================================================================
-# Implements Bronze -> Silver transformation for the cards dataset:
-#   1. Reads from bronze.cards
+# Implements Bronze -> Silver transformation for the customer_contact_logs dataset:
+#   1. Reads from bronze.customer_contact_logs
 #   2. Enforces Data Quality (DQ) rules and identifies failures
 #   3. Quarantines failed records to silver.quarantine_records
-#   4. Applies PII masking (masks PAN showing only the last 4 digits)
-#   5. Writes clean records to silver.cards
+#   4. Writes clean records to silver.customer_contact_logs
 # ============================================================================
 
 from pyspark.sql import SparkSession
@@ -15,9 +14,12 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import (
     StructType, StructField, StringType, IntegerType, TimestampType, DoubleType
 )
-from pyspark.sql.window import Window
 from pyspark.dbutils import DBUtils
-from pipeline.silver.snapshot import deduplicate_quarantine_rows, latest_batch_snapshot, snapshot_run_id
+from pipeline.silver.snapshot import (
+    deduplicate_quarantine_rows, exclude_dq_quarantined_rows,
+    latest_batch_snapshot, snapshot_run_id,
+)
+from pipeline.silver.type_cast import TypeCastRule, any_cast_failure, apply_type_casts, type_cast_quarantine_rows
 
 # In a Databricks environment, `spark` is pre-initialized.
 # This line gets the existing session or initializes one.
@@ -40,7 +42,7 @@ def _catalog_widget():
 
 CATALOG = _catalog_widget()
 SCHEMA = "silver"
-TABLE_NAME = "cards"
+TABLE_NAME = "customer_contact_logs"
 FULL_TABLE_NAME = f"{CATALOG}.{SCHEMA}.{TABLE_NAME}"
 BRONZE_TABLE_NAME = f"{CATALOG}.bronze.{TABLE_NAME}"
 QUARANTINE_TABLE_NAME = f"{CATALOG}.{SCHEMA}.quarantine_records"
@@ -48,78 +50,83 @@ QUARANTINE_TABLE_NAME = f"{CATALOG}.{SCHEMA}.quarantine_records"
 # ---------------------------------------------------------------------------
 # 1. LOAD BRONZE DATA
 # ---------------------------------------------------------------------------
-# Load raw conformed data from Bronze
 print(f"Reading from Bronze table: {BRONZE_TABLE_NAME}")
 df = latest_batch_snapshot(spark.read.table(BRONZE_TABLE_NAME))
+CAST_RULES = [
+    TypeCastRule("do_not_contact", "do_not_contact_typed", "BOOLEAN", "DQ-CTL-DNC-TYPE"),
+    TypeCastRule("contacted_at", "contacted_at_typed", "TIMESTAMP", "DQ-CTL-CONTACTED-TYPE"),
+]
+df = apply_type_casts(df, CAST_RULES)
 RUN_ID = snapshot_run_id(df)
 
-print(f"Reading Silver accounts for FK validation...")
-accounts_df = spark.read.table(f"{CATALOG}.{SCHEMA}.accounts") \
-    .select("account_id").distinct()
-
-# ---------------------------------------------------------------------------
-# 2. RUN DQ RULES & IDENTIFY FAILURES (QUARANTINE)
-# ---------------------------------------------------------------------------
-# Window function for card_id duplicates:
-# - rn_pk: Detects exact card_id duplicates (keeps first by _ingest_ts)
-pk_window = Window.partitionBy("card_id").orderBy("_ingest_ts")
-
-# Rank the records to detect duplicates and validate the clean parent key.
-df_ranked = (
-    df.withColumn("rn_pk", F.row_number().over(pk_window))
+print("Loading Silver customer and employee references...")
+customers_df = spark.read.table(f"{CATALOG}.{SCHEMA}.customers") \
+    .select("customer_id").distinct()
+employees_df = spark.read.table(f"{CATALOG}.{SCHEMA}.employees") \
+    .select("employee_id").distinct()
+df_joined = (
+    df.join(
+        customers_df.withColumn("customer_exists", F.lit(True)),
+        on="customer_id",
+        how="left",
+    )
     .join(
-        accounts_df.withColumn("account_exists", F.lit(True)),
-        on="account_id",
+        employees_df.withColumn("employee_exists", F.lit(True)),
+        on="employee_id",
         how="left",
     )
 )
 
-# Expired but active check
-is_expired_active = (
-        (F.col("status") == "active") &
-        (F.col("expiry").isNotNull()) &
-        (F.col("expiry") != "") &
-        (F.to_date(F.concat(F.col("expiry"), F.lit("-01")), "yyyy-MM-dd") < F.to_date(F.lit("2026-07-01"),
-                                                                                      "yyyy-MM-dd"))
-)
-is_missing_account = F.col("account_id").isNull() | (F.trim(F.col("account_id")) == "") | F.col("account_exists").isNull()
+# ---------------------------------------------------------------------------
+# 2. RUN DQ RULES & IDENTIFY FAILURES (QUARANTINE)
+# ---------------------------------------------------------------------------
+# DQ conditions
+is_dnc_violation = (F.col("direction") == "outbound") & (F.col("do_not_contact") == "true")
 
-# DQ failure expressions aligning with gov.dq_rules
-rule_id_expr = F.when(F.col("rn_pk") > 1, "DQ-CARD-DUP") \
-    .when(is_expired_active, "DQ-CARD-EXPIRED-ACTIVE") \
-    .when(is_missing_account, "DQ-CARD-ACCT-FK")
+# Regex pattern matching email, phone number (+d{6,15}), card/PAN (13-19 digits, or 4 blocks of 4 digits)
+regex_pattern = r'([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})|(\+\d{6,15})|(\b\d{13,19}\b)|(\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b)'
+is_pii_leak = F.col("note").rlike(regex_pattern)
+is_missing_customer = F.col("customer_id").isNull() | F.col("customer_exists").isNull()
+is_missing_employee = F.col("employee_id").isNull() | F.col("employee_exists").isNull()
 
-rule_name_expr = F.when(F.col("rn_pk") > 1, "card_id must be unique") \
-    .when(is_expired_active, "active card must not have a past expiry") \
-    .when(is_missing_account, "account_id must exist in Silver accounts")
+# DQ failure expressions aligning with gov.dq_rules / dq_failures SQL
+rule_id_expr = F.when(is_dnc_violation, "DQ-CTL-DNC-VIOLATION") \
+                .when(is_pii_leak, "DQ-CTL-NOTE-PII") \
+                .when(is_missing_customer, "DQ-CTL-CUST-FK") \
+                .when(is_missing_employee, "DQ-CTL-EMP-FK")
 
-failure_reason_expr = F.when(F.col("rn_pk") > 1, F.concat(F.lit("Duplicate card_id found: "), F.col("card_id"))) \
-    .when(is_expired_active, F.concat(F.lit("Card active but expired. expiry: "), F.col("expiry"))) \
-    .when(is_missing_account, F.lit("account_id does not resolve to Silver accounts"))
+rule_name_expr = F.when(is_dnc_violation, "no outbound contact when do_not_contact=true") \
+                  .when(is_pii_leak, "note must not contain raw PII/PAN") \
+                  .when(is_missing_customer, "customer_id must exist in Silver customers") \
+                  .when(is_missing_employee, "employee_id must exist in Silver employees")
+
+failure_reason_expr = F.when(is_dnc_violation, F.lit("DNC business-rule break")) \
+                      .when(is_pii_leak, F.lit("leaked PII in contact note")) \
+                      .when(is_missing_customer, F.lit("customer_id does not resolve to Silver customers")) \
+                      .when(is_missing_employee, F.lit("employee_id does not resolve to Silver employees"))
 
 # Filter out failed records for quarantine
-failed_df = df_ranked.filter(
-    (F.col("rn_pk") > 1) |
-    is_expired_active |
-    is_missing_account
-)
+failed_df = df_joined.filter(is_dnc_violation | is_pii_leak | is_missing_customer | is_missing_employee)
 
 # Structure the quarantined DataFrame matching silver.quarantine_records schema
 quarantine_df = failed_df.select(
     F.lit(RUN_ID).alias("run_id"),
-    F.lit("cards").alias("source_table"),
+    F.lit("customer_contact_logs").alias("source_table"),
     F.col("_source_record_id").alias("source_record_id"),
-    F.col("card_id").alias("record_key"),
+    F.col("contact_id").alias("record_key"),
     rule_id_expr.alias("rule_id"),
     rule_name_expr.alias("rule_name"),
     failure_reason_expr.alias("failure_reason"),
     F.lit("quarantine").alias("severity"),
     F.lit("quarantined").alias("disposition"),
     F.to_json(F.struct(
-        "card_id", "account_id", "card_type", "pan", "expiry", "status"
+        "contact_id", "customer_id", "direction", "contact_method", "do_not_contact", "contacted_at", "employee_id", "note"
     )).alias("raw_record"),
     F.current_timestamp().alias("detected_at")
 )
+quarantine_df = quarantine_df.unionByName(type_cast_quarantine_rows(
+    df_joined, CAST_RULES, TABLE_NAME, "contact_id", RUN_ID
+))
 quarantine_df = deduplicate_quarantine_rows(quarantine_df)
 
 # ---------------------------------------------------------------------------
@@ -130,17 +137,17 @@ spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SCHEMA}")
 
 # Idempotent write: clean up this run's prior quarantine rows first
 try:
-    print(f"Cleaning prior quarantine records for cards under run {RUN_ID}...")
+    print(f"Cleaning prior quarantine records for customer_contact_logs under run {RUN_ID}...")
     spark.sql(f"""
         DELETE FROM {QUARANTINE_TABLE_NAME} 
-        WHERE source_table = 'cards' AND run_id = '{RUN_ID}'
+        WHERE source_table = 'customer_contact_logs' AND run_id = '{RUN_ID}'
     """)
 except Exception as e:
     print(f"Quarantine delete skipped (table might not exist yet): {e}")
 
 # Append new failures to quarantine
-if failed_df.count() > 0:
-    print(f"Writing {failed_df.count()} failed records to quarantine...")
+if not quarantine_df.isEmpty():
+    print(f"Writing {quarantine_df.count()} failed records to quarantine...")
     quarantine_df.write \
         .format("delta") \
         .mode("append") \
@@ -149,26 +156,25 @@ else:
     print("No failed records found to quarantine.")
 
 # ---------------------------------------------------------------------------
-# 4. FILTER CLEAN RECORDS & APPLY PII MASKING
+# 4. FILTER CLEAN RECORDS
 # ---------------------------------------------------------------------------
 # Get clean records using a left anti-join on _source_record_id
-clean_df = df_ranked.join(
+clean_df = df_joined.join(
     failed_df,
     on="_source_record_id",
     how="left_anti"
-)
-
-# PII Masking logic for PAN: XXXX-XXXX-XXXX-1234 (keeping only last 4 digits)
-pan_masked = F.concat(F.lit("XXXX-XXXX-XXXX-"), F.substring(F.col("pan"), -4, 4))
+).filter(~any_cast_failure(CAST_RULES))
 
 # Construct Silver DataFrame
-silver_cards_df = clean_df.select(
-    F.col("card_id"),
-    F.col("account_id"),
-    F.col("card_type"),
-    pan_masked.alias("pan"),
-    F.col("expiry"),
-    F.col("status"),
+silver_customer_contact_logs_df = clean_df.select(
+    F.col("contact_id"),
+    F.col("customer_id"),
+    F.col("direction"),
+    F.col("contact_method"),
+    F.col("do_not_contact_typed").alias("do_not_contact"),
+    F.col("contacted_at_typed").alias("contacted_at"),
+    F.col("employee_id"),
+    F.col("note"),
     F.col("_source_file"),
     F.col("_source_file_mod_time").cast("timestamp").alias("_source_file_mod_time"),
     F.col("_ingest_ts").cast("timestamp").alias("_ingest_ts"),
@@ -177,13 +183,16 @@ silver_cards_df = clean_df.select(
     F.col("_source_record_id"),
     F.col("_record_hash")
 )
+silver_customer_contact_logs_df = exclude_dq_quarantined_rows(
+    silver_customer_contact_logs_df, spark, CATALOG, TABLE_NAME, RUN_ID
+)
 
 # ---------------------------------------------------------------------------
-# 5. WRITE CLEAN SILVER CARDS TABLE
+# 5. WRITE CLEAN SILVER CUSTOMER_CONTACT_LOGS TABLE
 # ---------------------------------------------------------------------------
 print(f"Writing clean records to Silver table: {FULL_TABLE_NAME}")
 (
-    silver_cards_df.write
+    silver_customer_contact_logs_df.write
     .format("delta")
     .mode("overwrite")
     .option("overwriteSchema", "true")
@@ -195,6 +204,6 @@ print(f"Table created/updated successfully: {FULL_TABLE_NAME}")
 # ---------------------------------------------------------------------------
 # 6. VERIFY & DESCRIBE
 # ---------------------------------------------------------------------------
-print("\nVerifying Silver Cards:")
+print("\nVerifying Silver Customer Contact Logs:")
 spark.sql(f"SELECT * FROM {FULL_TABLE_NAME} LIMIT 10").show()
 spark.sql(f"DESCRIBE TABLE {FULL_TABLE_NAME}").show(truncate=False)

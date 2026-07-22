@@ -9,6 +9,7 @@
 # ============================================================================
 
 from pyspark.sql import SparkSession
+from pipeline.bronze.autoloader_common import TABLE_CONFIG
 
 spark = SparkSession.builder.getOrCreate()
 
@@ -93,6 +94,11 @@ def warn_if_rows(name, query):
 expected_bronze_values = ",".join([f"('{t}')" for t in BRONZE_TABLES])
 expected_ingested_bronze_values = ",".join([f"('{t}')" for t in INGESTED_BRONZE_TABLES])
 expected_meta_values = ",".join([f"('{c}')" for c in BRONZE_METADATA_COLS])
+expected_source_values = ",".join(
+    f"('{table_name}','{column_name}')"
+    for table_name, (columns, _record_ids) in TABLE_CONFIG.items()
+    for column_name in columns
+)
 
 print("=== M1 Bronze validation ===")
 
@@ -144,6 +150,17 @@ for table_name in INGESTED_BRONZE_TABLES:
         LIMIT 20
         """,
     )
+    warn_if_rows(
+        f"bronze.{table_name} malformed CSV rows rescued",
+        f"""
+        SELECT _source_file, _batch_id, COUNT(*) AS rescued_rows
+        FROM {catalog}.bronze.{table_name}
+        WHERE _rescued_data IS NOT NULL
+        GROUP BY _source_file, _batch_id
+        ORDER BY _batch_id DESC, _source_file
+        LIMIT 20
+        """,
+    )
 
 for table_name in ["transactions", "customers", "accounts", "cards"]:
     warn_if_rows(
@@ -158,6 +175,96 @@ for table_name in ["transactions", "customers", "accounts", "cards"]:
     )
 
 fail_if_rows(
+    "latest Bronze cards have one account owner per card_id",
+    f"""
+    WITH latest_cards AS (
+      SELECT card_id, account_id
+      FROM {catalog}.bronze.cards
+      WHERE _batch_id = (SELECT MAX(_batch_id) FROM {catalog}.bronze.cards)
+    )
+    SELECT card_id, COUNT(DISTINCT account_id) AS account_count
+    FROM latest_cards
+    GROUP BY card_id
+    HAVING COUNT(DISTINCT account_id) > 1
+    LIMIT 20
+    """,
+)
+
+fail_if_rows(
+    "all contract columns remain present after schema evolution",
+    f"""
+    WITH expected(table_name, column_name) AS (VALUES {expected_source_values})
+    SELECT e.table_name, e.column_name AS missing_column
+    FROM expected e
+    LEFT JOIN {catalog}.information_schema.columns actual
+      ON actual.table_schema = 'bronze'
+     AND actual.table_name = e.table_name
+     AND actual.column_name = e.column_name
+    WHERE actual.column_name IS NULL
+    ORDER BY e.table_name, e.column_name
+    """,
+)
+
+fail_if_rows(
+    "all Bronze source and evolved columns are STRING",
+    f"""
+    WITH metadata(column_name) AS (VALUES {expected_meta_values}),
+         expected_tables(table_name) AS (VALUES {expected_bronze_values})
+    SELECT c.table_name, c.column_name, c.data_type
+    FROM {catalog}.information_schema.columns c
+    JOIN expected_tables t ON c.table_name = t.table_name
+    LEFT ANTI JOIN metadata m ON c.column_name = m.column_name
+    WHERE c.table_schema = 'bronze'
+      AND LOWER(c.data_type) <> 'string'
+    ORDER BY c.table_name, c.column_name
+    """,
+)
+
+fail_if_rows(
+    "latest Bronze transactions use the account owned by their card",
+    f"""
+    WITH latest_transactions AS (
+      SELECT transaction_id, account_id, card_id
+      FROM {catalog}.bronze.transactions
+      WHERE _batch_id = (SELECT MAX(_batch_id) FROM {catalog}.bronze.transactions)
+    ),
+    latest_cards AS (
+      SELECT DISTINCT card_id, account_id
+      FROM {catalog}.bronze.cards
+      WHERE _batch_id = (SELECT MAX(_batch_id) FROM {catalog}.bronze.cards)
+    )
+    SELECT t.transaction_id, t.card_id, t.account_id AS transaction_account_id,
+           c.account_id AS card_account_id
+    FROM latest_transactions t
+    JOIN latest_cards c ON t.card_id = c.card_id
+    WHERE t.account_id <> c.account_id
+    LIMIT 20
+    """,
+)
+
+fail_if_rows(
+    "latest Bronze unknown cards use only the intentional orphan pair",
+    f"""
+    WITH latest_transactions AS (
+      SELECT transaction_id, account_id, card_id
+      FROM {catalog}.bronze.transactions
+      WHERE _batch_id = (SELECT MAX(_batch_id) FROM {catalog}.bronze.transactions)
+    ),
+    latest_cards AS (
+      SELECT DISTINCT card_id
+      FROM {catalog}.bronze.cards
+      WHERE _batch_id = (SELECT MAX(_batch_id) FROM {catalog}.bronze.cards)
+    )
+    SELECT t.*
+    FROM latest_transactions t
+    LEFT JOIN latest_cards c ON t.card_id = c.card_id
+    WHERE c.card_id IS NULL
+      AND NOT (t.card_id = 'CARD-9999' AND t.account_id = 'ACC-9999')
+    LIMIT 20
+    """,
+)
+
+fail_if_rows(
     "defects manifest has no null/blank rule_id or record_key",
     f"""
     SELECT *
@@ -169,3 +276,7 @@ fail_if_rows(
 )
 
 print("\nPASS: M1 Bronze validation completed with no blocking failures.")
+
+# COMMAND ----------
+
+
