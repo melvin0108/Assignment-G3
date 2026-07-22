@@ -134,8 +134,8 @@ def build_fact_dispute(spark, catalog, run_id, batch_id):
 def build_fact_chargeback(spark, catalog, run_id, batch_id):
     """Build fact_chargeback table."""
     fact_dispute = spark.read.table(f"{catalog}.gold.fact_dispute")
-    fact_chargeback = (spark.read.table(f"{catalog}.silver.chargebacks").alias("c").join(fact_dispute.select("case_key", "dispute_id", "transaction_id", "currency_key"), "dispute_id")
-        .select(_key("fact_chargeback", "case_key", "chargeback_id").alias("chargeback_key"), "case_key", "currency_key", F.coalesce(F.date_format("processed_at", "yyyyMMdd").cast("int"), F.lit(0)).alias("processed_date_key"), "transaction_id", "dispute_id", "chargeback_id", "scheme", F.col("c.amount").cast("decimal(18,2)").alias("amount"), F.col("stage").alias("chargeback_stage"), "processed_at", F.col("c._source_record_id").alias("_source_record_id")))
+    fact_chargeback = (spark.read.table(f"{catalog}.silver.chargebacks").alias("c").join(fact_dispute.select("case_id", "dispute_id", "transaction_id", "currency_code"), "dispute_id")
+        .select("case_id", "transaction_id", "dispute_id", "chargeback_id", "currency_code", F.coalesce(F.date_format("processed_at", "yyyyMMdd").cast("int"), F.lit(0)).alias("processed_date_key"), "scheme", F.col("c.amount").cast("decimal(18,2)").alias("amount"), F.col("stage").alias("chargeback_stage"), "processed_at", F.col("c._source_record_id").alias("_source_record_id")))
     _write(_metadata(fact_chargeback, run_id, batch_id, "chargebacks", "_source_record_id"), catalog, "fact_chargeback")
 
 
@@ -172,8 +172,8 @@ def build_dim_case(spark, catalog, run_id, batch_id):
     fraud_types = spark.read.table(f"{catalog}.silver.fraud_types").select("fraud_type_code", F.col("description").alias("fraud_type_description"), "severity")
     statuses = spark.read.table(f"{catalog}.silver.case_status_types").select("status_code", F.col("description").alias("status_description"))
     fact_tx = spark.read.table(f"{catalog}.gold.fact_case_transaction")
-    case_warnings = fact_tx.groupBy("case_key").agg(F.array_sort(F.array_distinct(F.flatten(F.collect_list("warning_flags")))).alias("fact_warning_flags"), F.max(F.when(F.col("quality_status") == "partial", 1).otherwise(0)).alias("has_partial"))
-    dim_case = cases.join(statuses, "status_code", "left").join(fraud_types, "fraud_type_code", "left").withColumn("case_key", _key("dim_case", "case_id")).join(case_warnings, "case_key", "left").select("case_key", "case_id", "priority", "status_code", "status_description", "fraud_type_code", F.col("severity").alias("fraud_type_severity"), "opened_at", "closed_at", F.coalesce(F.date_format("opened_at", "yyyyMMdd").cast("int"), F.lit(0)).alias("opened_date_key"), F.coalesce(F.date_format("closed_at", "yyyyMMdd").cast("int"), F.lit(0)).alias("closed_date_key"), F.coalesce("fact_warning_flags", F.array()).alias("fact_warning_flags"), F.coalesce("has_partial", F.lit(0)).alias("has_partial"), F.col("c._source_record_id").alias("_source_record_id"))
+    case_warnings = fact_tx.groupBy("case_id").agg(F.array_sort(F.array_distinct(F.flatten(F.collect_list("warning_flags")))).alias("fact_warning_flags"), F.max(F.when(F.col("quality_status") == "partial", 1).otherwise(0)).alias("has_partial"))
+    dim_case = cases.join(statuses, "status_code", "left").join(fraud_types, "fraud_type_code", "left").join(case_warnings, "case_id", "left").select("case_id", "priority", "status_code", "status_description", "fraud_type_code", F.col("severity").alias("fraud_type_severity"), "opened_at", "closed_at", F.coalesce(F.date_format("opened_at", "yyyyMMdd").cast("int"), F.lit(0)).alias("opened_date_key"), F.coalesce(F.date_format("closed_at", "yyyyMMdd").cast("int"), F.lit(0)).alias("closed_date_key"), F.coalesce("fact_warning_flags", F.array()).alias("fact_warning_flags"), F.coalesce("has_partial", F.lit(0)).alias("has_partial"), F.col("c._source_record_id").alias("_source_record_id"))
     dim_case = _metadata(dim_case, run_id, batch_id, "investigation_cases", "_source_record_id", F.when(F.col("has_partial") == 1, "partial").otherwise("pass"), F.col("fact_warning_flags")).drop("fact_warning_flags", "has_partial")
     _write(dim_case, catalog, "dim_case")
 

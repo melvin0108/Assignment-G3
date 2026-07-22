@@ -92,6 +92,11 @@ class GoldContractTests(unittest.TestCase):
         for token in ("hashlib", "sha256", "stable_key_value", "F.sha2", "def _key"):
             self.assertNotIn(token, source)
 
+    def test_gold_builders_do_not_reference_legacy_hashed_columns(self):
+        source = (ROOT / "pipeline" / "gold" / "gold_models.py").read_text(encoding="utf-8")
+        for column in LEGACY_HASHED_COLUMNS:
+            self.assertNotIn(f'"{column}"', source, column)
+
     def test_forbidden_ai_columns_are_explicitly_blocked(self):
         forbidden = gold_common.FORBIDDEN_AI_COLUMNS
         for column in {"customer_id", "employee_id", "account_id", "card_id", "party_id", "pan", "email", "phone", "address", "ip_address"}:
