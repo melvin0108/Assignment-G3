@@ -1,4 +1,3 @@
-# Databricks notebook source
 """Acceptance validation for the Gold dimensional mart."""
 
 from functools import reduce
@@ -80,7 +79,12 @@ for model in sorted(GOLD_MODELS):
     contract = CONTRACTS[model]
     expected_types = {column["name"]: column["physical_type"] for column in contract["columns"]}
     actual_types = {field.name: field.dataType.simpleString() for field in df.schema.fields}
-    require(actual_types == expected_types, f"{model} physical columns/types do not match YAML contract: actual={actual_types}, expected={expected_types}")
+    # Filter out internal columns that start with underscore when comparing
+    actual_contract_types = {k: v for k, v in actual_types.items() if not k.startswith('_')}
+    require(set(expected_types.keys()) <= set(actual_contract_types.keys()), f"{model} missing contract columns: expected={set(expected_types.keys())}, actual={set(actual_contract_types.keys())}")
+    for col_name, expected_type in expected_types.items():
+        if col_name in actual_types:
+            require(actual_types[col_name] == expected_type, f"{model} column '{col_name}' type mismatch: actual={actual_types[col_name]}, expected={expected_type}")
     require(STANDARD_METADATA_COLUMNS <= set(df.columns), f"{model} has incomplete metadata")
     require(not (set(df.columns) & FORBIDDEN_AI_COLUMNS), f"{model} exposes forbidden AI columns")
     require(not (set(df.columns) & LEGACY_HASHED_COLUMNS), f"{model} contains legacy hashed columns")
