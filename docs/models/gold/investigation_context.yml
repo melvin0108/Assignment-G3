@@ -1,9 +1,45 @@
+schema_version: "1.0.0"
 model: investigation_context
+table: gold.investigation_context
+description: One deterministic, AI-safe detail document per eligible investigation case.
+domain: transaction_investigation
 type: materialized_context
-grain: one dim_case record
-source_models: [gold.dim_case, gold.fact_case_transaction, gold.fact_authorization_attempt, gold.fact_dispute, gold.fact_chargeback, gold.fact_fraud_alert, gold.fact_investigation_note, gold.fact_case_party_summary]
-keys: [case_id]
-context_version: 2.0.0
-ai_allowed: true
-usage_restrictions: internal_only
-limitations: [deterministic_summary_only, no_surrogate_keys, no_guilt_or_fraud_inference]
+grain: one row per case_id
+tags: [gold, context, ai_safe, detail]
+synonyms: [case detail, investigation context, chi tiết hồ sơ]
+sources: [gold.dim_case, gold.fact_case_transaction, gold.fact_authorization_attempt, gold.fact_dispute, gold.fact_chargeback, gold.fact_fraud_alert, gold.fact_investigation_note, gold.fact_case_party_summary]
+ai_access: {classification: ai_allowed, pii_safe: true}
+primary_key: [case_id]
+relationships:
+  - {target_model: gold.dim_case, cardinality: one_to_one, join_columns: [{from: case_id, to: case_id}]}
+  - {target_model: gold.fact_case_transaction, cardinality: one_to_many, join_columns: [{from: case_id, to: case_id}]}
+  - {target_model: gold.fact_authorization_attempt, cardinality: one_to_many, join_columns: [{from: case_id, to: case_id}]}
+  - {target_model: gold.fact_dispute, cardinality: one_to_many, join_columns: [{from: case_id, to: case_id}]}
+  - {target_model: gold.fact_chargeback, cardinality: one_to_many, join_columns: [{from: case_id, to: case_id}]}
+  - {target_model: gold.fact_fraud_alert, cardinality: one_to_many, join_columns: [{from: case_id, to: case_id}]}
+  - {target_model: gold.fact_investigation_note, cardinality: one_to_many, join_columns: [{from: case_id, to: case_id}]}
+  - {target_model: gold.fact_case_party_summary, cardinality: one_to_many, join_columns: [{from: case_id, to: case_id}]}
+columns:
+  - {name: case_id, physical_type: string, description: Natural investigation case identifier., semantic_role: primary_key, tags: [identifier], synonyms: [case, hồ sơ]}
+  - {name: context_category, physical_type: string, description: Stable category for investigation retrieval., semantic_role: dimension, tags: [context], synonyms: [context type], allowed_values: [investigation_case]}
+  - {name: case_detail, physical_type: "struct<priority:string,status_code:string,status_description:string,fraud_type_code:string,fraud_type_severity:string,opened_at:timestamp,closed_at:timestamp>", description: Typed case status and classification details., semantic_role: detail, tags: [context], synonyms: [case attributes]}
+  - {name: case_summary, physical_type: string, description: Deterministic case summary with no inferred guilt or fraud conclusion., semantic_role: text, tags: [context], synonyms: [summary, tóm tắt]}
+  - {name: transactions, physical_type: "array<struct<transaction_id:string,amount:decimal(18,2),currency_code:string,txn_ts:timestamp,transaction_status:string,merchant_name:string,category_name:string,category_group:string,channel_name:string>>", description: Sorted case-linked transaction details., semantic_role: detail, tags: [context, transaction], synonyms: [transactions, giao dịch]}
+  - {name: disputes, physical_type: "array<struct<dispute_id:string,transaction_id:string,amount:decimal(18,2),currency_code:string,dispute_status:string,raised_at:timestamp,chargebacks:array<struct<chargeback_id:string,scheme:string,amount:decimal(18,2),chargeback_stage:string,processed_at:timestamp>>>>", description: Sorted disputes with their associated chargebacks., semantic_role: detail, tags: [context, dispute], synonyms: [disputes, tranh chấp]}
+  - {name: fraud_alerts, physical_type: "array<struct<alert_id:string,transaction_id:string,rule_name:string,score:double,disposition:string,triggered_at:timestamp>>", description: Sorted fraud alerts linked to the case., semantic_role: detail, tags: [context, fraud_alert], synonyms: [alerts, cảnh báo]}
+  - {name: authorization_attempts, physical_type: "array<struct<attempt_id:string,transaction_id:string,decision:string,decline_reason:string,auth_ts:timestamp>>", description: Sorted authorization attempts linked to the case., semantic_role: detail, tags: [context, authorization], synonyms: [authorization outcomes]}
+  - {name: safe_notes, physical_type: "array<struct<note_id:string,safe_note_text:string,created_at:timestamp>>", description: Sorted PII-screened investigation notes., semantic_role: detail, tags: [context, safe_text], synonyms: [notes, ghi chú]}
+  - {name: party_summaries, physical_type: "array<struct<party_type:string,role:string,party_count:bigint>>", description: Safe case-party counts by type and role., semantic_role: detail, tags: [context, party], synonyms: [party composition]}
+  - {name: quality_status, physical_type: string, description: Context quality outcome., semantic_role: quality_flag, tags: [metadata], synonyms: [data quality], allowed_values: [pass, partial]}
+  - {name: warning_flags, physical_type: "array<string>", description: Machine-readable case warnings., semantic_role: quality_flag, tags: [metadata], synonyms: [warnings]}
+  - {name: source_references, physical_type: "array<struct<source_table:string,source_record_id:string>>", description: Source records used to build the context., semantic_role: lineage, tags: [metadata], synonyms: [lineage]}
+  - {name: usage_restrictions, physical_type: string, description: Consumer access classification., semantic_role: access_policy, tags: [metadata], synonyms: [AI access], allowed_values: [ai_allowed]}
+  - {name: masking_status, physical_type: string, description: PII protection status for the context., semantic_role: access_policy, tags: [metadata], synonyms: [masking], allowed_values: [masked, partial]}
+  - {name: context_version, physical_type: string, description: Breaking schema version of the context document., semantic_role: metadata, tags: [metadata], synonyms: [version], allowed_values: [2.0.0]}
+  - {name: pipeline_run_id, physical_type: string, description: Gold pipeline run identifier., semantic_role: lineage, tags: [metadata], synonyms: [run id]}
+  - {name: batch_id, physical_type: bigint, description: Source snapshot batch identifier., semantic_role: lineage, tags: [metadata], synonyms: [batch]}
+  - {name: last_refreshed_at, physical_type: timestamp, description: Time the context was refreshed., semantic_role: time, tags: [metadata], synonyms: [refresh time]}
+dimensions:
+  - {id: case_id, column: case_id, description: Investigation case identifier used for detail lookup., synonyms: [case, hồ sơ]}
+  - {id: context_category, column: context_category, description: Context document category., synonyms: [context type]}
+metrics: []

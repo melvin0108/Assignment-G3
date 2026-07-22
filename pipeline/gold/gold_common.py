@@ -6,8 +6,6 @@ run without a Databricks runtime.
 
 from __future__ import annotations
 
-import hashlib
-
 
 GOLD_MODELS = {
     "dim_date",
@@ -36,7 +34,7 @@ STANDARD_METADATA_COLUMNS = {
     "usage_restrictions",
 }
 
-USAGE_RESTRICTIONS = "internal_only"
+USAGE_RESTRICTIONS = "ai_allowed"
 AI_ALLOWED_RESTRICTIONS = "ai_allowed"
 FORBIDDEN_AI_COLUMNS = {
     "customer_id", "employee_id", "owner_employee_id", "author_employee_id",
@@ -50,12 +48,6 @@ SILVER_INPUTS = (
     "auth_attempts", "disputes", "chargebacks", "fraud_alerts",
     "investigation_notes", "case_transactions", "case_parties",
 )
-
-
-def stable_key_value(model_name: str, *business_key_values: object) -> str:
-    """Return a deterministic, model-scoped SHA-256 surrogate key."""
-    payload = "|".join([model_name, *("" if value is None else str(value) for value in business_key_values)])
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def assert_no_forbidden_columns(columns: list[str] | set[str] | tuple[str, ...]) -> None:

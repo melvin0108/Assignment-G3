@@ -1,8 +1,44 @@
+schema_version: "1.0.0"
 model: fact_chargeback
+table: gold.fact_chargeback
+description: Chargebacks linked to eligible case disputes using natural business identifiers.
+domain: transaction_investigation
 type: fact
-grain: one chargeback linked to an eligible case dispute
-source_models: [silver.chargebacks, gold.fact_dispute]
-keys: [chargeback_key]
-relationships: [case_key, currency_key, processed_date_key]
-ai_allowed: true
-usage_restrictions: internal_only
+grain: one row per case_id and chargeback_id
+tags: [gold, chargeback, ai_safe]
+synonyms: [chargeback, hoàn trả bắt buộc]
+sources: [silver.chargebacks, gold.fact_dispute]
+ai_access: {classification: ai_allowed, pii_safe: true}
+primary_key: [case_id, chargeback_id]
+relationships:
+  - {target_model: gold.dim_case, cardinality: many_to_one, join_columns: [{from: case_id, to: case_id}]}
+  - {target_model: gold.fact_dispute, cardinality: many_to_one, join_columns: [{from: case_id, to: case_id}, {from: dispute_id, to: dispute_id}]}
+  - {target_model: gold.dim_currency, cardinality: many_to_one, join_columns: [{from: currency_code, to: currency_code}]}
+  - {target_model: gold.dim_date, cardinality: many_to_one, join_columns: [{from: processed_date_key, to: date_key}]}
+columns:
+  - {name: case_id, physical_type: string, description: Natural investigation case identifier., semantic_role: primary_key, tags: [identifier], synonyms: [case, hồ sơ]}
+  - {name: transaction_id, physical_type: string, description: Related transaction identifier., semantic_role: business_key, tags: [identifier], synonyms: [transaction, giao dịch]}
+  - {name: dispute_id, physical_type: string, description: Related dispute identifier., semantic_role: foreign_key, tags: [identifier], synonyms: [dispute, tranh chấp]}
+  - {name: chargeback_id, physical_type: string, description: Natural chargeback identifier., semantic_role: primary_key, tags: [identifier], synonyms: [chargeback]}
+  - {name: currency_code, physical_type: string, description: Chargeback currency; monetary metrics must group or filter by it., semantic_role: foreign_key, tags: [currency], synonyms: [currency, tiền tệ]}
+  - {name: processed_date_key, physical_type: int, description: yyyyMMdd processed date key; 0 means UNKNOWN., semantic_role: foreign_key, tags: [date], synonyms: [processed date]}
+  - {name: scheme, physical_type: string, description: Card scheme processing the chargeback., semantic_role: dimension, tags: [chargeback], synonyms: [card scheme]}
+  - {name: amount, physical_type: "decimal(18,2)", description: Chargeback amount in currency_code., semantic_role: measure, tags: [amount, currency], synonyms: [chargeback amount, số tiền]}
+  - {name: chargeback_stage, physical_type: string, description: Current chargeback processing stage., semantic_role: dimension, tags: [chargeback], synonyms: [stage, giai đoạn]}
+  - {name: processed_at, physical_type: timestamp, description: Time the chargeback was processed., semantic_role: time, tags: [chargeback], synonyms: [processed time]}
+  - {name: pipeline_run_id, physical_type: string, description: Gold pipeline run identifier., semantic_role: lineage, tags: [metadata], synonyms: [run id]}
+  - {name: batch_id, physical_type: bigint, description: Source snapshot batch identifier., semantic_role: lineage, tags: [metadata], synonyms: [batch]}
+  - {name: last_refreshed_at, physical_type: timestamp, description: Time the Gold row was refreshed., semantic_role: time, tags: [metadata], synonyms: [refresh time]}
+  - {name: quality_status, physical_type: string, description: Row quality outcome., semantic_role: quality_flag, tags: [metadata], synonyms: [data quality], allowed_values: [pass, partial]}
+  - {name: warning_flags, physical_type: "array<string>", description: Machine-readable data quality warnings., semantic_role: quality_flag, tags: [metadata], synonyms: [warnings]}
+  - {name: source_references, physical_type: "array<struct<source_table:string,source_record_id:string>>", description: Source records used to build the row., semantic_role: lineage, tags: [metadata], synonyms: [lineage]}
+  - {name: usage_restrictions, physical_type: string, description: Consumer access classification., semantic_role: access_policy, tags: [metadata], synonyms: [AI access], allowed_values: [ai_allowed]}
+dimensions:
+  - {id: case_id, column: case_id, description: Investigation case., synonyms: [case, hồ sơ]}
+  - {id: currency_code, column: currency_code, description: Currency required for monetary aggregation., synonyms: [currency, tiền tệ]}
+  - {id: scheme, column: scheme, description: Processing card scheme., synonyms: [card scheme]}
+  - {id: chargeback_stage, column: chargeback_stage, description: Chargeback stage., synonyms: [stage, giai đoạn]}
+  - {id: processed_date_key, column: processed_date_key, description: Chargeback processed date., synonyms: [date, ngày xử lý]}
+metrics:
+  - {id: chargeback_count, description: Number of case-linked chargebacks., expression: "COUNT(*)", aggregation: count, format: integer, supported_dimensions: [case_id, currency_code, scheme, chargeback_stage, processed_date_key], time_field: processed_at}
+  - {id: chargeback_amount_total, description: Total chargeback amount; group or filter by currency_code., expression: "SUM(amount)", aggregation: sum, format: currency_by_currency_code, supported_dimensions: [case_id, currency_code, scheme, chargeback_stage, processed_date_key], time_field: processed_at}

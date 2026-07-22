@@ -1,8 +1,39 @@
+schema_version: "1.0.0"
 model: fact_authorization_attempt
+table: gold.fact_authorization_attempt
+description: Authorization outcomes for transactions linked to eligible investigation cases.
+domain: transaction_investigation
 type: fact
-grain: one authorization attempt linked to an eligible case transaction
-source_models: [silver.auth_attempts, silver.case_transactions]
-keys: [authorization_attempt_key]
-relationships: [case_key, authorization_date_key]
-ai_allowed: true
-usage_restrictions: internal_only
+grain: one row per case_id and attempt_id
+tags: [gold, authorization, ai_safe]
+synonyms: [authorization attempt, lần cấp phép]
+sources: [silver.auth_attempts, silver.case_transactions]
+ai_access: {classification: ai_allowed, pii_safe: true}
+primary_key: [case_id, attempt_id]
+relationships:
+  - {target_model: gold.dim_case, cardinality: many_to_one, join_columns: [{from: case_id, to: case_id}]}
+  - {target_model: gold.dim_date, cardinality: many_to_one, join_columns: [{from: authorization_date_key, to: date_key}]}
+columns:
+  - {name: case_id, physical_type: string, description: Natural investigation case identifier., semantic_role: primary_key, tags: [identifier], synonyms: [case, hồ sơ]}
+  - {name: transaction_id, physical_type: string, description: Related transaction identifier., semantic_role: business_key, tags: [identifier], synonyms: [transaction, giao dịch]}
+  - {name: attempt_id, physical_type: string, description: Natural authorization-attempt identifier., semantic_role: primary_key, tags: [identifier], synonyms: [attempt, lần thử]}
+  - {name: authorization_date_key, physical_type: int, description: yyyyMMdd authorization date key; 0 means UNKNOWN., semantic_role: foreign_key, tags: [date], synonyms: [authorization date]}
+  - {name: decision, physical_type: string, description: Authorization decision., semantic_role: dimension, tags: [authorization], synonyms: [outcome, kết quả], allowed_values: [approved, declined]}
+  - {name: decline_reason, physical_type: string, description: Decline reason when the attempt was declined., semantic_role: attribute, tags: [authorization], synonyms: [reason, lý do từ chối]}
+  - {name: auth_ts, physical_type: timestamp, description: Authorization attempt time., semantic_role: time, tags: [authorization], synonyms: [authorization time]}
+  - {name: pipeline_run_id, physical_type: string, description: Gold pipeline run identifier., semantic_role: lineage, tags: [metadata], synonyms: [run id]}
+  - {name: batch_id, physical_type: bigint, description: Source snapshot batch identifier., semantic_role: lineage, tags: [metadata], synonyms: [batch]}
+  - {name: last_refreshed_at, physical_type: timestamp, description: Time the Gold row was refreshed., semantic_role: time, tags: [metadata], synonyms: [refresh time]}
+  - {name: quality_status, physical_type: string, description: Row quality outcome., semantic_role: quality_flag, tags: [metadata], synonyms: [data quality], allowed_values: [pass, partial]}
+  - {name: warning_flags, physical_type: "array<string>", description: Machine-readable data quality warnings., semantic_role: quality_flag, tags: [metadata], synonyms: [warnings]}
+  - {name: source_references, physical_type: "array<struct<source_table:string,source_record_id:string>>", description: Source records used to build the row., semantic_role: lineage, tags: [metadata], synonyms: [lineage]}
+  - {name: usage_restrictions, physical_type: string, description: Consumer access classification., semantic_role: access_policy, tags: [metadata], synonyms: [AI access], allowed_values: [ai_allowed]}
+dimensions:
+  - {id: case_id, column: case_id, description: Investigation case., synonyms: [case, hồ sơ]}
+  - {id: decision, column: decision, description: Authorization outcome., synonyms: [outcome, kết quả]}
+  - {id: decline_reason, column: decline_reason, description: Authorization decline reason., synonyms: [reason, lý do]}
+  - {id: authorization_date_key, column: authorization_date_key, description: Authorization date., synonyms: [date, ngày cấp phép]}
+metrics:
+  - {id: authorization_attempt_count, description: Number of authorization attempts., expression: "COUNT(*)", aggregation: count, format: integer, supported_dimensions: [case_id, decision, decline_reason, authorization_date_key], time_field: auth_ts}
+  - {id: authorization_approval_rate, description: Approved attempts divided by all authorization attempts., expression: "AVG(CASE WHEN decision = 'approved' THEN 1.0 ELSE 0.0 END)", aggregation: ratio, format: percentage, supported_dimensions: [case_id, authorization_date_key], time_field: auth_ts}
+  - {id: authorization_decline_rate, description: Declined attempts divided by all authorization attempts., expression: "AVG(CASE WHEN decision = 'declined' THEN 1.0 ELSE 0.0 END)", aggregation: ratio, format: percentage, supported_dimensions: [case_id, decline_reason, authorization_date_key], time_field: auth_ts}
