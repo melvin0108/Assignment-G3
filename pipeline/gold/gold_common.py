@@ -6,8 +6,6 @@ run without a Databricks runtime.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 
 GOLD_MODELS = {
     "dim_date",
@@ -50,16 +48,6 @@ SILVER_INPUTS = (
     "auth_attempts", "disputes", "chargebacks", "fraud_alerts",
     "investigation_notes", "case_transactions", "case_parties",
 )
-
-
-def gold_model_dir(start: Path | None = None) -> Path:
-    """Find the co-versioned Gold YAML contracts from a notebook directory."""
-    current = (start or Path.cwd()).resolve()
-    for root in (current, *current.parents):
-        candidate = root / "docs" / "models" / "gold"
-        if candidate.is_dir():
-            return candidate
-    raise FileNotFoundError(f"Cannot find docs/models/gold from {current}")
 
 
 def assert_no_forbidden_columns(columns: list[str] | set[str] | tuple[str, ...]) -> None:

@@ -2,6 +2,7 @@
 """Acceptance validation for the Gold dimensional mart."""
 
 from functools import reduce
+from pathlib import Path
 
 import yaml
 from pyspark.sql import SparkSession
@@ -13,8 +14,17 @@ from pipeline.gold.gold_common import (
     GOLD_MODELS,
     STANDARD_METADATA_COLUMNS,
     catalog_widget,
-    gold_model_dir,
 )
+
+
+def gold_model_dir():
+    """Find the co-versioned YAML contracts from the notebook directory."""
+    current = Path.cwd().resolve()
+    for root in (current, *current.parents):
+        candidate = root / "docs" / "models" / "gold"
+        if candidate.is_dir():
+            return candidate
+    raise FileNotFoundError(f"Cannot find docs/models/gold from {current}")
 
 
 spark = SparkSession.builder.getOrCreate()

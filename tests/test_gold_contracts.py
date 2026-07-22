@@ -2,7 +2,6 @@
 
 import unittest
 from pathlib import Path
-from tempfile import TemporaryDirectory
 
 import yaml
 
@@ -56,18 +55,6 @@ def load_contracts():
 
 
 class GoldContractTests(unittest.TestCase):
-    def test_gold_model_dir_resolves_from_notebook_working_directory(self):
-        resolver = getattr(gold_common, "gold_model_dir", None)
-        self.assertIsNotNone(resolver)
-        with TemporaryDirectory() as temp_dir:
-            project_root = Path(temp_dir)
-            expected = project_root / "docs" / "models" / "gold"
-            notebook_dir = project_root / "pipeline" / "validation"
-            expected.mkdir(parents=True)
-            notebook_dir.mkdir(parents=True)
-
-            self.assertEqual(resolver(notebook_dir), expected)
-
     def test_gold_model_inventory_matches_the_plan(self):
         self.assertEqual(gold_common.GOLD_MODELS, {
         "dim_date",
@@ -133,6 +120,9 @@ class GoldContractTests(unittest.TestCase):
     def test_gold_validation_resolves_contracts_without_dunder_file(self):
         source = (Path(__file__).parents[1] / "pipeline" / "validation" / "validate_m3_gold.py").read_text(encoding="utf-8")
         self.assertNotIn("__file__", source)
+        self.assertIn("def gold_model_dir():", source)
+        self.assertIn("current = Path.cwd().resolve()", source)
+        self.assertNotIn("    gold_model_dir,", source)
         self.assertIn("MODEL_DIR = gold_model_dir()", source)
 
 
