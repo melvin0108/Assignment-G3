@@ -21,7 +21,8 @@ def _metadata(df, run_id, batch_id, source_table, record_id, quality=F.lit("pass
     if warnings is None:
         warnings = _empty_string_array()
     return add_standard_metadata(
-        df.withColumn("source_references", _refs(source_table, record_id)), run_id, batch_id, quality, warnings, usage_restrictions
+        df.withColumn("source_references", _refs(source_table, record_id)).drop("_source_record_id"),
+        run_id, batch_id, quality, warnings, usage_restrictions,
     )
 
 

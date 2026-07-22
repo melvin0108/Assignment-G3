@@ -105,6 +105,10 @@ class GoldContractTests(unittest.TestCase):
         self.assertNotIn("isinstance(field.dataType, ArrayType)", source)
         self.assertIn("return df.limit(1).select(*expressions)", source)
 
+    def test_gold_metadata_drops_temporary_source_record_id(self):
+        source = (Path(__file__).parents[1] / "pipeline" / "gold" / "gold_models.py").read_text(encoding="utf-8")
+        self.assertIn('.drop("_source_record_id")', source)
+
     def test_only_investigation_context_overrides_the_internal_only_policy(self):
         root = Path(__file__).parents[1]
         models = (root / "pipeline" / "gold" / "gold_models.py").read_text(encoding="utf-8")
