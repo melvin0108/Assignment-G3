@@ -96,7 +96,7 @@ FRAUD_TYPES = [("card_fraud", "Card compromise", "high"), ("account_takeover", "
 COUNTRIES = [("AU", "Australia", "APAC"), ("NZ", "New Zealand", "APAC"), ("US", "United States", "AMER"), ("GB", "United Kingdom", "EMEA"), ("SG", "Singapore", "APAC")]
 CURRENCIES = [("AUD", "Australian Dollar", 2), ("USD", "US Dollar", 2), ("NZD", "New Zealand Dollar", 2), ("GBP", "Pound Sterling", 2), ("SGD", "Singapore Dollar", 2)]
 BRANCHES = [("BR-01", "Melbourne Flagship", "AU", "VIC", "active"), ("BR-02", "Sydney CBD", "AU", "NSW", "active"), ("BR-03", "Brisbane", "AU", "QLD", "active"), ("BR-04", "Perth", "AU", "WA", "closed")]
-DATE_DIM_RANGE = (date(2023, 1, 1), RUN_DATE)  # inclusive daily calendar
+DATE_DIM_RANGE = (date(2023, 1, 1), date(2030, 12, 31))  # inclusive daily calendar
 
 # --------------------------------------------------------------------------
 # Table CSV schemas — column order is the on-disk order (bronze-layer.md)
