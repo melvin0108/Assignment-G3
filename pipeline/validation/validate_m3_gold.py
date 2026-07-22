@@ -2,7 +2,6 @@
 """Acceptance validation for the Gold dimensional mart."""
 
 from functools import reduce
-from pathlib import Path
 
 import yaml
 from pyspark.sql import SparkSession
@@ -14,6 +13,7 @@ from pipeline.gold.gold_common import (
     GOLD_MODELS,
     STANDARD_METADATA_COLUMNS,
     catalog_widget,
+    gold_model_dir,
 )
 
 
@@ -37,12 +37,16 @@ EXPECTED_PRIMARY_KEYS = {
     "fact_case_party_summary": ["case_id", "party_type", "role"],
     "investigation_context": ["case_id"],
 }
+EXPECTED_USAGE_RESTRICTIONS = {
+    model: "ai_allowed" if model == "investigation_context" else "internal_only"
+    for model in GOLD_MODELS
+}
 LEGACY_HASHED_COLUMNS = {
     "case_key", "merchant_key", "channel_key", "currency_key", "dispute_reason_key",
     "case_transaction_key", "authorization_attempt_key", "dispute_key", "chargeback_key",
     "fraud_alert_key", "investigation_note_key", "case_party_summary_key",
 }
-MODEL_DIR = Path(__file__).resolve().parents[2] / "docs" / "models" / "gold"
+MODEL_DIR = gold_model_dir()
 CONTRACTS = {
     contract["model"]: contract
     for path in MODEL_DIR.glob("*.yml")
@@ -70,7 +74,11 @@ for model in sorted(GOLD_MODELS):
     require(STANDARD_METADATA_COLUMNS <= set(df.columns), f"{model} has incomplete metadata")
     require(not (set(df.columns) & FORBIDDEN_AI_COLUMNS), f"{model} exposes forbidden AI columns")
     require(not (set(df.columns) & LEGACY_HASHED_COLUMNS), f"{model} contains legacy hashed columns")
-    require(df.filter(F.col("usage_restrictions") != "ai_allowed").isEmpty(), f"{model} has usage_restrictions other than ai_allowed")
+    expected_restriction = EXPECTED_USAGE_RESTRICTIONS[model]
+    restriction_column = next(column for column in contract["columns"] if column["name"] == "usage_restrictions")
+    require(contract["ai_access"]["classification"] == expected_restriction, f"{model} YAML AI classification does not match policy")
+    require(restriction_column["allowed_values"] == [expected_restriction], f"{model} YAML usage_restrictions values do not match policy")
+    require(df.filter(F.col("usage_restrictions") != expected_restriction).isEmpty(), f"{model} has usage_restrictions other than {expected_restriction}")
 
     key_columns = EXPECTED_PRIMARY_KEYS[model]
     null_key = reduce(lambda left, right: left | right, (F.col(column).isNull() for column in key_columns))

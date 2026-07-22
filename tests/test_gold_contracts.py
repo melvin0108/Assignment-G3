@@ -2,6 +2,7 @@
 
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import yaml
 
@@ -29,6 +30,8 @@ EXPECTED_PRIMARY_KEYS = {
     "investigation_context": ["case_id"],
 }
 
+INTERNAL_ONLY_MODELS = set(EXPECTED_PRIMARY_KEYS) - {"investigation_context"}
+
 EXPECTED_METRICS = {
     "case_count", "transaction_count", "transaction_amount_total",
     "transaction_amount_average", "authorization_attempt_count",
@@ -53,6 +56,18 @@ def load_contracts():
 
 
 class GoldContractTests(unittest.TestCase):
+    def test_gold_model_dir_resolves_from_notebook_working_directory(self):
+        resolver = getattr(gold_common, "gold_model_dir", None)
+        self.assertIsNotNone(resolver)
+        with TemporaryDirectory() as temp_dir:
+            project_root = Path(temp_dir)
+            expected = project_root / "docs" / "models" / "gold"
+            notebook_dir = project_root / "pipeline" / "validation"
+            expected.mkdir(parents=True)
+            notebook_dir.mkdir(parents=True)
+
+            self.assertEqual(resolver(notebook_dir), expected)
+
     def test_gold_model_inventory_matches_the_plan(self):
         self.assertEqual(gold_common.GOLD_MODELS, {
         "dim_date",
@@ -71,7 +86,7 @@ class GoldContractTests(unittest.TestCase):
         "investigation_context",
         })
 
-    def test_gold_metadata_contract_marks_every_output_ai_allowed(self):
+    def test_gold_metadata_contract_defaults_to_internal_only(self):
         self.assertEqual(gold_common.STANDARD_METADATA_COLUMNS, {
         "pipeline_run_id",
         "batch_id",
@@ -81,7 +96,7 @@ class GoldContractTests(unittest.TestCase):
         "source_references",
         "usage_restrictions",
         })
-        self.assertEqual(gold_common.USAGE_RESTRICTIONS, "ai_allowed")
+        self.assertEqual(gold_common.USAGE_RESTRICTIONS, "internal_only")
         self.assertEqual(gold_common.AI_ALLOWED_RESTRICTIONS, "ai_allowed")
 
     def test_sha256_helpers_are_absent(self):
@@ -103,17 +118,22 @@ class GoldContractTests(unittest.TestCase):
         self.assertNotIn("isinstance(field.dataType, ArrayType)", source)
         self.assertIn("return df.limit(1).select(*expressions)", source)
 
-    def test_gold_uses_ai_allowed_policy_labels_without_workspace_grants(self):
+    def test_only_investigation_context_overrides_the_internal_only_policy(self):
         root = Path(__file__).parents[1]
         models = (root / "pipeline" / "gold" / "gold_models.py").read_text(encoding="utf-8")
         runner = (root / "pipeline" / "gold" / "gold_all_tables.py").read_text(encoding="utf-8")
-        self.assertIn("usage_restrictions=AI_ALLOWED_RESTRICTIONS", models)
+        self.assertEqual(models.count("usage_restrictions=AI_ALLOWED_RESTRICTIONS"), 1)
         self.assertNotIn("GRANT ", runner)
 
     def test_gold_validation_allows_empty_optional_facts_and_reconciles_chargebacks(self):
         source = (Path(__file__).parents[1] / "pipeline" / "validation" / "validate_m3_gold.py").read_text(encoding="utf-8")
         self.assertIn('OPTIONAL_FACT_MODELS = {model for model in GOLD_MODELS if model.startswith("fact_")}', source)
         self.assertIn("fact_chargeback does not reconcile to case-scoped disputes", source)
+
+    def test_gold_validation_resolves_contracts_without_dunder_file(self):
+        source = (Path(__file__).parents[1] / "pipeline" / "validation" / "validate_m3_gold.py").read_text(encoding="utf-8")
+        self.assertNotIn("__file__", source)
+        self.assertIn("MODEL_DIR = gold_model_dir()", source)
 
 
 class GoldSemanticContractTests(unittest.TestCase):
@@ -144,8 +164,11 @@ class GoldSemanticContractTests(unittest.TestCase):
             self.assertEqual(set(contract), required_model_fields, model)
             self.assertEqual(contract["schema_version"], "1.0.0", model)
             self.assertEqual(contract["table"], f"gold.{model}", model)
+            expected_classification = (
+                "internal_only" if model in INTERNAL_ONLY_MODELS else "ai_allowed"
+            )
             self.assertEqual(contract["ai_access"], {
-                "classification": "ai_allowed",
+                "classification": expected_classification,
                 "pii_safe": True,
             })
             self.assertTrue(contract["description"], model)
@@ -159,6 +182,11 @@ class GoldSemanticContractTests(unittest.TestCase):
             for column in columns.values():
                 self.assertTrue(required_column_fields <= set(column), f"{model}.{column['name']}")
                 self.assertTrue(column["description"], f"{model}.{column['name']}")
+            self.assertEqual(
+                columns["usage_restrictions"]["allowed_values"],
+                [expected_classification],
+                model,
+            )
             self.assertTrue(set(contract["primary_key"]) <= set(columns), model)
 
             dimensions = {dimension["id"]: dimension for dimension in contract["dimensions"]}
@@ -224,9 +252,6 @@ class GoldSemanticContractTests(unittest.TestCase):
 
             routed_tables = [pattern["primary_table"], *pattern["supporting_tables"]]
             routed_contracts = [self.contracts[table.removeprefix("gold.")] for table in routed_tables]
-            for contract in routed_contracts:
-                self.assertEqual(contract["ai_access"]["classification"], "ai_allowed")
-
             available_dimensions = {
                 dimension["id"]
                 for contract in routed_contracts
@@ -240,6 +265,10 @@ class GoldSemanticContractTests(unittest.TestCase):
                 self.assertIn(pattern["time_dimension"], available_dimensions)
 
             if pattern["query_mode"] == "analytics":
+                for contract in routed_contracts:
+                    self.assertEqual(
+                        contract["ai_access"]["classification"], "internal_only"
+                    )
                 self.assertTrue(pattern["metric_ids"], pattern["id"])
                 self.assertTrue(set(pattern["metric_ids"]) <= set(metric_locations), pattern["id"])
                 routed_models = {table.removeprefix("gold.") for table in routed_tables}
@@ -251,11 +280,16 @@ class GoldSemanticContractTests(unittest.TestCase):
                 self.assertEqual(pattern["query_mode"], "detail")
                 self.assertEqual(pattern["metric_ids"], [])
                 self.assertEqual(pattern["primary_table"], "gold.investigation_context")
+                self.assertEqual(pattern["supporting_tables"], [])
+                self.assertEqual(
+                    routed_contracts[0]["ai_access"]["classification"], "ai_allowed"
+                )
 
     def test_m3_validation_covers_natural_grain_schema_and_ai_policy(self):
         source = (ROOT / "pipeline" / "validation" / "validate_m3_gold.py").read_text(encoding="utf-8")
         for token in (
-            "EXPECTED_PRIMARY_KEYS", "physical_type", "usage_restrictions", "UNKNOWN",
+            "EXPECTED_PRIMARY_KEYS", "EXPECTED_USAGE_RESTRICTIONS", "physical_type",
+            "usage_restrictions", "UNKNOWN",
             "legacy hashed columns", "investigation_context must have one row per case_id",
         ):
             self.assertIn(token, source)

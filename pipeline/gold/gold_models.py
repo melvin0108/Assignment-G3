@@ -52,7 +52,7 @@ def build_dimensions(spark, catalog, run_id, batch_id):
     dim_date = _metadata(date.select(
         F.date_format("date_id", "yyyyMMdd").cast("int").alias("date_key"), "date_id", "year", "month", "quarter", "is_weekend",
         F.lit(False).alias("is_unknown"), "_source_record_id"), run_id, batch_id, "date_dim", "_source_record_id")
-    unknown_date = _unknown_from(dim_date, {"date_key": 0, "is_unknown": True, "quality_status": "partial", "warning_flags": ["unknown_date"], "usage_restrictions": AI_ALLOWED_RESTRICTIONS})
+    unknown_date = _unknown_from(dim_date, {"date_key": 0, "is_unknown": True, "quality_status": "partial", "warning_flags": ["unknown_date"], "usage_restrictions": USAGE_RESTRICTIONS})
     _write(dim_date.unionByName(unknown_date), catalog, "dim_date")
 
     merchants = spark.read.table(f"{catalog}.silver.merchants").alias("m")
@@ -63,19 +63,19 @@ def build_dimensions(spark, catalog, run_id, batch_id):
         F.col("m.status").alias("merchant_status"), F.col("m.effective_at").alias("effective_at"), F.lit(False).alias("is_unknown"),
         F.col("m._source_record_id").alias("_source_record_id"))
     dim_merchant = _metadata(merchant, run_id, batch_id, "merchants", "_source_record_id")
-    _write(dim_merchant.unionByName(_unknown_from(dim_merchant, {"merchant_id": "UNKNOWN", "merchant_name": "Unknown merchant", "is_unknown": True, "quality_status": "partial", "warning_flags": ["unknown_merchant"], "usage_restrictions": AI_ALLOWED_RESTRICTIONS})), catalog, "dim_merchant")
+    _write(dim_merchant.unionByName(_unknown_from(dim_merchant, {"merchant_id": "UNKNOWN", "merchant_name": "Unknown merchant", "is_unknown": True, "quality_status": "partial", "warning_flags": ["unknown_merchant"], "usage_restrictions": USAGE_RESTRICTIONS})), catalog, "dim_merchant")
 
     channels = spark.read.table(f"{catalog}.silver.channels")
     dim_channel = _metadata(channels.select("channel_code", "channel_name", F.lit(False).alias("is_unknown"), "_source_record_id"), run_id, batch_id, "channels", "_source_record_id")
-    _write(dim_channel.unionByName(_unknown_from(dim_channel, {"channel_code": "UNKNOWN", "channel_name": "Unknown channel", "is_unknown": True, "quality_status": "partial", "warning_flags": ["unknown_channel"], "usage_restrictions": AI_ALLOWED_RESTRICTIONS})), catalog, "dim_channel")
+    _write(dim_channel.unionByName(_unknown_from(dim_channel, {"channel_code": "UNKNOWN", "channel_name": "Unknown channel", "is_unknown": True, "quality_status": "partial", "warning_flags": ["unknown_channel"], "usage_restrictions": USAGE_RESTRICTIONS})), catalog, "dim_channel")
 
     reasons = spark.read.table(f"{catalog}.silver.dispute_reason_codes")
     dim_reason = _metadata(reasons.select("reason_code", "description", F.lit(False).alias("is_unknown"), "_source_record_id"), run_id, batch_id, "dispute_reason_codes", "_source_record_id")
-    _write(dim_reason.unionByName(_unknown_from(dim_reason, {"reason_code": "UNKNOWN", "description": "Unknown dispute reason", "is_unknown": True, "quality_status": "partial", "warning_flags": ["unknown_dispute_reason"], "usage_restrictions": AI_ALLOWED_RESTRICTIONS})), catalog, "dim_dispute_reason")
+    _write(dim_reason.unionByName(_unknown_from(dim_reason, {"reason_code": "UNKNOWN", "description": "Unknown dispute reason", "is_unknown": True, "quality_status": "partial", "warning_flags": ["unknown_dispute_reason"], "usage_restrictions": USAGE_RESTRICTIONS})), catalog, "dim_dispute_reason")
 
     currencies = spark.read.table(f"{catalog}.silver.currencies")
     dim_currency = _metadata(currencies.select("currency_code", F.col("name").alias("currency_name"), "decimals", F.lit(False).alias("is_unknown"), "_source_record_id"), run_id, batch_id, "currencies", "_source_record_id")
-    _write(dim_currency.unionByName(_unknown_from(dim_currency, {"currency_code": "UNKNOWN", "currency_name": "Unknown currency", "is_unknown": True, "quality_status": "partial", "warning_flags": ["unknown_currency"], "usage_restrictions": AI_ALLOWED_RESTRICTIONS})), catalog, "dim_currency")
+    _write(dim_currency.unionByName(_unknown_from(dim_currency, {"currency_code": "UNKNOWN", "currency_name": "Unknown currency", "is_unknown": True, "quality_status": "partial", "warning_flags": ["unknown_currency"], "usage_restrictions": USAGE_RESTRICTIONS})), catalog, "dim_currency")
 
 
 def build_case_and_facts(spark, catalog, run_id, batch_id):

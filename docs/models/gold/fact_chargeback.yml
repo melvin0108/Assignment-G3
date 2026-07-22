@@ -8,7 +8,7 @@ grain: one row per case_id and chargeback_id
 tags: [gold, chargeback, ai_safe]
 synonyms: [chargeback, hoàn trả bắt buộc]
 sources: [silver.chargebacks, gold.fact_dispute]
-ai_access: {classification: ai_allowed, pii_safe: true}
+ai_access: {classification: internal_only, pii_safe: true}
 primary_key: [case_id, chargeback_id]
 relationships:
   - {target_model: gold.dim_case, cardinality: many_to_one, join_columns: [{from: case_id, to: case_id}]}
@@ -32,7 +32,7 @@ columns:
   - {name: quality_status, physical_type: string, description: Row quality outcome., semantic_role: quality_flag, tags: [metadata], synonyms: [data quality], allowed_values: [pass, partial]}
   - {name: warning_flags, physical_type: "array<string>", description: Machine-readable data quality warnings., semantic_role: quality_flag, tags: [metadata], synonyms: [warnings]}
   - {name: source_references, physical_type: "array<struct<source_table:string,source_record_id:string>>", description: Source records used to build the row., semantic_role: lineage, tags: [metadata], synonyms: [lineage]}
-  - {name: usage_restrictions, physical_type: string, description: Consumer access classification., semantic_role: access_policy, tags: [metadata], synonyms: [AI access], allowed_values: [ai_allowed]}
+  - {name: usage_restrictions, physical_type: string, description: Consumer access classification., semantic_role: access_policy, tags: [metadata], synonyms: [AI access], allowed_values: [internal_only]}
 dimensions:
   - {id: case_id, column: case_id, description: Investigation case., synonyms: [case, hồ sơ]}
   - {id: currency_code, column: currency_code, description: Currency required for monetary aggregation., synonyms: [currency, tiền tệ]}

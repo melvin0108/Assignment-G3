@@ -21,18 +21,23 @@ deterministic case summary; it must not infer guilt or a fraud conclusion.
 
 ## Output policy
 
-All 14 PII-safe Gold outputs, including `investigation_context`, are
-`ai_allowed`. Bronze, Silver, and quarantine records are operational outputs
-and are never AI retrieval sources. This prototype documents the policy with
-`usage_restrictions`; it does not provision Databricks users, groups, or grants.
+`investigation_context` is the only `ai_allowed` Gold table. The six dimensions
+and seven facts are PII-safe but `internal_only`; a future trusted query broker
+may use them for allowlisted analytics execution. Bronze, Silver, and quarantine
+records are operational outputs and are never AI retrieval sources. This
+prototype documents the policy with `usage_restrictions`; those labels do not
+provision or replace Databricks users, groups, or Unity Catalog grants.
 
 ## AI use
 
-The internal AI consumer may answer questions such as “Which case-linked
-transactions were disputed?”, “What alerts were triggered?”, and “What are
-the safe investigation notes?”. It must refuse requests for customer,
-employee, account, card, party, device/IP, PAN, contact details, legal-hold
-records, or conclusions not present in the context.
+The AI consumer may retrieve case detail directly from `investigation_context`.
+For analytics, it first matches a question to the routing YAML and reads only
+the listed model YAML contracts. It may return the generated SQL, or a future
+trusted broker may validate and execute that SQL against the listed internal
+tables and return the bounded result. The AI must not discover the full schema,
+hold unrestricted table credentials, or guess SQL when no route matches. It
+must also refuse requests for customer, employee, account, card, party,
+device/IP, PAN, contact details, legal-hold records, or unsupported conclusions.
 
 ## Run and validate
 
@@ -60,6 +65,10 @@ questions for case overview, transactions, authorization outcomes, disputes,
 chargebacks, fraud alerts, safe notes, party composition, and case-detail
 lookup. Analytics routes reference model metric IDs. Detail lookup routes to
 `gold.investigation_context` without an artificial metric or embedded SQL.
+After a route matches, only its primary and supporting model contracts are read
+for grain, columns, relationships, dimensions, and metric expressions. An
+unmatched or ambiguous question requires clarification or an unsupported-query
+response rather than a full-schema scan.
 
 ## Breaking migration
 
@@ -68,4 +77,5 @@ are removed with no compatibility columns or views. Downstream queries must use
 the natural joins above and rebuild Gold cleanly before consuming the new
 contracts. M3 validates exact YAML types, natural-grain uniqueness,
 business-key referential integrity, documented UNKNOWN members, one context row
-per `case_id`, absence of legacy hashed keys, and `ai_allowed` on every row.
+per `case_id`, absence of legacy hashed keys, `internal_only` on every dimension
+and fact row, and `ai_allowed` only on `investigation_context`.

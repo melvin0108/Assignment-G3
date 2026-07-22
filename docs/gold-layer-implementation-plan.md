@@ -8,7 +8,7 @@ The design follows the supervisor's guidance:
 
 - Silver remains atomic and integrated.
 - Gold becomes dimensional.
-- AI can query individual Gold facts and dimensions or retrieve a complete case context.
+- AI retrieves complete case context directly; analytics over facts and dimensions is generated from scoped YAML metadata for execution by a future trusted broker.
 - YAML metadata explains every model, relationship, field, safety rule, and supported use case.
 
 ## Gold Model Contracts
@@ -21,7 +21,7 @@ Every Gold model is an overwrite-based Delta table carrying:
 - `quality_status STRING` -- `pass` or `partial`
 - `warning_flags ARRAY<STRING>`
 - `source_references ARRAY<STRUCT<source_table:STRING,source_record_id:STRING>>`
-- `usage_restrictions STRING` -- `ai_allowed`
+- `usage_restrictions STRING` -- `internal_only` for dimensions and facts; `ai_allowed` for `investigation_context`
 
 Dimensions and facts use business IDs and natural composite grains; SHA-256 surrogate and fact keys are not published. `dim_date.date_key` uses `yyyyMMdd`; key `0` represents an unknown date.
 
@@ -80,7 +80,7 @@ Collections use typed `ARRAY<STRUCT>` values and typed empty arrays rather than 
 6. Build `investigation_context` only after every Gold dimension and fact reports the same run and batch.
 7. Execute Gold notebooks through an ordered `gold_all_tables.py` runner, following the existing Silver runner pattern. Replace the stale single-context job task with `gold_all_tables`, then run `validate_m3_gold`.
 8. Add a job-level `catalog` parameter defaulting to `g3_catalog` and pass it explicitly to Gold and validation tasks.
-9. Label every PII-safe Gold model as `ai_allowed`. Document Bronze, Silver, and quarantine as non-AI operational outputs; do not provision users, groups, or Unity Catalog grants in this prototype.
+9. Label the six dimensions and seven facts as `internal_only`, and label only `investigation_context` as `ai_allowed`. Document Bronze, Silver, and quarantine as non-AI operational outputs; do not provision users, groups, or Unity Catalog grants in this prototype.
 
 ### Failure Policy
 
@@ -102,10 +102,18 @@ Create one YAML file per Gold model under the Gold model documentation directory
 - Columns, types, required status, semantic definitions, and allowed values
 - Fact-to-dimension join relationships
 - Measures and aggregation guidance
-- PII classification and `ai_allowed` status
+- PII classification and model-specific `internal_only` or `ai_allowed` status
 - Quality, exclusion, unknown-member, and warning behavior
 - Usage restrictions and known limitations
 - Example AI questions supported by that model
+
+At query time, the AI reads `questions-to-metrics.yaml` first. A matched route
+provides the metric IDs plus the primary and supporting tables, after which only
+those model YAML contracts are loaded for grain, relationships, dimensions, and
+metric expressions. Detail routes use `gold.investigation_context`; analytics
+SQL over internal models is returned to the user or, in a future phase, sent to
+an allowlisted trusted broker. Unmatched or ambiguous questions do not trigger
+full-schema discovery and must be clarified or reported as unsupported.
 
 Update the Gold architecture documentation and data model to show the constellation, join paths, context derivation, answerable questions, and required refusals. Export three to five validated `g3_catalog` context records as reviewed JSON samples; do not commit full datasets.
 
@@ -127,7 +135,7 @@ Update the Gold architecture documentation and data model to show the constellat
 - All note text passes the repository's PII/PAN leakage expressions.
 - `fact_case_party_summary` contains counts only, never raw party identifiers.
 - Only approved values appear in quality, restriction, masking, and context-version fields.
-- The AI group can query every Gold model but has no direct or inherited Bronze/Silver `SELECT` access.
+- Policy metadata marks only `investigation_context` for direct AI access; all facts and dimensions are `internal_only` broker sources.
 
 ### Context Reconciliation
 
@@ -144,14 +152,15 @@ Update the Gold architecture documentation and data model to show the constellat
 - Every Gold table has exactly one YAML contract, and documented fields/types match the Delta schema.
 - YAML relationships match implemented foreign keys.
 - The complete `g3_catalog` job runs Bronze -> DQ -> Silver -> Gold -> M3 validation successfully.
-- Validation prints table counts, pass/partial counts, exclusions, unknown-member usage, referential-integrity results, safety results, and grant evidence.
+- Validation prints table counts, pass/partial counts, exclusions, unknown-member usage, referential-integrity results, safety results, and policy-label evidence.
 
 ## Assumptions
 
 - `g3_catalog` is the catalog; `bronze`, `silver`, `gold`, and `gov` are schemas beneath it.
 - Gold remains current-state Type 1 because Silver does not preserve SCD2 history.
-- `investigation_context` and all PII-safe supporting Gold models are AI-allowed, while restricted operational models stay in Bronze/Silver.
-- No chatbot, vector database, semantic search index, LLM summary, dashboard, or full enterprise warehouse is added.
+- `investigation_context` is AI-allowed; PII-safe supporting Gold models are internal-only, while restricted operational models stay in Bronze/Silver.
+- YAML contracts provide question-to-metric routing and scoped technical metadata; no Unity Catalog Metric Views are created.
+- No chatbot, query broker implementation, vector database, semantic search index, LLM summary, dashboard, or full enterprise warehouse is added.
 - Gold tables are not partitioned because only case-linked investigation records are published.
 - Rebuilds are batch operations with no supported concurrent-reader atomicity guarantee.
 - The reverted context-only implementation is not restored wholesale, and the user's deleted/unstaged files are preserved.
