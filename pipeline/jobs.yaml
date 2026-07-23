@@ -1,715 +1,723 @@
 resources:
   jobs:
-    ai_ready_context_pipeline:
-      name: AI-ready transaction investigation context
-      parameters:
-        - name: catalog
-          default: g3_catalog
+    AI_ready_transaction_investigation_context_pipeline:
+      name: AI-ready transaction investigation context pipeline
+      description: This pipeline is designed to process raw transaction data, perform
+        data quality checks, and generate AI-ready context for transaction investigations.
+        It includes tasks for data ingestion, validation, transformation, and context
+        generation, ensuring that the data is clean, accurate, and structured for
+        AI applications.
       tasks:
-        # =====================================================================
-        # BRONZE LAYER (RAW INGESTION TASKS)
-        # =====================================================================
-        - task_key: bronze_date_dim
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_date_dim
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: bronze_defects_manifest
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_defects_manifest
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: bronze_countries
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_countries
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: bronze_currencies
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_currencies
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: bronze_branches
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_branches
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: bronze_channels
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_channels
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: bronze_merchant_categories
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_merchant_categories
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: bronze_dispute_reason_codes
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_dispute_reason_codes
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: bronze_fraud_types
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_fraud_types
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: bronze_case_status_types
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_case_status_types
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: bronze_customers
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_customers
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: bronze_employees
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_employees
-            source: WORKSPACE
-          environment_key: Default
-
+      - task_key: bronze_date_dim
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_date_dim
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: bronze_defects_manifest
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_defects_manifest
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: bronze_countries
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_countries
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: bronze_currencies
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_currencies
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: bronze_branches
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_branches
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: bronze_channels
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_channels
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: bronze_merchant_categories
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_merchant_categories
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: bronze_dispute_reason_codes
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_dispute_reason_codes
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: bronze_fraud_types
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_fraud_types
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: bronze_case_status_types
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_case_status_types
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: bronze_customers
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_customers
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: bronze_employees
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_employees
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: bronze_accounts
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_accounts
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: bronze_cards
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_cards
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: bronze_merchants
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_merchants
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: bronze_transactions
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_transactions
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: bronze_auth_attempts
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_auth_attempts
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: bronze_transaction_devices
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_transaction_devices
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: bronze_disputes
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_disputes
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: bronze_chargebacks
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_chargebacks
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: bronze_fraud_alerts
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_fraud_alerts
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: bronze_investigation_cases
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_investigation_cases
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: bronze_investigation_notes
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_investigation_notes
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: bronze_case_transactions
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_case_transactions
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: bronze_case_parties
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_case_parties
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: bronze_customer_contact_logs
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_customer_contact_logs
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: validate_m1_bronze
+        depends_on:
         - task_key: bronze_accounts
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_accounts
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: bronze_cards
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_cards
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: bronze_merchants
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_merchants
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: bronze_transactions
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_transactions
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: bronze_auth_attempts
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_auth_attempts
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: bronze_transaction_devices
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_transaction_devices
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: bronze_disputes
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_disputes
-            source: WORKSPACE
-          environment_key: Default
-
         - task_key: bronze_chargebacks
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_chargebacks
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: bronze_fraud_alerts
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_fraud_alerts
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: bronze_investigation_cases
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_investigation_cases
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: bronze_investigation_notes
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_investigation_notes
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: bronze_case_transactions
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_case_transactions
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: bronze_case_parties
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_case_parties
-            source: WORKSPACE
-          environment_key: Default
-
+        - task_key: bronze_case_status_types
         - task_key: bronze_customer_contact_logs
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/bronze/bronze_customer_contact_logs
-            source: WORKSPACE
-          environment_key: Default
-
-        # =====================================================================
-        # BRONZE VALIDATION & DATA QUALITY ENGINE
-        # =====================================================================
+        - task_key: bronze_branches
+        - task_key: bronze_transaction_devices
+        - task_key: bronze_date_dim
+        - task_key: bronze_disputes
+        - task_key: bronze_auth_attempts
+        - task_key: bronze_merchants
+        - task_key: bronze_customers
+        - task_key: bronze_defects_manifest
+        - task_key: bronze_investigation_cases
+        - task_key: bronze_investigation_notes
+        - task_key: bronze_cards
+        - task_key: bronze_channels
+        - task_key: bronze_merchant_categories
+        - task_key: bronze_countries
+        - task_key: bronze_transactions
+        - task_key: bronze_dispute_reason_codes
+        - task_key: bronze_fraud_types
+        - task_key: bronze_employees
+        - task_key: bronze_case_parties
+        - task_key: bronze_case_transactions
+        - task_key: bronze_fraud_alerts
+        - task_key: bronze_currencies
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/validation/validate_m1_bronze
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: silver_date_dim
+        depends_on:
         - task_key: validate_m1_bronze
-          depends_on:
-            - task_key: bronze_date_dim
-            - task_key: bronze_defects_manifest
-            - task_key: bronze_countries
-            - task_key: bronze_currencies
-            - task_key: bronze_branches
-            - task_key: bronze_channels
-            - task_key: bronze_merchant_categories
-            - task_key: bronze_dispute_reason_codes
-            - task_key: bronze_fraud_types
-            - task_key: bronze_case_status_types
-            - task_key: bronze_customers
-            - task_key: bronze_employees
-            - task_key: bronze_accounts
-            - task_key: bronze_cards
-            - task_key: bronze_merchants
-            - task_key: bronze_transactions
-            - task_key: bronze_auth_attempts
-            - task_key: bronze_transaction_devices
-            - task_key: bronze_disputes
-            - task_key: bronze_chargebacks
-            - task_key: bronze_fraud_alerts
-            - task_key: bronze_investigation_cases
-            - task_key: bronze_investigation_notes
-            - task_key: bronze_case_transactions
-            - task_key: bronze_case_parties
-            - task_key: bronze_customer_contact_logs
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/validation/validate_m1_bronze
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: dq_setup
-          depends_on:
-            - task_key: validate_m1_bronze
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/dq/dq_01_setup
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: dq_load_rules
-          depends_on:
-            - task_key: dq_setup
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/dq/dq_02_load_dq_rules
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: dq_failures
-          depends_on:
-            - task_key: dq_load_rules
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/dq/dq_03_failures_all_rules
-            source: WORKSPACE
-          environment_key: Default
-
-        # =====================================================================
-        # SILVER LAYER (CLEANED, TYPED & GOVERNED TASKS)
-        # =====================================================================
-        - task_key: silver_date_dim
-          depends_on:
-            - task_key: dq_failures
-            - task_key: bronze_date_dim
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_date_dim
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: silver_defects_manifest
-          depends_on:
-            - task_key: dq_failures
-            - task_key: bronze_defects_manifest
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_defects_manifest
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: silver_countries
-          depends_on:
-            - task_key: dq_failures
-            - task_key: bronze_countries
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_countries
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: silver_currencies
-          depends_on:
-            - task_key: dq_failures
-            - task_key: bronze_currencies
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_currencies
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: silver_branches
-          depends_on:
-            - task_key: dq_failures
-            - task_key: bronze_branches
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_branches
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: silver_channels
-          depends_on:
-            - task_key: dq_failures
-            - task_key: bronze_channels
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_channels
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: silver_merchant_categories
-          depends_on:
-            - task_key: dq_failures
-            - task_key: bronze_merchant_categories
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_merchant_categories
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: silver_dispute_reason_codes
-          depends_on:
-            - task_key: dq_failures
-            - task_key: bronze_dispute_reason_codes
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_dispute_reason_codes
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: silver_fraud_types
-          depends_on:
-            - task_key: dq_failures
-            - task_key: bronze_fraud_types
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_fraud_types
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: silver_case_status_types
-          depends_on:
-            - task_key: dq_failures
-            - task_key: bronze_case_status_types
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_case_status_types
-            source: WORKSPACE
-          environment_key: Default
-
+        - task_key: bronze_date_dim
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_date_dim
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: silver_defects_manifest
+        depends_on:
+        - task_key: validate_m1_bronze
+        - task_key: bronze_defects_manifest
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_defects_manifest
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: silver_countries
+        depends_on:
+        - task_key: validate_m1_bronze
+        - task_key: bronze_countries
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_countries
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: silver_currencies
+        depends_on:
+        - task_key: validate_m1_bronze
+        - task_key: bronze_currencies
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_currencies
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: silver_branches
+        depends_on:
+        - task_key: validate_m1_bronze
+        - task_key: bronze_branches
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_branches
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: silver_channels
+        depends_on:
+        - task_key: validate_m1_bronze
+        - task_key: bronze_channels
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_channels
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: silver_merchant_categories
+        depends_on:
+        - task_key: validate_m1_bronze
+        - task_key: bronze_merchant_categories
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_merchant_categories
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: silver_dispute_reason_codes
+        depends_on:
+        - task_key: validate_m1_bronze
+        - task_key: bronze_dispute_reason_codes
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_dispute_reason_codes
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: silver_fraud_types
+        depends_on:
+        - task_key: validate_m1_bronze
+        - task_key: bronze_fraud_types
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_fraud_types
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: silver_case_status_types
+        depends_on:
+        - task_key: validate_m1_bronze
+        - task_key: bronze_case_status_types
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_case_status_types
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: silver_customers
+        depends_on:
+        - task_key: validate_m1_bronze
+        - task_key: bronze_customers
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_customers
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: silver_employees
+        depends_on:
+        - task_key: validate_m1_bronze
+        - task_key: bronze_employees
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_employees
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: silver_accounts
+        depends_on:
+        - task_key: validate_m1_bronze
+        - task_key: bronze_accounts
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_accounts
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: silver_cards
+        depends_on:
+        - task_key: validate_m1_bronze
+        - task_key: bronze_cards
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_cards
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: silver_merchants
+        depends_on:
+        - task_key: validate_m1_bronze
+        - task_key: bronze_merchants
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_merchants
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: silver_masking_policies
+        depends_on:
+        - task_key: validate_m1_bronze
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_masking_policies
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: silver_metadata_lineage
+        depends_on:
+        - task_key: validate_m1_bronze
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_metadata_lineage
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: silver_transactions
+        depends_on:
+        - task_key: validate_m1_bronze
+        - task_key: bronze_transactions
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_transactions
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: silver_auth_attempts
+        depends_on:
+        - task_key: validate_m1_bronze
+        - task_key: bronze_auth_attempts
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_auth_attempts
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: silver_transaction_devices
+        depends_on:
+        - task_key: validate_m1_bronze
+        - task_key: bronze_transaction_devices
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_transaction_devices
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: silver_disputes
+        depends_on:
+        - task_key: validate_m1_bronze
+        - task_key: bronze_disputes
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_disputes
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: silver_chargebacks
+        depends_on:
+        - task_key: validate_m1_bronze
+        - task_key: bronze_chargebacks
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_chargebacks
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: silver_fraud_alerts
+        depends_on:
+        - task_key: validate_m1_bronze
+        - task_key: bronze_fraud_alerts
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_fraud_alerts
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: silver_investigation_cases
+        depends_on:
+        - task_key: validate_m1_bronze
+        - task_key: bronze_investigation_cases
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_investigation_cases
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: silver_investigation_notes
+        depends_on:
+        - task_key: validate_m1_bronze
+        - task_key: bronze_investigation_notes
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_investigation_notes
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: silver_case_transactions
+        depends_on:
+        - task_key: validate_m1_bronze
+        - task_key: bronze_case_transactions
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_case_transactions
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: silver_case_parties
+        depends_on:
+        - task_key: validate_m1_bronze
+        - task_key: bronze_case_parties
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_case_parties
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: silver_customer_contact_logs
+        depends_on:
+        - task_key: validate_m1_bronze
+        - task_key: bronze_customer_contact_logs
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_customer_contact_logs
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: validate_m2_silver
+        depends_on:
         - task_key: silver_customers
-          depends_on:
-            - task_key: dq_failures
-            - task_key: bronze_customers
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_customers
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: silver_employees
-          depends_on:
-            - task_key: dq_failures
-            - task_key: bronze_employees
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_employees
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: silver_accounts
-          depends_on:
-            - task_key: dq_failures
-            - task_key: bronze_accounts
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_accounts
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: silver_cards
-          depends_on:
-            - task_key: dq_failures
-            - task_key: bronze_cards
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_cards
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: silver_merchants
-          depends_on:
-            - task_key: dq_failures
-            - task_key: bronze_merchants
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_merchants
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: silver_masking_policies
-          depends_on:
-            - task_key: dq_failures
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_masking_policies
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: silver_metadata_lineage
-          depends_on:
-            - task_key: dq_failures
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_metadata_lineage
-            source: WORKSPACE
-          environment_key: Default
-
         - task_key: silver_transactions
-          depends_on:
-            - task_key: dq_failures
-            - task_key: bronze_transactions
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_transactions
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: silver_auth_attempts
-          depends_on:
-            - task_key: dq_failures
-            - task_key: bronze_auth_attempts
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_auth_attempts
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: silver_transaction_devices
-          depends_on:
-            - task_key: dq_failures
-            - task_key: bronze_transaction_devices
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_transaction_devices
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: silver_disputes
-          depends_on:
-            - task_key: dq_failures
-            - task_key: bronze_disputes
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_disputes
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: silver_chargebacks
-          depends_on:
-            - task_key: dq_failures
-            - task_key: bronze_chargebacks
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_chargebacks
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: silver_fraud_alerts
-          depends_on:
-            - task_key: dq_failures
-            - task_key: bronze_fraud_alerts
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_fraud_alerts
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: silver_investigation_cases
-          depends_on:
-            - task_key: dq_failures
-            - task_key: bronze_investigation_cases
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_investigation_cases
-            source: WORKSPACE
-          environment_key: Default
-
-        - task_key: silver_investigation_notes
-          depends_on:
-            - task_key: dq_failures
-            - task_key: bronze_investigation_notes
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_investigation_notes
-            source: WORKSPACE
-          environment_key: Default
-
+        - task_key: silver_branches
+        - task_key: silver_fraud_types
+        - task_key: silver_date_dim
         - task_key: silver_case_transactions
-          depends_on:
-            - task_key: dq_failures
-            - task_key: bronze_case_transactions
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_case_transactions
-            source: WORKSPACE
-          environment_key: Default
-
+        - task_key: silver_investigation_cases
         - task_key: silver_case_parties
-          depends_on:
-            - task_key: dq_failures
-            - task_key: bronze_case_parties
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_case_parties
-            source: WORKSPACE
-          environment_key: Default
-
+        - task_key: silver_defects_manifest
+        - task_key: silver_cards
+        - task_key: silver_countries
+        - task_key: silver_disputes
+        - task_key: silver_accounts
+        - task_key: silver_employees
+        - task_key: silver_merchant_categories
+        - task_key: silver_chargebacks
+        - task_key: silver_masking_policies
+        - task_key: silver_investigation_notes
+        - task_key: silver_transaction_devices
+        - task_key: silver_fraud_alerts
+        - task_key: silver_merchants
+        - task_key: silver_channels
+        - task_key: silver_currencies
+        - task_key: silver_metadata_lineage
+        - task_key: silver_case_status_types
         - task_key: silver_customer_contact_logs
-          depends_on:
-            - task_key: dq_failures
-            - task_key: bronze_customer_contact_logs
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/silver/silver_customer_contact_logs
-            source: WORKSPACE
-          environment_key: Default
-
-        # =====================================================================
-        # SILVER VALIDATION GATE
-        # =====================================================================
-        - task_key: validate_m2_dq
-          depends_on:
-            - task_key: silver_date_dim
-            - task_key: silver_defects_manifest
-            - task_key: silver_countries
-            - task_key: silver_currencies
-            - task_key: silver_branches
-            - task_key: silver_channels
-            - task_key: silver_merchant_categories
-            - task_key: silver_dispute_reason_codes
-            - task_key: silver_fraud_types
-            - task_key: silver_case_status_types
-            - task_key: silver_customers
-            - task_key: silver_employees
-            - task_key: silver_accounts
-            - task_key: silver_cards
-            - task_key: silver_merchants
-            - task_key: silver_masking_policies
-            - task_key: silver_metadata_lineage
-            - task_key: silver_transactions
-            - task_key: silver_auth_attempts
-            - task_key: silver_transaction_devices
-            - task_key: silver_disputes
-            - task_key: silver_chargebacks
-            - task_key: silver_fraud_alerts
-            - task_key: silver_investigation_cases
-            - task_key: silver_investigation_notes
-            - task_key: silver_case_transactions
-            - task_key: silver_case_parties
-            - task_key: silver_customer_contact_logs
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/validation/validate_m2_dq
-            source: WORKSPACE
-          environment_key: Default
-
-        # =====================================================================
-        # GOLD LAYER (CURATED & AI-READY TASKS)
-        # =====================================================================
-        - task_key: dim_date
-          depends_on:
-            - task_key: validate_m2_dq
-            - task_key: silver_date_dim
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/dim_date
-            source: WORKSPACE
-            base_parameters:
-              catalog: "{{job.parameters.catalog}}"
-          environment_key: Default
-
-        - task_key: dim_merchant
-          depends_on:
-            - task_key: validate_m2_dq
-            - task_key: silver_merchants
-            - task_key: silver_merchant_categories
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/dim_merchant
-            source: WORKSPACE
-            base_parameters:
-              catalog: "{{job.parameters.catalog}}"
-          environment_key: Default
-
-        - task_key: dim_channel
-          depends_on:
-            - task_key: validate_m2_dq
-            - task_key: silver_channels
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/dim_channel
-            source: WORKSPACE
-            base_parameters:
-              catalog: "{{job.parameters.catalog}}"
-          environment_key: Default
-
-        - task_key: dim_dispute_reason
-          depends_on:
-            - task_key: validate_m2_dq
-            - task_key: silver_dispute_reason_codes
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/dim_dispute_reason
-            source: WORKSPACE
-            base_parameters:
-              catalog: "{{job.parameters.catalog}}"
-          environment_key: Default
-
-        - task_key: dim_currency
-          depends_on:
-            - task_key: validate_m2_dq
-            - task_key: silver_currencies
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/dim_currency
-            source: WORKSPACE
-            base_parameters:
-              catalog: "{{job.parameters.catalog}}"
-          environment_key: Default
-
-        - task_key: fact_case_transaction
-          depends_on:
-            - task_key: validate_m2_dq
-            - task_key: silver_investigation_cases
-            - task_key: silver_case_transactions
-            - task_key: silver_transactions
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/fact_case_transaction
-            source: WORKSPACE
-            base_parameters:
-              catalog: "{{job.parameters.catalog}}"
-          environment_key: Default
-
-        - task_key: fact_authorization_attempt
-          depends_on:
-            - task_key: validate_m2_dq
-            - task_key: silver_auth_attempts
-            - task_key: silver_case_transactions
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/fact_authorization_attempt
-            source: WORKSPACE
-            base_parameters:
-              catalog: "{{job.parameters.catalog}}"
-          environment_key: Default
-
+        - task_key: silver_auth_attempts
+        - task_key: silver_dispute_reason_codes
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/validation/validate_m2_silver
+          source: WORKSPACE
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+        environment_key: Default
+      - task_key: dim_date
+        depends_on:
+        - task_key: validate_m2_silver
+        - task_key: silver_date_dim
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/dim_date
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+          source: WORKSPACE
+        environment_key: Default
+      - task_key: dim_merchant
+        depends_on:
+        - task_key: validate_m2_silver
+        - task_key: silver_merchants
+        - task_key: silver_merchant_categories
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/dim_merchant
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+          source: WORKSPACE
+        environment_key: Default
+      - task_key: dim_channel
+        depends_on:
+        - task_key: validate_m2_silver
+        - task_key: silver_channels
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/dim_channel
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+          source: WORKSPACE
+        environment_key: Default
+      - task_key: dim_dispute_reason
+        depends_on:
+        - task_key: validate_m2_silver
+        - task_key: silver_dispute_reason_codes
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/dim_dispute_reason
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+          source: WORKSPACE
+        environment_key: Default
+      - task_key: dim_currency
+        depends_on:
+        - task_key: validate_m2_silver
+        - task_key: silver_currencies
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/dim_currency
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+          source: WORKSPACE
+        environment_key: Default
+      - task_key: fact_case_transaction
+        depends_on:
+        - task_key: validate_m2_silver
+        - task_key: silver_investigation_cases
+        - task_key: silver_case_transactions
+        - task_key: silver_transactions
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/fact_case_transaction
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+          source: WORKSPACE
+        environment_key: Default
+      - task_key: fact_authorization_attempt
+        depends_on:
+        - task_key: validate_m2_silver
+        - task_key: silver_auth_attempts
+        - task_key: silver_case_transactions
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/fact_authorization_attempt
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+          source: WORKSPACE
+        environment_key: Default
+      - task_key: fact_dispute
+        depends_on:
+        - task_key: validate_m2_silver
+        - task_key: silver_disputes
+        - task_key: silver_case_transactions
+        - task_key: silver_transactions
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/fact_dispute
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+          source: WORKSPACE
+        environment_key: Default
+      - task_key: fact_chargeback
+        depends_on:
+        - task_key: validate_m2_silver
+        - task_key: silver_chargebacks
         - task_key: fact_dispute
-          depends_on:
-            - task_key: validate_m2_dq
-            - task_key: silver_disputes
-            - task_key: silver_case_transactions
-            - task_key: silver_transactions
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/fact_dispute
-            source: WORKSPACE
-            base_parameters:
-              catalog: "{{job.parameters.catalog}}"
-          environment_key: Default
-
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/fact_chargeback
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+          source: WORKSPACE
+        environment_key: Default
+      - task_key: fact_fraud_alert
+        depends_on:
+        - task_key: validate_m2_silver
+        - task_key: silver_fraud_alerts
+        - task_key: silver_case_transactions
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/fact_fraud_alert
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+          source: WORKSPACE
+        environment_key: Default
+      - task_key: fact_investigation_note
+        depends_on:
+        - task_key: validate_m2_silver
+        - task_key: silver_investigation_notes
+        - task_key: silver_investigation_cases
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/fact_investigation_note
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+          source: WORKSPACE
+        environment_key: Default
+      - task_key: fact_case_party_summary
+        depends_on:
+        - task_key: validate_m2_silver
+        - task_key: silver_case_parties
+        - task_key: silver_investigation_cases
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/fact_case_party_summary
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+          source: WORKSPACE
+        environment_key: Default
+      - task_key: dim_case
+        depends_on:
+        - task_key: fact_case_transaction
+        - task_key: silver_fraud_types
+        - task_key: silver_investigation_cases
+        - task_key: validate_m2_silver
+        - task_key: silver_case_status_types
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/dim_case
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+          source: WORKSPACE
+        environment_key: Default
+      - task_key: validate_m3_gold
+        depends_on:
+        - task_key: fact_case_transaction
         - task_key: fact_chargeback
-          depends_on:
-            - task_key: validate_m2_dq
-            - task_key: silver_chargebacks
-            - task_key: fact_dispute
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/fact_chargeback
-            source: WORKSPACE
-            base_parameters:
-              catalog: "{{job.parameters.catalog}}"
-          environment_key: Default
-
-        - task_key: fact_fraud_alert
-          depends_on:
-            - task_key: validate_m2_dq
-            - task_key: silver_fraud_alerts
-            - task_key: silver_case_transactions
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/fact_fraud_alert
-            source: WORKSPACE
-            base_parameters:
-              catalog: "{{job.parameters.catalog}}"
-          environment_key: Default
-
+        - task_key: dim_currency
         - task_key: fact_investigation_note
-          depends_on:
-            - task_key: validate_m2_dq
-            - task_key: silver_investigation_notes
-            - task_key: silver_investigation_cases
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/fact_investigation_note
-            source: WORKSPACE
-            base_parameters:
-              catalog: "{{job.parameters.catalog}}"
-          environment_key: Default
-
+        - task_key: dim_merchant
+        - task_key: fact_dispute
         - task_key: fact_case_party_summary
-          depends_on:
-            - task_key: validate_m2_dq
-            - task_key: silver_case_parties
-            - task_key: silver_investigation_cases
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/fact_case_party_summary
-            source: WORKSPACE
-            base_parameters:
-              catalog: "{{job.parameters.catalog}}"
-          environment_key: Default
-
+        - task_key: dim_channel
+        - task_key: dim_dispute_reason
+        - task_key: dim_date
+        - task_key: fact_authorization_attempt
+        - task_key: fact_fraud_alert
         - task_key: dim_case
-          depends_on:
-            - task_key: validate_m2_dq
-            - task_key: silver_investigation_cases
-            - task_key: silver_case_status_types
-            - task_key: silver_fraud_types
-            - task_key: fact_case_transaction
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/dim_case
-            source: WORKSPACE
-            base_parameters:
-              catalog: "{{job.parameters.catalog}}"
-          environment_key: Default
-
-        - task_key: investigation_context
-          depends_on:
-            - task_key: dim_case
-            - task_key: dim_merchant
-            - task_key: dim_channel
-            - task_key: fact_case_transaction
-            - task_key: fact_authorization_attempt
-            - task_key: fact_dispute
-            - task_key: fact_chargeback
-            - task_key: fact_fraud_alert
-            - task_key: fact_investigation_note
-            - task_key: fact_case_party_summary
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/investigation_context
-            source: WORKSPACE
-            base_parameters:
-              catalog: "{{job.parameters.catalog}}"
-          environment_key: Default
-
-        # =====================================================================
-        # FINAL M3 GOLD ACCEPTANCE VALIDATION
-        # =====================================================================
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/validation/validate_m3_gold
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+          source: WORKSPACE
+        environment_key: Default
+      - task_key: investigation_context
+        depends_on:
         - task_key: validate_m3_gold
-          depends_on:
-            - task_key: investigation_context
-          notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/validation/validate_m3_gold
-            source: WORKSPACE
-            base_parameters:
-              catalog: "{{job.parameters.catalog}}"
-          environment_key: Default
+        notebook_task:
+          notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/investigation_context
+          base_parameters:
+            catalog: '{{job.parameters.catalog}}'
+          source: WORKSPACE
+        environment_key: Default
       queue:
         enabled: true
+      parameters:
+      - name: catalog
+        default: g3_test
       environments:
-        - environment_key: Default
-          spec:
-            environment_version: "5"
+      - environment_key: Default
+        spec:
+          environment_version: '5'
       performance_target: PERFORMANCE_OPTIMIZED

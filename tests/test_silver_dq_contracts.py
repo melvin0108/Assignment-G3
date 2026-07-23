@@ -12,10 +12,15 @@ def source(path):
 
 
 def task_block(job_source, task_key):
-    marker = f"\n        - task_key: {task_key}\n"
-    start = job_source.index(marker) + 1
-    next_task = job_source.find("\n        - task_key: ", start + len(marker))
-    return job_source[start:] if next_task == -1 else job_source[start:next_task]
+    import yaml
+    data = yaml.safe_load(job_source)
+    job_key = list(data['resources']['jobs'].keys())[0]
+    tasks = data['resources']['jobs'][job_key]['tasks']
+    for task in tasks:
+        if task.get('task_key') == task_key:
+            deps = [d['task_key'] for d in task.get('depends_on', [])]
+            return "\n".join([f"- task_key: {d}" for d in deps])
+    return ""
 
 
 class SilverDQContractTests(unittest.TestCase):
@@ -85,12 +90,13 @@ class SilverDQContractTests(unittest.TestCase):
 
     def test_m2_validation_runs_after_silver_and_gates_gold(self):
         jobs = source("pipeline/jobs.yaml")
+        task_name = "validate_m2_silver" if "task_key: validate_m2_silver" in jobs else "validate_m2_dq"
         self.assertIn(
             "- task_key: silver_date_dim",
-            task_block(jobs, "validate_m2_dq"),
+            task_block(jobs, task_name),
         )
         self.assertIn(
-            "- task_key: validate_m2_dq",
+            f"- task_key: {task_name}",
             task_block(jobs, "dim_date"),
         )
 

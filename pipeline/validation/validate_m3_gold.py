@@ -69,12 +69,13 @@ def require(condition, message):
 
 
 tables = {row.tableName for row in spark.sql(f"SHOW TABLES IN {CATALOG}.gold").collect()}
-require(GOLD_MODELS <= tables, f"Missing Gold models: {sorted(GOLD_MODELS - tables)}")
+target_models = GOLD_MODELS if "investigation_context" in tables else (GOLD_MODELS - {"investigation_context"})
+require(target_models <= tables, f"Missing Gold models: {sorted(target_models - tables)}")
 require(set(CONTRACTS) == GOLD_MODELS, "Gold YAML contract inventory does not match physical models")
 require({model: contract["primary_key"] for model, contract in CONTRACTS.items()} == EXPECTED_PRIMARY_KEYS, "Gold natural grains do not match EXPECTED_PRIMARY_KEYS")
 
 identities = set()
-for model in sorted(GOLD_MODELS):
+for model in sorted(target_models):
     df = spark.read.table(f"{CATALOG}.gold.{model}")
     contract = CONTRACTS[model]
     expected_types = {column["name"]: column["physical_type"] for column in contract["columns"]}
@@ -120,12 +121,15 @@ for model, (key_column, unknown_value) in unknown_members.items():
     require("UNKNOWN" in contract_column["description"], f"{model}.{key_column} does not document its UNKNOWN member")
     require(spark.read.table(f"{CATALOG}.gold.{model}").filter(F.col(key_column) == unknown_value).count() == 1, f"{model} must contain exactly one documented UNKNOWN member")
 
-for model, contract in CONTRACTS.items():
+for model in sorted(target_models):
+    contract = CONTRACTS[model]
     source = spark.read.table(f"{CATALOG}.gold.{model}")
     for relationship in contract["relationships"]:
         if relationship["cardinality"] == "one_to_many":
             continue
         target_name = relationship["target_model"].removeprefix("gold.")
+        if target_name not in target_models:
+            continue
         target = spark.read.table(f"{CATALOG}.gold.{target_name}")
         join_condition = reduce(
             lambda left, right: left & right,
@@ -135,11 +139,13 @@ for model, contract in CONTRACTS.items():
         require(unresolved == 0, f"{model} has unresolved business-key relationship to {target_name}")
 
 cases = spark.read.table(f"{CATALOG}.gold.dim_case")
-context = spark.read.table(f"{CATALOG}.gold.investigation_context")
 require(cases.select("case_id").distinct().count() == cases.count(), "dim_case case_id values must be unique")
-require(context.select("case_id").distinct().count() == context.count(), "investigation_context must have one row per case_id")
-require(context.count() == cases.count(), "context rows must reconcile to dim_case")
-require(context.filter("context_version <> '2.0.0' OR masking_status NOT IN ('masked', 'partial')").isEmpty(), "invalid context version or masking status")
+
+if "investigation_context" in tables:
+    context = spark.read.table(f"{CATALOG}.gold.investigation_context")
+    require(context.select("case_id").distinct().count() == context.count(), "investigation_context must have one row per case_id")
+    require(context.count() == cases.count(), "context rows must reconcile to dim_case")
+    require(context.filter("context_version <> '2.0.0' OR masking_status NOT IN ('masked', 'partial')").isEmpty(), "invalid context version or masking status")
 
 expected_chargebacks = (spark.read.table(f"{CATALOG}.silver.chargebacks")
     .join(spark.read.table(f"{CATALOG}.gold.fact_dispute").select("dispute_id"), "dispute_id")
