@@ -1,0 +1,15 @@
+schema_version: "1.0.0"
+dataset: branches
+layer: source_to_silver
+source: data/raw/branches.csv
+purpose: "Mock source dataset for branches."
+grain: "one row per branche"
+primary_key: ["branch_code"]
+contractual_type_layer: silver
+failure_handling: {default_disposition: quarantined, destination: silver.quarantine_records}
+fields:
+  - {name: "branch_code", type: "string", required: true, example: "BR-01", classification: "internal", rules: []}
+  - {name: "name", type: "string", required: true, example: "example", classification: "internal", rules: []}
+  - {name: "country", type: "string", required: true, example: "example", classification: "internal", rules: [], references: "countries.iso_code"}
+  - {name: "region", type: "string", required: true, example: "example", classification: "internal", rules: []}
+  - {name: "status", type: "string", required: true, example: "example", classification: "internal", rules: []}

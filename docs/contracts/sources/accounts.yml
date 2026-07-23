@@ -1,0 +1,16 @@
+schema_version: "1.0.0"
+dataset: accounts
+layer: source_to_silver
+source: data/raw/accounts.csv
+purpose: "Mock source dataset for accounts."
+grain: "one row per account"
+primary_key: ["account_id"]
+contractual_type_layer: silver
+failure_handling: {default_disposition: quarantined, destination: silver.quarantine_records}
+fields:
+  - {name: "account_id", type: "string", required: true, example: "ACC-0001", classification: "internal", rules: []}
+  - {name: "customer_id", type: "string", required: true, example: "CUST-0001", classification: "internal", rules: ["DQ-ACC-CUST-FK"], references: "customers.customer_id"}
+  - {name: "product_type", type: "string", required: true, example: "Everyday", classification: "internal", rules: [], accepted_values: ["Everyday", "Savings", "Credit", "Debit"]}
+  - {name: "open_date", type: "date", required: true, example: "2026-07-06", classification: "internal", rules: ["DQ-ACC-OPENDATE-FUTURE", "DQ-ACC-OPENDATE-TYPE"]}
+  - {name: "status", type: "string", required: true, example: "active", classification: "internal", rules: [], accepted_values: ["active", "dormant", "closed", "frozen"]}
+  - {name: "currency", type: "string", required: true, example: "example", classification: "internal", rules: []}

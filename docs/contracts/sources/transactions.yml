@@ -1,0 +1,19 @@
+schema_version: "1.0.0"
+dataset: transactions
+layer: source_to_silver
+source: data/raw/transactions.csv
+purpose: "Mock source dataset for transactions."
+grain: "one row per transaction"
+primary_key: ["transaction_id"]
+contractual_type_layer: silver
+failure_handling: {default_disposition: quarantined, destination: silver.quarantine_records}
+fields:
+  - {name: "transaction_id", type: "string", required: true, example: "TXN-000001", classification: "internal", rules: ["DQ-TXN-ID-DUP"]}
+  - {name: "account_id", type: "string", required: true, example: "ACC-0001", classification: "internal", rules: ["DQ-TXN-ACCT-FK"], references: "accounts.account_id"}
+  - {name: "card_id", type: "string", required: true, example: "CARD-0001", classification: "internal", rules: ["DQ-TXN-CARD-ACTIVE", "DQ-TXN-CARD-FK"], references: "cards.card_id"}
+  - {name: "merchant_id", type: "string", required: true, example: "MCH-0001", classification: "internal", rules: ["DQ-TXN-MERCH-REQ", "DQ-TXN-MERCH-FK"], references: "merchants.merchant_id"}
+  - {name: "channel", type: "string", required: true, example: "example", classification: "internal", rules: [], references: "channels.channel_code"}
+  - {name: "amount", type: "decimal(18,2)", required: true, example: "100.00", classification: "internal", rules: ["DQ-TXN-AMT-POS", "DQ-TXN-AMOUNT-TYPE"]}
+  - {name: "currency", type: "string", required: true, example: "example", classification: "internal", rules: [], references: "currencies.currency_code"}
+  - {name: "txn_ts", type: "timestamp", required: true, example: "2026-07-06T10:00:00Z", classification: "internal", rules: ["DQ-TXN-TS-FUTURE", "DQ-TXN-TS-TYPE"]}
+  - {name: "status", type: "string", required: true, example: "authorized", classification: "internal", rules: [], accepted_values: ["authorized", "settled", "declined", "reversed", "refunded"]}

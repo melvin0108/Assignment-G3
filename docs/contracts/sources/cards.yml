@@ -1,0 +1,17 @@
+schema_version: "1.0.0"
+dataset: cards
+layer: source_to_silver
+source: data/raw/cards.csv
+purpose: "Mock source dataset for cards."
+grain: "one row per card"
+primary_key: ["card_id"]
+contractual_type_layer: silver
+failure_handling: {default_disposition: quarantined, destination: silver.quarantine_records}
+fields:
+  - {name: "card_id", type: "string", required: true, example: "CARD-0001", classification: "internal", rules: ["DQ-CARD-DUP"]}
+  - {name: "account_id", type: "string", required: true, example: "ACC-0001", classification: "internal", rules: ["DQ-CARD-ACCT-FK"], references: "accounts.account_id"}
+  - {name: "card_type", type: "string", required: true, example: "debit", classification: "internal", rules: [], accepted_values: ["debit", "credit"]}
+  - {name: "pan", type: "string", required: true, example: "example", classification: "payment_card", rules: []}
+  - {name: "expiry", type: "string", required: true, example: "example", classification: "internal", rules: ["DQ-CARD-EXPIRED-ACTIVE"]}
+  - {name: "status", type: "string", required: true, example: "active", classification: "internal", rules: [], accepted_values: ["active", "blocked", "expired", "closed"]}
+  - {name: "effective_at", type: "timestamp", required: true, example: "2026-07-06T10:00:00Z", classification: "internal", rules: []}

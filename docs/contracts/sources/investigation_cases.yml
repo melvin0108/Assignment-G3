@@ -1,0 +1,18 @@
+schema_version: "1.0.0"
+dataset: investigation_cases
+layer: source_to_silver
+source: data/raw/investigation_cases.csv
+purpose: "Mock source dataset for investigation cases."
+grain: "one row per investigation_case"
+primary_key: ["case_id"]
+contractual_type_layer: silver
+failure_handling: {default_disposition: quarantined, destination: silver.quarantine_records}
+fields:
+  - {name: "case_id", type: "string", required: true, example: "CASE-0001", classification: "internal", rules: []}
+  - {name: "priority", type: "string", required: true, example: "low", classification: "internal", rules: [], accepted_values: ["low", "medium", "high", "critical"]}
+  - {name: "status_code", type: "string", required: true, example: "example", classification: "internal", rules: ["DQ-CASE-STATUS-ENUM"], references: "case_status_types.status_code"}
+  - {name: "fraud_type_code", type: "string", required: true, example: "example", classification: "internal", rules: [], references: "fraud_types.fraud_type_code"}
+  - {name: "owner_employee_id", type: "string", required: true, example: "example", classification: "internal", rules: [], references: "employees.employee_id"}
+  - {name: "opened_at", type: "timestamp", required: true, example: "2026-07-06T10:00:00Z", classification: "internal", rules: ["DQ-CASE-STALE", "DQ-CASE-OPENED-TYPE"]}
+  - {name: "closed_at", type: "timestamp", required: false, example: "2026-07-06T10:00:00Z", classification: "internal", rules: ["DQ-CASE-CLOSED-TYPE"]}
+  - {name: "legal_hold", type: "boolean", required: true, example: true, classification: "restricted", rules: ["DQ-CASE-LEGALHOLD", "DQ-CASE-LEGALHOLD-TYPE"]}

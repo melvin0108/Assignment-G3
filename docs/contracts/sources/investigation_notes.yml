@@ -1,0 +1,15 @@
+schema_version: "1.0.0"
+dataset: investigation_notes
+layer: source_to_silver
+source: data/raw/investigation_notes.csv
+purpose: "Mock source dataset for investigation notes."
+grain: "one row per investigation_note"
+primary_key: ["note_id"]
+contractual_type_layer: silver
+failure_handling: {default_disposition: quarantined, destination: silver.quarantine_records}
+fields:
+  - {name: "note_id", type: "string", required: true, example: "NOTE-0001", classification: "internal", rules: []}
+  - {name: "case_id", type: "string", required: true, example: "CASE-0001", classification: "internal", rules: ["DQ-NOTE-CASE-FK"], references: "investigation_cases.case_id"}
+  - {name: "author_employee_id", type: "string", required: true, example: "example", classification: "internal", rules: ["DQ-NOTE-EMP-FK"], references: "employees.employee_id"}
+  - {name: "note_text", type: "string", required: true, example: "example", classification: "sensitive_free_text", rules: ["DQ-NOTE-PII-LEAK"]}
+  - {name: "created_at", type: "timestamp", required: true, example: "2026-07-06T10:00:00Z", classification: "internal", rules: ["DQ-NOTE-CREATED-TYPE"]}

@@ -1,0 +1,18 @@
+schema_version: "1.0.0"
+dataset: customer_contact_logs
+layer: source_to_silver
+source: data/raw/customer_contact_logs.csv
+purpose: "Mock source dataset for customer contact logs."
+grain: "one row per customer_contact_log"
+primary_key: ["contact_id"]
+contractual_type_layer: silver
+failure_handling: {default_disposition: quarantined, destination: silver.quarantine_records}
+fields:
+  - {name: "contact_id", type: "string", required: true, example: "CTL-0001", classification: "internal", rules: []}
+  - {name: "customer_id", type: "string", required: true, example: "CUST-0001", classification: "internal", rules: ["DQ-CTL-CUST-FK"], references: "customers.customer_id"}
+  - {name: "direction", type: "string", required: true, example: "inbound", classification: "internal", rules: [], accepted_values: ["inbound", "outbound"]}
+  - {name: "contact_method", type: "string", required: true, example: "phone", classification: "internal", rules: [], accepted_values: ["phone", "email", "sms", "post"]}
+  - {name: "do_not_contact", type: "boolean", required: true, example: true, classification: "internal", rules: ["DQ-CTL-DNC-TYPE", "DQ-CTL-DNC-VIOLATION"]}
+  - {name: "contacted_at", type: "timestamp", required: true, example: "2026-07-06T10:00:00Z", classification: "internal", rules: ["DQ-CTL-CONTACTED-TYPE"]}
+  - {name: "employee_id", type: "string", required: true, example: "EMP-0001", classification: "internal", rules: ["DQ-CTL-EMP-FK"], references: "employees.employee_id"}
+  - {name: "note", type: "string", required: true, example: "example", classification: "sensitive_free_text", rules: ["DQ-CTL-NOTE-PII"]}

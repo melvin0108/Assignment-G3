@@ -1,0 +1,13 @@
+schema_version: "1.0.0"
+dataset: case_transactions
+layer: source_to_silver
+source: data/raw/case_transactions.csv
+purpose: "Mock source dataset for case transactions."
+grain: "one row per case-to-transaction link"
+primary_key: ["case_id", "transaction_id"]
+contractual_type_layer: silver
+failure_handling: {default_disposition: quarantined, destination: silver.quarantine_records}
+fields:
+  - {name: "case_id", type: "string", required: true, example: "CASE-0001", classification: "internal", rules: ["DQ-CASETXN-CASE-FK"], references: "investigation_cases.case_id"}
+  - {name: "transaction_id", type: "string", required: true, example: "TXN-000001", classification: "internal", rules: ["DQ-CASETXN-TXN-FK"], references: "transactions.transaction_id"}
+  - {name: "linked_at", type: "timestamp", required: true, example: "2026-07-06T10:00:00Z", classification: "internal", rules: ["DQ-CASETXN-LINKED-TYPE"]}

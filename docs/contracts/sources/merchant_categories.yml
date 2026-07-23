@@ -1,0 +1,13 @@
+schema_version: "1.0.0"
+dataset: merchant_categories
+layer: source_to_silver
+source: data/raw/merchant_categories.csv
+purpose: "Mock source dataset for merchant categories."
+grain: "one row per merchant_categorie"
+primary_key: ["mcc"]
+contractual_type_layer: silver
+failure_handling: {default_disposition: quarantined, destination: silver.quarantine_records}
+fields:
+  - {name: "mcc", type: "string", required: true, example: "example", classification: "internal", rules: []}
+  - {name: "category_name", type: "string", required: true, example: "example", classification: "internal", rules: []}
+  - {name: "category_group", type: "string", required: true, example: "example", classification: "internal", rules: []}

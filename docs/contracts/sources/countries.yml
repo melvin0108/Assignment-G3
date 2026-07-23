@@ -1,0 +1,13 @@
+schema_version: "1.0.0"
+dataset: countries
+layer: source_to_silver
+source: data/raw/countries.csv
+purpose: "Mock source dataset for countries."
+grain: "one row per countrie"
+primary_key: ["iso_code"]
+contractual_type_layer: silver
+failure_handling: {default_disposition: quarantined, destination: silver.quarantine_records}
+fields:
+  - {name: "iso_code", type: "string", required: true, example: "example", classification: "internal", rules: []}
+  - {name: "name", type: "string", required: true, example: "example", classification: "internal", rules: []}
+  - {name: "region", type: "string", required: true, example: "example", classification: "internal", rules: []}

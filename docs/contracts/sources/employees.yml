@@ -1,0 +1,15 @@
+schema_version: "1.0.0"
+dataset: employees
+layer: source_to_silver
+source: data/raw/employees.csv
+purpose: "Mock source dataset for employees."
+grain: "one row per employee"
+primary_key: ["employee_id"]
+contractual_type_layer: silver
+failure_handling: {default_disposition: quarantined, destination: silver.quarantine_records}
+fields:
+  - {name: "employee_id", type: "string", required: true, example: "EMP-0001", classification: "internal", rules: []}
+  - {name: "full_name", type: "string", required: true, example: "example", classification: "staff_identifier", rules: []}
+  - {name: "email", type: "string", required: true, example: "example", classification: "staff_identifier", rules: []}
+  - {name: "team", type: "string", required: true, example: "example", classification: "internal", rules: []}
+  - {name: "role", type: "string", required: true, example: "example", classification: "internal", rules: []}

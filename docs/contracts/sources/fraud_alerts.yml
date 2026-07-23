@@ -1,0 +1,16 @@
+schema_version: "1.0.0"
+dataset: fraud_alerts
+layer: source_to_silver
+source: data/raw/fraud_alerts.csv
+purpose: "Mock source dataset for fraud alerts."
+grain: "one row per fraud_alert"
+primary_key: ["alert_id"]
+contractual_type_layer: silver
+failure_handling: {default_disposition: quarantined, destination: silver.quarantine_records}
+fields:
+  - {name: "alert_id", type: "string", required: true, example: "ALT-0001", classification: "internal", rules: []}
+  - {name: "transaction_id", type: "string", required: true, example: "TXN-000001", classification: "internal", rules: ["DQ-ALT-TXN-FK"], references: "transactions.transaction_id"}
+  - {name: "rule_name", type: "string", required: true, example: "example", classification: "internal", rules: []}
+  - {name: "score", type: "double", required: true, example: "0.85", classification: "internal", rules: ["DQ-ALT-SCORE-RANGE", "DQ-ALT-SCORE-TYPE"]}
+  - {name: "triggered_at", type: "timestamp", required: true, example: "2026-07-06T10:00:00Z", classification: "internal", rules: ["DQ-ALT-TRIGGERED-TYPE"]}
+  - {name: "disposition", type: "string", required: true, example: "open", classification: "internal", rules: [], accepted_values: ["open", "escalated_to_case", "dismissed", "true_positive", "false_positive"]}

@@ -1,0 +1,14 @@
+schema_version: "1.0.0"
+dataset: case_parties
+layer: source_to_silver
+source: data/raw/case_parties.csv
+purpose: "Mock source dataset for case parties."
+grain: "one row per case-to-party link"
+primary_key: ["case_id", "party_type", "party_id"]
+contractual_type_layer: silver
+failure_handling: {default_disposition: quarantined, destination: silver.quarantine_records}
+fields:
+  - {name: "case_id", type: "string", required: true, example: "CASE-0001", classification: "internal", rules: ["DQ-CASEPARTY-CASE-FK"], references: "investigation_cases.case_id"}
+  - {name: "party_type", type: "string", required: true, example: "customer", classification: "internal", rules: ["DQ-CASEPARTY-TYPE-ENUM"], accepted_values: ["customer", "merchant", "third_party"]}
+  - {name: "party_id", type: "string", required: true, example: "example", classification: "internal", rules: ["DQ-CASEPARTY-RESOLVE"]}
+  - {name: "role", type: "string", required: true, example: "subject", classification: "internal", rules: [], accepted_values: ["subject", "reporter", "witness", "merchant"]}

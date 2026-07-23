@@ -1,0 +1,12 @@
+schema_version: "1.0.0"
+dataset: channels
+layer: source_to_silver
+source: data/raw/channels.csv
+purpose: "Mock source dataset for channels."
+grain: "one row per channel"
+primary_key: ["channel_code"]
+contractual_type_layer: silver
+failure_handling: {default_disposition: quarantined, destination: silver.quarantine_records}
+fields:
+  - {name: "channel_code", type: "string", required: true, example: "example", classification: "internal", rules: []}
+  - {name: "channel_name", type: "string", required: true, example: "example", classification: "internal", rules: []}

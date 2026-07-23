@@ -1,0 +1,15 @@
+schema_version: "1.0.0"
+dataset: date_dim
+layer: source_to_silver
+source: data/raw/date_dim.csv
+purpose: "Mock source dataset for date dim."
+grain: "one row per calendar day"
+primary_key: ["date_id"]
+contractual_type_layer: silver
+failure_handling: {default_disposition: quarantined, destination: silver.quarantine_records}
+fields:
+  - {name: "date_id", type: "date", required: true, example: "20260706", classification: "internal", rules: ["DQ-DATE-ID-TYPE"]}
+  - {name: "year", type: "integer", required: true, example: 2, classification: "internal", rules: ["DQ-DATE-YEAR-TYPE"]}
+  - {name: "month", type: "integer", required: true, example: 2, classification: "internal", rules: ["DQ-DATE-MONTH-TYPE"]}
+  - {name: "quarter", type: "integer", required: true, example: 2, classification: "internal", rules: ["DQ-DATE-QUARTER-TYPE"]}
+  - {name: "is_weekend", type: "boolean", required: true, example: true, classification: "internal", rules: ["DQ-DATE-WEEKEND-TYPE"]}

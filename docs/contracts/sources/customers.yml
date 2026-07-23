@@ -1,0 +1,20 @@
+schema_version: "1.0.0"
+dataset: customers
+layer: source_to_silver
+source: data/raw/customers.csv
+purpose: "Mock source dataset for customers."
+grain: "one row per customer"
+primary_key: ["customer_id"]
+contractual_type_layer: silver
+failure_handling: {default_disposition: quarantined, destination: silver.quarantine_records}
+fields:
+  - {name: "customer_id", type: "string", required: true, example: "CUST-0001", classification: "internal", rules: ["DQ-CUST-ID-DUP", "DQ-CUST-NEAR-DUP"]}
+  - {name: "first_name", type: "string", required: true, example: "example", classification: "direct_identifier", rules: []}
+  - {name: "last_name", type: "string", required: true, example: "example", classification: "direct_identifier", rules: []}
+  - {name: "dob", type: "date", required: true, example: "2026-07-06", classification: "sensitive", rules: ["DQ-CUST-DOB-TYPE"]}
+  - {name: "email", type: "string", required: false, example: "example", classification: "contact", rules: ["DQ-CUST-EMAIL-FMT"]}
+  - {name: "phone", type: "string", required: false, example: "example", classification: "contact", rules: []}
+  - {name: "address", type: "string", required: false, example: "example", classification: "sensitive", rules: []}
+  - {name: "tax_id", type: "string", required: false, example: "example", classification: "sensitive", rules: []}
+  - {name: "created_at", type: "timestamp", required: true, example: "2026-07-06T10:00:00Z", classification: "internal", rules: ["DQ-CUST-CREATED-TYPE"]}
+  - {name: "effective_at", type: "timestamp", required: true, example: "2026-07-06T10:00:00Z", classification: "internal", rules: []}

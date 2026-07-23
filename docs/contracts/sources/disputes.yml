@@ -1,0 +1,16 @@
+schema_version: "1.0.0"
+dataset: disputes
+layer: source_to_silver
+source: data/raw/disputes.csv
+purpose: "Mock source dataset for disputes."
+grain: "one row per dispute"
+primary_key: ["dispute_id"]
+contractual_type_layer: silver
+failure_handling: {default_disposition: quarantined, destination: silver.quarantine_records}
+fields:
+  - {name: "dispute_id", type: "string", required: true, example: "DSP-0001", classification: "internal", rules: []}
+  - {name: "transaction_id", type: "string", required: true, example: "TXN-000001", classification: "internal", rules: ["DQ-DISP-TXN-FK"], references: "transactions.transaction_id"}
+  - {name: "reason_code", type: "string", required: true, example: "example", classification: "internal", rules: ["DQ-DISP-REASON-REQ"], references: "dispute_reason_codes.reason_code"}
+  - {name: "amount", type: "decimal(18,2)", required: true, example: "100.00", classification: "internal", rules: ["DQ-DISP-AMOUNT-TYPE"]}
+  - {name: "status", type: "string", required: true, example: "open", classification: "internal", rules: ["DQ-DISP-STATUS-ENUM"], accepted_values: ["open", "in_review", "resolved", "rejected", "withdrawn"]}
+  - {name: "raised_at", type: "timestamp", required: true, example: "2026-07-06T10:00:00Z", classification: "internal", rules: ["DQ-DISP-RAISED-TYPE"]}

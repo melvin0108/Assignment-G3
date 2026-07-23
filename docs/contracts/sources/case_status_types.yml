@@ -1,0 +1,12 @@
+schema_version: "1.0.0"
+dataset: case_status_types
+layer: source_to_silver
+source: data/raw/case_status_types.csv
+purpose: "Mock source dataset for case status types."
+grain: "one row per case_status_type"
+primary_key: ["status_code"]
+contractual_type_layer: silver
+failure_handling: {default_disposition: quarantined, destination: silver.quarantine_records}
+fields:
+  - {name: "status_code", type: "string", required: true, example: "example", classification: "internal", rules: []}
+  - {name: "description", type: "string", required: true, example: "example", classification: "internal", rules: []}

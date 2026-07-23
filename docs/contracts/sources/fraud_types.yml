@@ -1,0 +1,13 @@
+schema_version: "1.0.0"
+dataset: fraud_types
+layer: source_to_silver
+source: data/raw/fraud_types.csv
+purpose: "Mock source dataset for fraud types."
+grain: "one row per fraud_type"
+primary_key: ["fraud_type_code"]
+contractual_type_layer: silver
+failure_handling: {default_disposition: quarantined, destination: silver.quarantine_records}
+fields:
+  - {name: "fraud_type_code", type: "string", required: true, example: "example", classification: "internal", rules: []}
+  - {name: "description", type: "string", required: true, example: "example", classification: "internal", rules: []}
+  - {name: "severity", type: "string", required: true, example: "example", classification: "internal", rules: []}

@@ -1,0 +1,16 @@
+schema_version: "1.0.0"
+dataset: chargebacks
+layer: source_to_silver
+source: data/raw/chargebacks.csv
+purpose: "Mock source dataset for chargebacks."
+grain: "one row per chargeback"
+primary_key: ["chargeback_id"]
+contractual_type_layer: silver
+failure_handling: {default_disposition: quarantined, destination: silver.quarantine_records}
+fields:
+  - {name: "chargeback_id", type: "string", required: true, example: "CBK-0001", classification: "internal", rules: []}
+  - {name: "dispute_id", type: "string", required: true, example: "DSP-0001", classification: "internal", rules: ["DQ-CBK-DISP-FK"], references: "disputes.dispute_id"}
+  - {name: "scheme", type: "string", required: true, example: "example", classification: "internal", rules: []}
+  - {name: "amount", type: "decimal(18,2)", required: true, example: "100.00", classification: "internal", rules: ["DQ-CBK-AMOUNT-TYPE"]}
+  - {name: "stage", type: "string", required: true, example: "example", classification: "internal", rules: []}
+  - {name: "processed_at", type: "timestamp", required: true, example: "2026-07-06T10:00:00Z", classification: "internal", rules: ["DQ-CBK-PROCESSED-TYPE"]}

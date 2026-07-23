@@ -1,0 +1,15 @@
+schema_version: "1.0.0"
+dataset: auth_attempts
+layer: source_to_silver
+source: data/raw/auth_attempts.csv
+purpose: "Mock source dataset for auth attempts."
+grain: "one row per auth_attempt"
+primary_key: ["attempt_id"]
+contractual_type_layer: silver
+failure_handling: {default_disposition: quarantined, destination: silver.quarantine_records}
+fields:
+  - {name: "attempt_id", type: "string", required: true, example: "AUTH-000001", classification: "internal", rules: []}
+  - {name: "transaction_id", type: "string", required: true, example: "TXN-000001", classification: "internal", rules: ["DQ-AUTH-TXN-FK"], references: "transactions.transaction_id"}
+  - {name: "decision", type: "string", required: true, example: "approved", classification: "internal", rules: [], accepted_values: ["approved", "declined"]}
+  - {name: "decline_reason", type: "string", required: false, example: "example", classification: "internal", rules: []}
+  - {name: "auth_ts", type: "string", required: true, example: "example", classification: "internal", rules: ["DQ-AUTH-TS-ORDER", "DQ-AUTH-TS-TYPE"]}

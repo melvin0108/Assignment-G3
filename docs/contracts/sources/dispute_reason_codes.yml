@@ -1,0 +1,12 @@
+schema_version: "1.0.0"
+dataset: dispute_reason_codes
+layer: source_to_silver
+source: data/raw/dispute_reason_codes.csv
+purpose: "Mock source dataset for dispute reason codes."
+grain: "one row per dispute_reason_code"
+primary_key: ["reason_code"]
+contractual_type_layer: silver
+failure_handling: {default_disposition: quarantined, destination: silver.quarantine_records}
+fields:
+  - {name: "reason_code", type: "string", required: true, example: "example", classification: "internal", rules: []}
+  - {name: "description", type: "string", required: true, example: "example", classification: "internal", rules: []}

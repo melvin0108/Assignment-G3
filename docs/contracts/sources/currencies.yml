@@ -1,0 +1,13 @@
+schema_version: "1.0.0"
+dataset: currencies
+layer: source_to_silver
+source: data/raw/currencies.csv
+purpose: "Mock source dataset for currencies."
+grain: "one row per currencie"
+primary_key: ["currency_code"]
+contractual_type_layer: silver
+failure_handling: {default_disposition: quarantined, destination: silver.quarantine_records}
+fields:
+  - {name: "currency_code", type: "string", required: true, example: "example", classification: "internal", rules: []}
+  - {name: "name", type: "string", required: true, example: "example", classification: "internal", rules: []}
+  - {name: "decimals", type: "integer", required: true, example: 2, classification: "internal", rules: ["DQ-CURR-DECIMALS-TYPE"]}

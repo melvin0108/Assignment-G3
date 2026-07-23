@@ -1,0 +1,15 @@
+schema_version: "1.0.0"
+dataset: transaction_devices
+layer: source_to_silver
+source: data/raw/transaction_devices.csv
+purpose: "Mock source dataset for transaction devices."
+grain: "one row per transaction_device"
+primary_key: ["device_id"]
+contractual_type_layer: silver
+failure_handling: {default_disposition: quarantined, destination: silver.quarantine_records}
+fields:
+  - {name: "device_id", type: "string", required: true, example: "DEV-000001", classification: "device_identifier", rules: []}
+  - {name: "transaction_id", type: "string", required: true, example: "TXN-000001", classification: "internal", rules: ["DQ-DEV-TXN-FK"], references: "transactions.transaction_id"}
+  - {name: "device_type", type: "string", required: true, example: "example", classification: "internal", rules: ["DQ-DEV-TYPE-REQ"]}
+  - {name: "ip", type: "string", required: true, example: "example", classification: "network_identifier", rules: []}
+  - {name: "geo_country", type: "string", required: true, example: "example", classification: "internal", rules: [], references: "countries.iso_code"}
