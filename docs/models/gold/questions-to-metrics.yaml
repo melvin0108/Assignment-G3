@@ -23,27 +23,73 @@ patterns:
     primary_table: gold.dim_case
     supporting_tables: [gold.dim_date]
 
+  - id: case_closure_trends
+    intent: case_closure_trends
+    query_mode: analytics
+    examples:
+      vi: ["Có bao nhiêu hồ sơ đã đóng theo tháng?", "Xu hướng đóng hồ sơ theo mức ưu tiên là gì?"]
+      en: ["How many cases were closed each month?", "Show closure trends by case priority"]
+    keywords:
+      vi: ["đóng", "hoàn tất", "xu hướng"]
+      en: ["closed", "closure", "resolved", "trend"]
+    synonyms:
+      vi: ["hồ sơ hoàn thành", "hồ sơ đã xử lý"]
+      en: ["case completion", "resolved investigation"]
+    metric_ids: [case_count]
+    dimensions: [priority, status_code, fraud_type_code, closed_date_key]
+    filters:
+      - {dimension: priority, operators: [equals, in]}
+      - {dimension: status_code, operators: [equals, in]}
+      - {dimension: closed_date_key, operators: [between, equals]}
+    time_dimension: closed_date_key
+    primary_table: gold.dim_case
+    supporting_tables: [gold.dim_date]
+
   - id: transaction_activity
     intent: transaction_activity
     query_mode: analytics
     examples:
-      vi: ["Tổng số giao dịch và số tiền theo loại tiền là bao nhiêu?", "Giao dịch theo kênh và người bán"]
-      en: ["What are transaction count and amount by currency?", "Show transactions by channel and merchant"]
+      vi: ["Tổng số giao dịch và số tiền theo loại tiền là bao nhiêu?", "Giao dịch theo kênh và trạng thái"]
+      en: ["What are transaction count and amount by currency?", "Show transactions by channel and status"]
     keywords:
-      vi: [giao dịch, số tiền, kênh, người bán]
-      en: [transaction, amount, channel, merchant]
+      vi: [giao dịch, số tiền, kênh, trạng thái]
+      en: [transaction, amount, channel, status]
     synonyms:
       vi: [hoạt động giao dịch, giá trị giao dịch]
       en: [transaction activity, transaction value]
     metric_ids: [transaction_count, transaction_amount_total, transaction_amount_average]
-    dimensions: [case_id, merchant_id, channel_code, currency_code, transaction_status, transaction_date_key]
+    dimensions: [case_id, channel_code, currency_code, transaction_status, transaction_date_key]
     filters:
       - {dimension: currency_code, operators: [equals, in]}
       - {dimension: channel_code, operators: [equals, in]}
       - {dimension: transaction_date_key, operators: [between, equals]}
     time_dimension: transaction_date_key
     primary_table: gold.fact_case_transaction
-    supporting_tables: [gold.dim_merchant, gold.dim_channel, gold.dim_currency, gold.dim_date]
+    supporting_tables: [gold.dim_channel, gold.dim_currency, gold.dim_date]
+
+  - id: merchant_risk_exposure
+    intent: merchant_risk_exposure
+    query_mode: analytics
+    examples:
+      vi: ["Tổng số tiền giao dịch theo mức rủi ro của người bán là bao nhiêu?", "Giao dịch theo danh mục người bán và quốc gia"]
+      en: ["What is the transaction amount by merchant risk rating?", "Show transactions by merchant category and country"]
+    keywords:
+      vi: ["người bán", "danh mục", "MCC", "rủi ro", "quốc gia"]
+      en: ["merchant", "category", "MCC", "risk", "country"]
+    synonyms:
+      vi: ["nhóm người bán", "rủi ro người bán"]
+      en: ["merchant exposure", "merchant classification"]
+    metric_ids: [transaction_count, transaction_amount_total, transaction_amount_average]
+    dimensions: [merchant_id, mcc, category_name, category_group, country, risk_rating, merchant_status, currency_code, transaction_date_key]
+    filters:
+      - {dimension: risk_rating, operators: [equals, in]}
+      - {dimension: category_group, operators: [equals, in]}
+      - {dimension: country, operators: [equals, in]}
+      - {dimension: currency_code, operators: [equals, in]}
+      - {dimension: transaction_date_key, operators: [between, equals]}
+    time_dimension: transaction_date_key
+    primary_table: gold.fact_case_transaction
+    supporting_tables: [gold.dim_merchant, gold.dim_currency, gold.dim_date]
 
   - id: authorization_outcomes
     intent: authorization_outcomes
