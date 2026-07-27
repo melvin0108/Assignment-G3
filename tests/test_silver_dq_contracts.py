@@ -24,10 +24,17 @@ def task_block(job_source, task_key):
 
 
 class SilverDQContractTests(unittest.TestCase):
-    def test_dq_quarantine_is_an_authoritative_silver_filter(self):
+    def test_blocking_quarantine_is_a_shared_silver_filter(self):
         snapshot = source("pipeline/silver/snapshot.py")
         self.assertIn("def exclude_dq_quarantined_rows", snapshot)
-        self.assertIn('F.col("run_id") == f"{run_id}-DQ"', snapshot)
+        self.assertIn(
+            'F.col("run_id").isin(run_id, f"{run_id}-DQ")',
+            snapshot,
+        )
+        self.assertIn(
+            'F.lower(F.col("disposition")).isin("quarantined", "rejected")',
+            snapshot,
+        )
         self.assertIn('how="left_anti"', snapshot)
 
         dq_filtered_tables = [
