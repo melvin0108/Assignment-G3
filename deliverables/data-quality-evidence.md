@@ -2,9 +2,9 @@
 
 ## Evidence status
 
-**Collected — validation passed with non-blocking warnings.**
+**Historical Batch 1 evidence — validation passed with non-blocking warnings.**
 
-This document records the Deliverable 5: Data Quality evidence produced by the Databricks validation run for the latest snapshot. The executable validation gate passed, while the manifest reconciliation reported differences that are disclosed below and must not be interpreted as perfect recall or precision.
+This document records Deliverable 5 Data Quality evidence produced by a Batch 1 Databricks validation run. The executable validation gate passed, while the manifest reconciliation reported differences that are disclosed below and must not be interpreted as perfect recall or precision. For inspectable generated inputs and outputs from the later observed Batch 2 snapshot, see [Generated output samples](generated-output-samples.md); that package explicitly records its own validation limitations.
 
 ## Evidence scope
 

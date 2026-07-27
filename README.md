@@ -38,6 +38,7 @@ behind this runbook:
 | [Mock data logic and data contract](deliverables/mock-data-logic-and-data-contract.md) | Source-dataset purposes, schemas, keys, relationships, sensitive-field classifications, and intentional quality defects. |
 | [Data pipeline](deliverables/data_pipeline.md) | Pipeline lineage and implementation walkthrough from mock sources through the governed AI-ready output. |
 | [Data quality evidence](deliverables/data-quality-evidence.md) | Validation summary, quarantine evidence, sample failures, and the documented handling of non-blocking warnings. |
+| [Generated output samples](deliverables/generated-output-samples.md) | Compact Batch 2 Bronze, defects-manifest, sanitized quarantine, and Silver table rows with provenance and reconciliation. |
 | [AI-ready context output](deliverables/ai-ready-context-output.md) | Approved retrieval output, access boundaries, metadata, traceability, and safe-use guidance. |
 
 ## Prerequisites

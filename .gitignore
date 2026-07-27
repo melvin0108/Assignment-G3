@@ -3,6 +3,8 @@
 __pycache__/
 data/raw/*.csv
 AGENTS.md
+AGENT.md
+tests/test_gold_contracts.py
 .claude
 CLAUDE.md
 README_dq.md
