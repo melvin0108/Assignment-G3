@@ -302,6 +302,95 @@ rules, and reports those differences as warnings.
 The manifest records injected issues, not every possible issue that random data
 might naturally create. One source row can also have more than one defect.
 
+#### Generated output samples
+
+The following deterministic examples show the expected CSV format. They use
+fixed IDs, values, and timestamps so they do not change between reviews. The
+examples deliberately contain normal and defective source rows. Defect metadata
+is not added to the source CSVs: the source schemas remain unchanged, and the
+separate manifest identifies the injected problems.
+
+| Source | Rows | Purpose | Primary key | Sensitive fields | Relationships |
+|---|---:|---|---|---|---|
+| `customers/customer01.csv` | 4 | Customer identity and contact source. | `customer_id` | Direct identifiers: `first_name`, `last_name`; sensitive: `dob`, `address`, `tax_id`; contact: `email`, `phone`. | One customer can own many accounts through `accounts.customer_id`. |
+| `accounts/account01.csv` | 5 | Customer account and product source. | `account_id` | No fields are classified as sensitive in the source contract; `customer_id` is an internal relationship key. | Many accounts can reference one `customers.customer_id`; one account can have many `transactions.account_id` rows. |
+| `transactions/transaction01.csv` | 5 | Payment activity source used for investigation. | `transaction_id` | No fields are classified as sensitive in the source contract; all are internal. | Each row references `accounts.account_id`; it also references `cards.card_id`, `merchants.merchant_id`, `channels.channel_code`, and `currencies.currency_code`. |
+| `defects_manifest/defects_manifest01.csv` | 3 | Expected-defect oracle for the three source samples. | `source_table`, `record_key`, `rule_id` | `failure_reason` can describe source values and must be handled as controlled quality evidence. | Each row points to the affected source row using `source_table` and its natural `record_key`. |
+
+##### Customers sample
+
+```csv
+customer_id,first_name,last_name,dob,email,phone,address,tax_id,created_at,effective_at
+CUST-0001,Ava,Nguyen,1992-04-18,ava.nguyen@example.test,+61400000001,"10 Sample Street, Melbourne VIC",100000001,2026-07-01T09:00:00Z,2026-07-01T09:00:00Z
+CUST-0002,Liam,Tran,1987-11-02,liam.tran@example.test,+61400000002,"20 Sample Street, Sydney NSW",100000002,2026-07-01T09:05:00Z,2026-07-01T09:05:00Z
+CUST-0003,Mia,Patel,1995-08-21,mia.patel@example.test,+61400000003,"30 Sample Street, Brisbane QLD",100000003,2026-07-01T09:10:00Z,2026-07-01T09:10:00Z
+CUST-0004,Noah,Smith,1979-01-30,invalid-email,+61400000004,"40 Sample Street, Perth WA",100000004,2026-07-01T09:15:00Z,2026-07-01T09:15:00Z
+```
+
+##### Accounts sample
+
+```csv
+account_id,customer_id,product_type,open_date,status,currency
+ACC-0001,CUST-0001,Everyday,2020-03-12,active,AUD
+ACC-0002,CUST-0001,Savings,2021-06-08,active,AUD
+ACC-0003,CUST-0002,Credit,2022-09-15,active,AUD
+ACC-0004,CUST-0003,Debit,2024-02-20,dormant,AUD
+ACC-0005,CUST-9999,Everyday,2025-05-10,active,AUD
+```
+
+##### Transactions sample
+
+```csv
+transaction_id,account_id,card_id,merchant_id,channel,amount,currency,txn_ts,status
+TXN-000001,ACC-0001,CARD-0001,MCH-0001,pos,42.50,AUD,2026-07-05T08:30:00Z,settled
+TXN-000002,ACC-0002,CARD-0002,MCH-0002,online,125.00,AUD,2026-07-05T10:15:00Z,authorized
+TXN-000003,ACC-0003,CARD-0003,MCH-0001,mobile,19.95,AUD,2026-07-06T01:20:00Z,settled
+TXN-000004,ACC-0004,CARD-0004,MCH-0003,atm,200.00,AUD,2026-07-06T03:45:00Z,authorized
+TXN-000005,ACC-0001,CARD-0001,MCH-0002,online,-25.00,AUD,2026-07-06T04:10:00Z,settled
+```
+
+##### Matching defects manifest sample
+
+```csv
+source_table,record_key,rule_id,rule_name,failure_reason,severity
+customers,CUST-0004,DQ-CUST-EMAIL-FMT,email must match pattern if present,email value 'invalid-email' is malformed,quarantine
+accounts,ACC-0005,DQ-ACC-CUST-FK,customer_id must exist in customers,customer_id CUST-9999 does not exist in customers,quarantine
+transactions,TXN-000005,DQ-TXN-AMT-POS,amount must be > 0,amount -25.00 is not greater than zero,quarantine
+```
+
+The full field definitions are in the existing [customers](#customers),
+[accounts](#accounts), and [transactions](#transactions) contracts below.
+`CARD-0001`–`CARD-0004`, `MCH-0001`–`MCH-0003`, and the channel and currency
+codes are representative valid companion keys. Their source rows are omitted
+to keep this review fixture small. Therefore, when testing only these three
+files, validate their schemas, their customer-to-account-to-transaction path,
+and the three manifest defects. Load the companion source datasets before
+enabling the card, merchant, channel, and currency relationship checks in a
+full pipeline run.
+
+To replace the fixture with Databricks data, export the same columns in the
+same order, retain CSV headers, preserve the table-first paths, and use one
+common batch suffix such as `01`. Do not copy the sample's invalid records into
+a production extract. If defects are intentionally seeded for a test batch,
+write one manifest row per expected rule failure using the six-column manifest
+schema shown above.
+
+#### Example quality problems
+
+The fixture has exactly one intentional failure in each source dataset and
+three corresponding manifest entries:
+
+| Source record | Intentional problem | Expected rule | Expected handling |
+|---|---|---|---|
+| `customers.CUST-0004` | `email` is `invalid-email`, which is not a valid email shape. | `DQ-CUST-EMAIL-FMT` | Quarantine the customer row. |
+| `accounts.ACC-0005` | `customer_id=CUST-9999` does not resolve to the customer sample. | `DQ-ACC-CUST-FK` | Quarantine the account row. |
+| `transactions.TXN-000005` | `amount=-25.00` violates the positive-amount rule. | `DQ-TXN-AMT-POS` | Quarantine the transaction row. |
+
+All other rows are valid within the three-file review scope. The manifest is a
+seeded-defect oracle, not a replacement for executing the DQ rules: additional
+issues in replacement data can still be detected even when they are absent
+from the manifest.
+
 ### 8. Transaction sampling and large files
 
 Transactions can reach 2 million rows, so the generator does not keep every
