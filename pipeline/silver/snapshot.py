@@ -76,15 +76,16 @@ def deduplicate_quarantine_rows(df):
 
 
 def exclude_dq_quarantined_rows(df, spark, catalog, source_table, run_id):
-    """Remove physical source rows rejected by the authoritative DQ stage."""
+    """Remove source rows blocked by the current Silver or authoritative DQ stage."""
     if "_source_record_id" not in df.columns:
         raise ValueError("Silver output is missing required _source_record_id metadata")
 
     rejected_source_rows = (
         spark.read.table(f"{catalog}.silver.quarantine_records")
         .filter(
-            (F.col("run_id") == f"{run_id}-DQ")
+            F.col("run_id").isin(run_id, f"{run_id}-DQ")
             & (F.col("source_table") == source_table)
+            & F.lower(F.col("disposition")).isin("quarantined", "rejected")
         )
         .select(F.col("source_record_id").alias("_source_record_id"))
         .distinct()
