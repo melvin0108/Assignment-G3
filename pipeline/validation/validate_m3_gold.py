@@ -1,3 +1,4 @@
+# Databricks notebook source
 """Acceptance validation for the Gold dimensional mart."""
 
 from functools import reduce
