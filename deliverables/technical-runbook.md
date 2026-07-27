@@ -24,7 +24,6 @@ The data is synthetic only. Do not use real customer, account, or NAB data.
 | `pipeline/silver/` | Type casting, quarantine filtering, masking, and lineage transformations. |
 | `pipeline/gold/` | Curated dimensions, facts, and the AI-ready `investigation_context` table. |
 | `pipeline/validation/` | Executable M1, M2, and M3 validation notebooks. |
-| `tests/` | Local source-contract tests. |
 | `docs/` | Requirements, source contracts, data dictionary, and Gold-model contracts. |
 | `pipeline/jobs.yaml` | Reference definition for the main Databricks job. Its notebook paths are workspace-specific, so do not deploy it unchanged to another user’s workspace. |
 | `deliverables/` | Submission-ready evidence and documentation samples. |
@@ -233,7 +232,7 @@ The `run-now` command waits for completion by default. Add `--no-wait` only
 when you intend to monitor the returned run ID separately. A run is successful
 only when its lifecycle state is terminal and its result state is `SUCCESS`.
 
-## Validation and local tests
+## Databricks validation checks
 
 The Databricks validation notebooks are part of the execution order. They are
 the main acceptance evidence:
@@ -248,15 +247,6 @@ the main acceptance evidence:
 Each validation notebook raises an exception for a blocking failure. Save its
 completed output. `validate_m2_dq.py` also prints a JSON summary with check
 counts, warnings, quarantined-record totals, and sample failures.
-
-You can also run the repository’s local source-contract tests. These do not run
-the Databricks pipeline; they validate the local implementation and mock-data
-contracts.
-
-```powershell
-python -m pip install -r requirements.txt
-python -m pytest tests
-```
 
 ## Outputs and inspection queries
 
