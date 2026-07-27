@@ -93,7 +93,7 @@ can bootstrap the initial Bronze data required by the rule registry:
 |---:|---|
 | 1 | `generate_mock_databricks.py` |
 | 2 | `pipeline/bronze/bronze_all_tables.py` |
-| 3 | `pipeline/validation/validate_m1_bronze.py` |
+| 3 | `pipeline/validation/validate_bronze.py` |
 | 4 | `pipeline/dq/dq_01_setup.py` |
 | 5 | `pipeline/dq/dq_02_load_dq_rules.py` |
 
@@ -107,13 +107,13 @@ parameter `catalog` to every task.
 | Order | Main-job task notebook |
 |---:|---|
 | 1 | `pipeline/bronze/bronze_all_tables.py` |
-| 2 | `pipeline/validation/validate_m1_bronze.py` |
+| 2 | `pipeline/validation/validate_bronze.py` |
 | 3 | `pipeline/dq/dq_03_failures_all_rules.py` |
 | 4 | `pipeline/silver/silver_all_tables.py` |
-| 5 | `pipeline/validation/validate_m2_dq.py` |
-| 6 | `pipeline/validation/validate_m2_silver.py` |
+| 5 | `pipeline/validation/validate_dq.py` |
+| 6 | `pipeline/validation/validate_silver.py` |
 | 7 | `pipeline/gold/gold_all_tables.py` |
-| 8 | `pipeline/validation/validate_m3_gold.py` |
+| 8 | `pipeline/validation/validate_gold.py` |
 
 For the **first** job-based execution, run **DQ Rules Setup** from **Jobs &
 Pipelines**, then run the main pipeline job from the same page. Later runs can
@@ -155,15 +155,15 @@ completion before starting the next one.
 |---:|---|---|
 | 1 | `generate_mock_databricks.py` | CSV source batch and `defects_manifest` under `/Volumes/<catalog>/bronze/raw_data/`. |
 | 2 | `pipeline/bronze/bronze_all_tables.py` | Raw source tables in `<catalog>.bronze`. |
-| 3 | `pipeline/validation/validate_m1_bronze.py` | Bronze validation completes with no blocking failures. |
+| 3 | `pipeline/validation/validate_bronze.py` | Bronze validation completes with no blocking failures. |
 | 4 | `pipeline/dq/dq_01_setup.py` | Governance and quarantine table structures exist. |
 | 5 | `pipeline/dq/dq_02_load_dq_rules.py` | Enabled rules are stored in `<catalog>.gov.dq_rules`. |
 | 6 | `pipeline/dq/dq_03_failures_all_rules.py` | Current-run failed records are written to quarantine. |
 | 7 | `pipeline/silver/silver_all_tables.py` | Clean, typed, protected Silver tables are created. |
-| 8 | `pipeline/validation/validate_m2_dq.py` | Blocking DQ checks pass; precision/recall differences can be warnings. |
-| 9 | `pipeline/validation/validate_m2_silver.py` | Silver validation completes with no blocking failures. |
+| 8 | `pipeline/validation/validate_dq.py` | Blocking DQ checks pass; precision/recall differences can be warnings. |
+| 9 | `pipeline/validation/validate_silver.py` | Silver validation completes with no blocking failures. |
 | 10 | `pipeline/gold/gold_all_tables.py` | Curated Gold models and investigation context are created. |
-| 11 | `pipeline/validation/validate_m3_gold.py` | Gold validation passes. |
+| 11 | `pipeline/validation/validate_gold.py` | Gold validation passes. |
 
 For a `.py` notebook, open it from the Git folder; Databricks recognises the
 `# Databricks notebook source` format. Select **Run all**. Do not copy an
