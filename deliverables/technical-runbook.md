@@ -23,7 +23,7 @@ The data is synthetic only. Do not use real customer, account, or NAB data.
 | `pipeline/dq/` | DQ-rule registry and failed-record quarantine processing. |
 | `pipeline/silver/` | Type casting, quarantine filtering, masking, and lineage transformations. |
 | `pipeline/gold/` | Curated dimensions, facts, and the AI-ready `investigation_context` table. |
-| `pipeline/validation/` | Executable M1, M2, and M3 validation notebooks. |
+| `pipeline/validation/` | Executable Bronze, DQ, Silver, and Gold validation notebooks. |
 | `docs/` | Requirements, source contracts, data dictionary, and Gold-model contracts. |
 | `pipeline/jobs.yaml` | Reference definition for the main Databricks job. Its notebook paths are workspace-specific, so do not deploy it unchanged to another user’s workspace. |
 | `deliverables/` | Submission-ready evidence and documentation samples. |
@@ -81,7 +81,7 @@ The workspace uses these job names:
 
 | Job | When to run it | Purpose |
 |---|---|---|
-| `DQ Rules Setup` | Once for the initial run in a catalog, and again only when DQ rules change or a new catalog is bootstrapped. | Generates mock data, bootstraps Bronze/M1, then creates the DQ structures and loads the enabled rule registry. |
+| `DQ Rules Setup` | Once for the initial run in a catalog, and again only when DQ rules change or a new catalog is bootstrapped. | Generates mock data, bootstraps Bronze, then creates the DQ structures and loads the enabled rule registry. |
 | `AI-ready transaction investigation context pipeline` | After DQ Rules Setup has succeeded; run again for each ordinary pipeline execution. | Runs the Bronze, DQ, Silver, Gold, and validation workflow to produce the AI-ready context. |
 
 For a new workspace, configure each job in **Jobs & Pipelines** to run
@@ -93,12 +93,12 @@ can bootstrap the initial Bronze data required by the rule registry:
 |---:|---|
 | 1 | `generate_mock_databricks.py` |
 | 2 | `pipeline/bronze/bronze_all_tables.py` |
-| 3 | `pipeline/validation/validate_m1_bronze.py` |
+| 3 | `pipeline/validation/validate_bronze.py` |
 | 4 | `pipeline/dq/dq_01_setup.py` |
 | 5 | `pipeline/dq/dq_02_load_dq_rules.py` |
 
 The main pipeline job must run `pipeline/dq/dq_03_failures_all_rules.py` after
-Bronze/M1 and before any Silver task. This rule evaluation is per source batch;
+Bronze validation and before any Silver task. This rule evaluation is per source batch;
 it is not replaced by the one-time rule-registry setup.
 
 Configure the main job with the following dependency order. Pass the job
@@ -107,13 +107,13 @@ parameter `catalog` to every task.
 | Order | Main-job task notebook |
 |---:|---|
 | 1 | `pipeline/bronze/bronze_all_tables.py` |
-| 2 | `pipeline/validation/validate_m1_bronze.py` |
+| 2 | `pipeline/validation/validate_bronze.py` |
 | 3 | `pipeline/dq/dq_03_failures_all_rules.py` |
 | 4 | `pipeline/silver/silver_all_tables.py` |
-| 5 | `pipeline/validation/validate_m2_dq.py` |
-| 6 | `pipeline/validation/validate_m2_silver.py` |
+| 5 | `pipeline/validation/validate_dq.py` |
+| 6 | `pipeline/validation/validate_silver.py` |
 | 7 | `pipeline/gold/gold_all_tables.py` |
-| 8 | `pipeline/validation/validate_m3_gold.py` |
+| 8 | `pipeline/validation/validate_gold.py` |
 
 For the **first** job-based execution, run **DQ Rules Setup** from **Jobs &
 Pipelines**, then run the main pipeline job from the same page. Later runs can
@@ -133,12 +133,12 @@ automatically.
 1. Go to **Jobs & Pipelines**.
 2. For the first run only, open **DQ Rules Setup**, select **Run now**, set
    `catalog` to `g3_dev`, and wait for a successful run. This job generates the
-   mock data, completes Bronze/M1, and loads the DQ rule registry.
+   mock data, completes Bronze validation, and loads the DQ rule registry.
 3. Open **AI-ready transaction investigation context pipeline**.
 4. Select **Run now**, set the job parameter `catalog` to `g3_dev`, and start
    the job.
-5. Open the run details and confirm that every task succeeds. Preserve the M1,
-   M2, and M3 validation output as execution evidence.
+5. Open the run details and confirm that every task succeeds. Preserve the
+   Bronze, DQ, Silver, and Gold validation output as execution evidence.
 
 The supplied screenshot shows where both persistent jobs appear: **Jobs &
 Pipelines**. A green tick means the displayed run completed; open the run for
@@ -155,15 +155,15 @@ completion before starting the next one.
 |---:|---|---|
 | 1 | `generate_mock_databricks.py` | CSV source batch and `defects_manifest` under `/Volumes/<catalog>/bronze/raw_data/`. |
 | 2 | `pipeline/bronze/bronze_all_tables.py` | Raw source tables in `<catalog>.bronze`. |
-| 3 | `pipeline/validation/validate_m1_bronze.py` | `PASS: M1 Bronze validation completed with no blocking failures.` |
+| 3 | `pipeline/validation/validate_bronze.py` | Bronze validation completes with no blocking failures. |
 | 4 | `pipeline/dq/dq_01_setup.py` | Governance and quarantine table structures exist. |
 | 5 | `pipeline/dq/dq_02_load_dq_rules.py` | Enabled rules are stored in `<catalog>.gov.dq_rules`. |
 | 6 | `pipeline/dq/dq_03_failures_all_rules.py` | Current-run failed records are written to quarantine. |
 | 7 | `pipeline/silver/silver_all_tables.py` | Clean, typed, protected Silver tables are created. |
-| 8 | `pipeline/validation/validate_m2_dq.py` | Blocking DQ checks pass; precision/recall differences can be warnings. |
-| 9 | `pipeline/validation/validate_m2_silver.py` | `PASS: M2 Silver validation completed with no blocking failures.` |
+| 8 | `pipeline/validation/validate_dq.py` | Blocking DQ checks pass; precision/recall differences can be warnings. |
+| 9 | `pipeline/validation/validate_silver.py` | Silver validation completes with no blocking failures. |
 | 10 | `pipeline/gold/gold_all_tables.py` | Curated Gold models and investigation context are created. |
-| 11 | `pipeline/validation/validate_m3_gold.py` | M3 Gold validation passes. |
+| 11 | `pipeline/validation/validate_gold.py` | Gold validation passes. |
 
 For a `.py` notebook, open it from the Git folder; Databricks recognises the
 `# Databricks notebook source` format. Select **Run all**. Do not copy an
@@ -239,13 +239,13 @@ the main acceptance evidence:
 
 | Check | Run after | Confirms |
 |---|---|---|
-| `validate_m1_bronze.py` | Bronze | Bronze tables, required metadata, lineage, contracts, and source checks. |
-| `validate_m2_dq.py` | DQ and Silver | Rule registry, quarantine records, and DQ-to-Silver handling. |
-| `validate_m2_silver.py` | Silver | Schema, integrity, business rules, masking, lineage, and Gold inputs. |
-| `validate_m3_gold.py` | Gold | Gold contracts, grains, AI policy, metadata, and relationships. |
+| Bronze validation notebook | Bronze | Bronze tables, required metadata, lineage, contracts, and source checks. |
+| DQ validation notebook | DQ | Rule registry, quarantine records, and DQ-to-Silver handling. |
+| Silver validation notebook | Silver | Schema, integrity, business rules, masking, lineage, and Gold inputs. |
+| Gold validation notebook | Gold | Gold contracts, grains, AI policy, metadata, and relationships. |
 
 Each validation notebook raises an exception for a blocking failure. Save its
-completed output. `validate_m2_dq.py` also prints a JSON summary with check
+completed output. The DQ validation notebook also prints a JSON summary with check
 counts, warnings, quarantined-record totals, and sample failures.
 
 ## Outputs and inspection queries
@@ -318,7 +318,7 @@ DQ rules change, run **DQ Rules Setup** again before the main pipeline job.
 | `ModuleNotFoundError` for `mock` or `pipeline` | Run the notebook from its cloned Git folder; do not move individual files. |
 | Catalog validation or permission error | Use the same supported catalog in every task and confirm access in Catalog Explorer. |
 | Bronze finds no source files | Confirm that **DQ Rules Setup** completed, then inspect `/Volumes/<catalog>/bronze/raw_data/`. In the manual fallback only, rerun `generate_mock_databricks.py`. |
-| `dq_02_load_dq_rules.py` cannot find `bronze.defects_manifest` | The Bronze/M1 tasks in **DQ Rules Setup** did not complete. Fix that job run, then rerun it. |
+| `dq_02_load_dq_rules.py` cannot find `bronze.defects_manifest` | The Bronze tasks in **DQ Rules Setup** did not complete. Fix that job run, then rerun it. |
 | DQ registry or quarantine table missing | Rerun **DQ Rules Setup** to create/load the registry. The main job creates current-batch quarantine records in its DQ task. |
 | Silver reports a snapshot mismatch | Rerun the main pipeline job. It runs Bronze, the current-batch DQ evaluation, then Silver in order. |
 | The generator stops after Faker installation | In the job flow, inspect the generator task and wait for its restart to finish. In the manual fallback, reconnect and select **Run all** again. |
@@ -333,10 +333,10 @@ it has no production scheduler, alerting, or operational-support model.
 ## Completion checklist
 
 - Mock source data and `defects_manifest` have been published.
-- M1 Bronze validation passes.
+- Bronze validation passes.
 - The DQ rule registry is loaded and the current batch has quarantine results.
-- M2 DQ and M2 Silver validations pass their blocking checks.
-- M3 Gold validation passes.
+- DQ and Silver validations pass their blocking checks.
+- Gold validation passes.
 - `<catalog>.gold.investigation_context` exists and contains only approved,
   AI-allowed context.
 
