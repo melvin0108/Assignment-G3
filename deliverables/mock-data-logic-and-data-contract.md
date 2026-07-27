@@ -17,8 +17,8 @@ validate, and join.
 
 The business story is:
 
-1. A customer owns one or more bank accounts.
-2. An account can have one or more cards.
+1. A customer may own one or more bank accounts.
+2. An account may have one or more cards.
 3. A card is used to make transactions with merchants.
 4. A transaction may have supporting evidence, such as an authorization attempt
    or device information.
@@ -48,7 +48,7 @@ Important business terms:
 | Bronze | The raw landing layer where source CSV values arrive first. |
 | Silver | The cleaned and validated layer used after Bronze. |
 | Quarantine | A holding area for records that fail data quality rules. |
-| SCD Type 2 | A way to keep history when a dimension changes, such as a customer address changing over time. ( Although the mock data includes SCD2-style changes, Silver uses SCD Type 1 for this use case: it keeps only the latest valid version of each customer, card, and merchant record.)|
+| SCD Type 2 | A way to keep history when a dimension changes, such as a customer address changing over time. ( Although the mock data includes SCD2-style changes, Silver uses SCD Type 1 for this use case: it keeps only the latest valid version of each customer, card, and merchant record.) |
 
 ### 2. Business flow represented by the data
 
@@ -65,12 +65,14 @@ flowchart TD
     G --> I[Case transactions linked]
     G --> J[Case parties linked]
     G --> K[Investigation notes written]
-    G --> L[Customer contact recorded]
+    G -.-> L[Customer contact may be recorded]
 ```
 
 This diagram explains the business idea. The code does not generate a perfect
 step-by-step timeline. Most tables are generated as source extracts, meaning
-they look like current records from upstream systems.
+they look like current records from upstream systems. `customer_contact_logs`
+has no `case_id`; its row count is derived from the case count, but it is linked
+only to customers and employees.
 
 ### 3. How the tables connect
 
@@ -127,14 +129,11 @@ case has a dispute.
 
 ### 4. How the mock data is created
 
-The generator lives in `mock/`. The local command is:
-
-```powershell
-python -m mock.generate
-```
-
-For Databricks, `generate_mock_databricks.py` calls the same generator and
-publishes the CSV files into the Bronze landing volume.
+The generator implementation lives in `mock/`, but this project runs it through
+the Databricks notebook `generate_mock_databricks.py`. The notebook installs
+Faker, reads its Databricks widgets, calls the generator in the workspace, and
+publishes CSV files directly into the Bronze landing volume. No local Python run
+or manual file upload is required.
 
 The generator follows this simple pattern:
 
@@ -151,23 +150,27 @@ The generator follows this simple pattern:
 7. Generate transaction and investigation tables using those stored IDs.
 8. Inject known bad records for data quality testing.
 9. Write one CSV file per table.
-10. Write `defects_manifest.csv`, which lists every intentionally injected bad
-    record.
+10. Write the defects manifest, which is published as
+    `defects_manifest/defects_manifest<NN>.csv` for the common batch number.
 
-Because the generator uses fixed seeds, the same inputs produce the same output.
-The default seed is `42`. The pinned business date is `2026-07-06`, so "future"
-and "stale" checks are measured from that date, not from the day the code runs.
+Because the generator uses fixed seeds, the same inputs produce the same
+baseline output. The default seed is `42`. The pinned business date is
+`2026-07-06`, so "future" and "stale" checks are measured from that date, not
+from the day the code runs. Later Databricks batches intentionally differ
+because they apply SCD changes to the preceding batch.
 
 ### 5. Dataset size and generation order
 
-The default baseline is large enough to test a real pipeline:
+The Databricks notebook defaults to a development-sized run of 200,000
+transactions. Setting its `transactions` widget to `2000000` produces the full
+assignment baseline shown below:
 
-| Dataset | Default size logic |
+| Dataset | Databricks size logic |
 |---|---:|
 | `customers` | 5,000 |
 | `employees` | 200 |
 | `merchants` | 2,000 |
-| `transactions` | 2,000,000 |
+| `transactions` | 200,000 by default in Databricks; 2,000,000 for the full baseline |
 | `accounts` | about 1.5 accounts per customer |
 | `cards` | about 1.2 cards per account |
 | `auth_attempts` | about 1.2 per transaction |
@@ -226,8 +229,8 @@ not a full stage-by-stage history.
 ### 7. Data quality test logic
 
 After clean rows are created, the generator deliberately changes some rows into
-bad rows. This is done so the Silver layer can prove it catches and quarantines
-bad data.
+bad rows. This exercises the DQ and Silver quarantine behavior without assuming
+that manifest reconciliation has perfect recall or precision.
 
 The default defect rate is `0.05`, or 5%. The actual count varies by rule
 because each defect type has its own weight. Examples of injected issues are:
@@ -249,15 +252,52 @@ because each defect type has its own weight. Examples of injected issues are:
 | Notes and contact logs | Free text contains synthetic sensitive data that should be masked or blocked. |
 | Case links and parties | Link points to a transaction that does not exist, or party type/party ID does not resolve correctly. |
 
-Every injected issue is logged in `defects_manifest.csv`:
+#### Dataset-level quality-problem coverage
+
+The assignment requires quality-problem documentation for every source dataset.
+The table below distinguishes deliberately seeded defects from clean reference
+datasets that are still covered by schema, type, or relationship validation.
+
+| Dataset | Example quality problem or explicit clean-data status |
+|---|---|
+| `customers` | Seeded empty email, duplicate `customer_id`, and duplicate identity attributes under a different ID. |
+| `accounts` | Seeded orphan `customer_id` and future `open_date`. |
+| `cards` | Seeded duplicate `card_id` and active card with an expired `expiry`. |
+| `merchants` | Seeded invalid `risk_rating` casing. |
+| `merchant_categories` | No dedicated seeded defect; generated as a clean MCC lookup and checked through downstream merchant references. |
+| `countries` | No dedicated seeded defect; generated as a clean ISO-like lookup and checked by merchant, branch, and device references. |
+| `currencies` | No dedicated seeded defect; `decimals` is protected by an integer cast check. |
+| `channels` | No dedicated seeded defect; generated as a clean lookup and checked through transaction references. |
+| `branches` | No dedicated seeded defect; generated as a clean lookup with country references. |
+| `date_dim` | No dedicated seeded defect; date, year, month, quarter, and weekend fields have executable type checks. |
+| `transactions` | Seeded duplicate ID, negative amount, missing merchant, orphan account/card, future timestamp, and use of a closed card. |
+| `auth_attempts` | Seeded orphan transaction and `auth_ts` later than the related transaction. |
+| `transaction_devices` | Seeded orphan transaction and missing `device_type`. |
+| `disputes` | Seeded orphan transaction, invalid status casing, and missing reason code. |
+| `dispute_reason_codes` | No dedicated seeded defect; generated as a clean lookup and checked through dispute references. |
+| `chargebacks` | Seeded orphan `dispute_id`; amount and timestamp casts are also validated. |
+| `fraud_alerts` | Seeded score outside `[0,1]`; transaction reference and runtime casts are also validated. |
+| `fraud_types` | No dedicated seeded defect; generated as a clean lookup and checked through case references. |
+| `investigation_cases` | Seeded invalid status, stale open case, and `legal_hold=true` AI exclusion. |
+| `case_status_types` | No dedicated seeded defect; generated as a clean lookup and checked through case status references. |
+| `employees` | Seeded duplicate email and duplicate/near-duplicate full name. |
+| `investigation_notes` | Seeded PII/PAN leakage and notes linked to legal-hold cases; case and employee references are validated. |
+| `case_transactions` | Seeded orphan transaction; case reference and `linked_at` cast are also validated. |
+| `case_parties` | Seeded invalid `party_type` and a `party_id` that does not resolve for its declared type. |
+| `customer_contact_logs` | Seeded do-not-contact violation and PII/PAN leakage; customer and employee references are validated. |
+
+Every injected issue is logged in the batch's `defects_manifest<NN>.csv`:
 
 ```text
 source_table, record_key, rule_id, rule_name, failure_reason, severity
 ```
 
-This manifest is the expected-answer file for data quality testing. If the
-generator says a transaction has a negative amount, the Silver quarantine logic
-should catch that same transaction.
+This manifest is the seeded-defect oracle used for data quality reconciliation.
+It is compared with the DQ quarantine by
+`pipeline/validation/validate_m2_dq.py`. The comparison is diagnostic rather
+than a perfect-recall or perfect-precision assertion: the current evidence
+contains both manifest keys missed by DQ and additional keys found by executable
+rules, and reports those differences as warnings.
 
 The manifest records injected issues, not every possible issue that random data
 might naturally create. One source row can also have more than one defect.
@@ -273,10 +313,10 @@ case links choose from this retained transaction sample. This keeps generation
 fast and memory-bounded, while still giving child tables realistic transaction
 references.
 
-### 9. SCD Type 2 snapshot logic
+### 9. SCD Type 2 batch logic
 
-SCD Type 2 means keeping history when an important descriptive record changes.
-In this mock data, only three dimensions have this history behavior:
+The Databricks generator models descriptive changes across complete numbered
+source batches. Only three dimensions have this change behavior:
 
 | Table | What can change | Business meaning |
 |---|---|---|
@@ -284,23 +324,31 @@ In this mock data, only three dimensions have this history behavior:
 | `cards` | `status` | Card lifecycle changed, such as active to blocked. |
 | `merchants` | `risk_rating` | Merchant risk was reassessed. |
 
-With `--snapshots 2` or more, the generator creates complete snapshot folders:
+Batch 01 is a complete baseline extract. Each later run receives the next common
+batch number, restores the complete preceding batch, changes a small number of
+clean customer, card, and merchant rows, and advances their `effective_at`
+values by the configured 30-day interval. Defective rows are excluded from SCD
+changes so the DQ and SCD manifests do not describe the same mutation.
+
+The batch layout is table-first:
 
 ```text
-snapshot_T0
-snapshot_T1
-snapshot_T2
+raw_data/
+  customers/customer01.csv
+  customers/customer02.csv
+  cards/card01.csv
+  cards/card02.csv
+  merchants/merchant01.csv
+  merchants/merchant02.csv
 ```
 
-Each later snapshot starts as a copy of the previous snapshot. Then the
-generator changes a small number of clean customer, card, and merchant rows and
-updates their `effective_at` date. Defective rows are excluded from SCD changes
-so the data quality manifest and the SCD history manifest do not describe the
-same problem.
-
-SCD changes are written to `scd_changes_manifest.csv`. This file is the
-expected-answer file for history testing, similar to how `defects_manifest.csv`
-is the expected-answer file for data quality testing.
+`scd_changes_manifest/scd_changes_manifest<NN>.csv` is cumulative and records
+the expected changes across batches. Bronze retains all newly ingested batch
+files with `_batch_id` and `_run_id` lineage. Silver reads only the maximum
+`_batch_id`, uses `effective_at` to resolve duplicate customer/card business
+keys, and overwrites its managed tables with the latest valid current state.
+This is current-state/SCD Type 1 publication rather than a Type 2 Silver history
+table.
 
 ### 10. Databricks generation
 
@@ -312,7 +360,7 @@ writes the result to:
 ```
 
 On the first batch, it generates new mock data. On later batches, it restores
-the previous batch and applies SCD changes. This means later batches are
+the preceding batch and applies SCD changes. Later batches are therefore
 complete source extracts with small customer, card, and merchant changes.
 
 Files are staged first and only published after generation succeeds. Published
@@ -322,6 +370,7 @@ files use one batch number across all tables, for example:
 customers/customer01.csv
 transactions/transaction01.csv
 defects_manifest/defects_manifest01.csv
+scd_changes_manifest/scd_changes_manifest01.csv
 ```
 
 For later batches, the notebook also repairs transaction account links so the
@@ -350,10 +399,22 @@ cards are left unchanged because they are intentional data quality test cases.
 ### 12. How to read the contracts
 
 There is one YAML contract per generated domain CSV under
-`docs/contracts/sources`. `mock.config.TABLE_SCHEMAS` is the source of truth for
-physical CSV column order, and the YAML files define the Source-to-Silver
-contract. Raw values land in Bronze as strings. Silver performs type coercion,
-validation, masking, and quarantine routing.
+`docs/contracts/sources`. The tables below are a reconciled human-readable view:
+`mock.config.TABLE_SCHEMAS` defines physical CSV column order, the YAML files
+provide requiredness, keys, classifications, and declared values, and the
+executable DQ registry and Silver notebooks define the runtime rules and casts.
+When a YAML declaration differs from executable behavior, this view reports the
+runtime behavior.
+
+Legacy local source paths from the YAML metadata are not used for execution or
+rendered as physical locations here. The deployed Databricks source pattern is
+`/Volumes/<catalog>/bronze/raw_data/<table>/<singular><NN>.csv`. `<NN>` is not
+an abbreviation; it is a placeholder for the common, zero-padded two-digit
+batch number (`01`, `02`, and so on). For example, the `case_transactions`
+dataset uses `case_transactions/case_transaction01.csv` in batch 01. Raw values
+land in Bronze as strings. Silver selects the newest batch, performs type
+coercion, validation, masking, and quarantine routing, then overwrites the
+current-state tables.
 
 All contracts below have schema version `1.0.0`, layer `source_to_silver`,
 contractual type layer `silver`, default failure disposition `quarantined`, and
@@ -363,11 +424,24 @@ Conventions:
 
 - **PK** is taken from the YAML `primary_key`.
 - **FK** is shown only when the YAML field declares `references`.
-- **â€”** means the YAML does not declare a reference, accepted-value list, or DQ
-  rule for that field.
-- Examples and even awkward grain wording are reproduced from the YAML rather
-  than silently corrected here.
+- **—** means no reference, declared accepted-value list, or executable DQ rule
+  applies to that field; unconstrained descriptive text remains governed by its
+  type and requiredness.
+- Readable patterns such as `CUST-<digits>`, `YYYY-MM-DD`, and
+  `####-####-####-####` describe the generated wire format rather than a
+  programming-language-specific regular expression.
+- Types are the declared or runtime cast types used during Bronze-to-Silver
+  processing, not necessarily the final representation after privacy
+  transformations.
+- Customer names are tokenized, date of birth becomes an age band, addresses
+  and tax IDs are hashed, emails and phones are masked, and card PANs retain only
+  their last four digits in Silver.
+- `customers.effective_at` and `cards.effective_at` select the latest version but
+  are not projected to final Silver; `merchants.effective_at` is retained.
 - Classification describes sensitivity and handling, not a data type.
+- Names, contacts, addresses, identifiers, and PANs shown in the Example column
+  are explicitly synthetic test values; they do not identify real people or
+  accounts.
 
 ### 13. Contract index
 
@@ -381,363 +455,363 @@ Conventions:
 
 ### customers
 
-Source: `data/raw/customers.csv`  
+Databricks source: `/Volumes/<catalog>/bronze/raw_data/customers/customer<NN>.csv`<br>
 Purpose: Mock source dataset for customers.  
 Grain: one row per customer  
 Primary key: `customer_id`
 
-| Field | Type | Required | Key / reference | Accepted values | Classification | DQ rules | Example |
+| Field | Type | Required | Key / reference | Accepted values / pattern | Classification | DQ rules | Example |
 |---|---|---:|---|---|---|---|---|
-| `customer_id` | string | yes | PK | â€” | internal | `DQ-CUST-ID-DUP`, `DQ-CUST-NEAR-DUP` | `CUST-0001` |
-| `first_name` | string | yes | â€” | â€” | direct_identifier | â€” | `example` |
-| `last_name` | string | yes | â€” | â€” | direct_identifier | â€” | `example` |
-| `dob` | date | yes | â€” | â€” | sensitive | `DQ-CUST-DOB-TYPE` | `2026-07-06` |
-| `email` | string | no | â€” | â€” | contact | `DQ-CUST-EMAIL-FMT` | `example` |
-| `phone` | string | no | â€” | â€” | contact | â€” | `example` |
-| `address` | string | no | â€” | â€” | sensitive | â€” | `example` |
-| `tax_id` | string | no | â€” | â€” | sensitive | â€” | `example` |
-| `created_at` | timestamp | yes | â€” | â€” | internal | `DQ-CUST-CREATED-TYPE` | `2026-07-06T10:00:00Z` |
-| `effective_at` | timestamp | yes | â€” | â€” | internal | â€” | `2026-07-06T10:00:00Z` |
+| `customer_id` | string | yes | PK | `CUST-<digits>` | internal | `DQ-CUST-ID-DUP`, `DQ-CUST-NEAR-DUP` | `CUST-0001` |
+| `first_name` | string | yes | — | non-empty text | direct_identifier | — | `Sample` |
+| `last_name` | string | yes | — | non-empty text | direct_identifier | — | `Customer` |
+| `dob` | date | yes | — | `YYYY-MM-DD` | sensitive | `DQ-CUST-DOB-TYPE` | `1990-05-20` |
+| `email` | string | no | — | `local@domain.tld` if present | contact | `DQ-CUST-EMAIL-FMT` | `sample.customer@example.test` |
+| `phone` | string | no | — | `+61` followed by 9 digits | contact | — | `+61400000000` |
+| `address` | string | no | — | free text if present | sensitive | — | `1 Example Street, Sampleville` |
+| `tax_id` | string | no | — | 9 digits if present | sensitive | — | `123456789` |
+| `created_at` | timestamp | yes | — | ISO-8601 timestamp | internal | `DQ-CUST-CREATED-TYPE` | `2026-07-06T10:00:00Z` |
+| `effective_at` | timestamp | yes | — | ISO-8601 timestamp | internal | — | `2026-07-06T10:00:00Z` |
 
 ### accounts
 
-Source: `data/raw/accounts.csv`  
+Databricks source: `/Volumes/<catalog>/bronze/raw_data/accounts/account<NN>.csv`<br>
 Purpose: Mock source dataset for accounts.  
 Grain: one row per account  
 Primary key: `account_id`
 
-| Field | Type | Required | Key / reference | Accepted values | Classification | DQ rules | Example |
+| Field | Type | Required | Key / reference | Accepted values / pattern | Classification | DQ rules | Example |
 |---|---|---:|---|---|---|---|---|
-| `account_id` | string | yes | PK | â€” | internal | â€” | `ACC-0001` |
-| `customer_id` | string | yes | FK â†’ `customers.customer_id` | â€” | internal | `DQ-ACC-CUST-FK` | `CUST-0001` |
-| `product_type` | string | yes | â€” | `Everyday`, `Savings`, `Credit`, `Debit` | internal | â€” | `Everyday` |
-| `open_date` | date | yes | â€” | â€” | internal | `DQ-ACC-OPENDATE-FUTURE`, `DQ-ACC-OPENDATE-TYPE` | `2026-07-06` |
-| `status` | string | yes | â€” | `active`, `dormant`, `closed`, `frozen` | internal | â€” | `active` |
-| `currency` | string | yes | â€” | â€” | internal | â€” | `example` |
+| `account_id` | string | yes | PK | `ACC-<digits>` | internal | — | `ACC-0001` |
+| `customer_id` | string | yes | FK → `customers.customer_id` | — | internal | `DQ-ACC-CUST-FK` | `CUST-0001` |
+| `product_type` | string | yes | — | `Everyday`, `Savings`, `Credit`, `Debit` | internal | — | `Everyday` |
+| `open_date` | date | yes | — | `YYYY-MM-DD`; not after `2026-07-06` | internal | `DQ-ACC-OPENDATE-FUTURE`, `DQ-ACC-OPENDATE-TYPE` | `2026-07-06` |
+| `status` | string | yes | — | `active`, `dormant`, `closed`, `frozen` | internal | — | `active` |
+| `currency` | string | yes | — | `AUD` | internal | — | `AUD` |
 
 ### cards
 
-Source: `data/raw/cards.csv`  
+Databricks source: `/Volumes/<catalog>/bronze/raw_data/cards/card<NN>.csv`<br>
 Purpose: Mock source dataset for cards.  
 Grain: one row per card  
 Primary key: `card_id`
 
-| Field | Type | Required | Key / reference | Accepted values | Classification | DQ rules | Example |
+| Field | Type | Required | Key / reference | Accepted values / pattern | Classification | DQ rules | Example |
 |---|---|---:|---|---|---|---|---|
-| `card_id` | string | yes | PK | â€” | internal | `DQ-CARD-DUP` | `CARD-0001` |
-| `account_id` | string | yes | FK â†’ `accounts.account_id` | â€” | internal | `DQ-CARD-ACCT-FK` | `ACC-0001` |
-| `card_type` | string | yes | â€” | `debit`, `credit` | internal | â€” | `debit` |
-| `pan` | string | yes | â€” | â€” | payment_card | â€” | `example` |
-| `expiry` | string | yes | â€” | â€” | internal | `DQ-CARD-EXPIRED-ACTIVE` | `example` |
-| `status` | string | yes | â€” | `active`, `blocked`, `expired`, `closed` | internal | â€” | `active` |
-| `effective_at` | timestamp | yes | â€” | â€” | internal | â€” | `2026-07-06T10:00:00Z` |
+| `card_id` | string | yes | PK | `CARD-<digits>` | internal | `DQ-CARD-DUP` | `CARD-0001` |
+| `account_id` | string | yes | FK → `accounts.account_id` | — | internal | `DQ-CARD-ACCT-FK` | `ACC-0001` |
+| `card_type` | string | yes | — | `debit`, `credit` | internal | — | `debit` |
+| `pan` | string | yes | — | `####-####-####-####` | payment_card | — | `4111-1111-1111-1111` |
+| `expiry` | string | yes | — | `YYYY-MM` | internal | `DQ-CARD-EXPIRED-ACTIVE` | `2028-12` |
+| `status` | string | yes | — | `active`, `blocked`, `expired`, `closed` | internal | — | `active` |
+| `effective_at` | timestamp | yes | — | ISO-8601 timestamp | internal | — | `2026-07-06T10:00:00Z` |
 
 ### merchants
 
-Source: `data/raw/merchants.csv`  
+Databricks source: `/Volumes/<catalog>/bronze/raw_data/merchants/merchant<NN>.csv`<br>
 Purpose: Mock source dataset for merchants.  
 Grain: one row per merchant  
 Primary key: `merchant_id`
 
-| Field | Type | Required | Key / reference | Accepted values | Classification | DQ rules | Example |
+| Field | Type | Required | Key / reference | Accepted values / pattern | Classification | DQ rules | Example |
 |---|---|---:|---|---|---|---|---|
-| `merchant_id` | string | yes | PK | â€” | internal | â€” | `MCH-0001` |
-| `name` | string | yes | â€” | â€” | internal | â€” | `example` |
-| `mcc` | string | yes | FK â†’ `merchant_categories.mcc` | â€” | internal | â€” | `example` |
-| `country` | string | yes | FK â†’ `countries.iso_code` | â€” | internal | â€” | `example` |
-| `risk_rating` | string | yes | â€” | `low`, `medium`, `high` | internal | `DQ-MERCH-RISK-CASING` | `low` |
-| `status` | string | yes | â€” | `active`, `suspended`, `closed` | internal | â€” | `active` |
-| `effective_at` | timestamp | yes | â€” | â€” | internal | `DQ-MERCH-EFFECTIVE-TYPE` | `2026-07-06T10:00:00Z` |
+| `merchant_id` | string | yes | PK | `MCH-<digits>` | internal | — | `MCH-0001` |
+| `name` | string | yes | — | — | internal | — | `Example Electronics` |
+| `mcc` | string | yes | FK → `merchant_categories.mcc` | — | internal | — | `5732` |
+| `country` | string | yes | FK → `countries.iso_code` | — | internal | — | `AU` |
+| `risk_rating` | string | yes | — | `low`, `medium`, `high` | internal | `DQ-MERCH-RISK-CASING` | `low` |
+| `status` | string | yes | — | `active`, `suspended`, `closed` | internal | — | `active` |
+| `effective_at` | timestamp | yes | — | ISO-8601 timestamp | internal | `DQ-MERCH-EFFECTIVE-TYPE` | `2026-07-06T10:00:00Z` |
 
 ### merchant_categories
 
-Source: `data/raw/merchant_categories.csv`  
+Databricks source: `/Volumes/<catalog>/bronze/raw_data/merchant_categories/merchant_category<NN>.csv`<br>
 Purpose: Mock source dataset for merchant categories.  
-Grain: one row per merchant_categorie  
+Grain: one row per merchant category<br>
 Primary key: `mcc`
 
-| Field | Type | Required | Key / reference | Accepted values | Classification | DQ rules | Example |
+| Field | Type | Required | Key / reference | Accepted values / pattern | Classification | DQ rules | Example |
 |---|---|---:|---|---|---|---|---|
-| `mcc` | string | yes | PK | â€” | internal | â€” | `example` |
-| `category_name` | string | yes | â€” | â€” | internal | â€” | `example` |
-| `category_group` | string | yes | â€” | â€” | internal | â€” | `example` |
+| `mcc` | string | yes | PK | 4 digits | internal | — | `5732` |
+| `category_name` | string | yes | — | — | internal | — | `Electronics` |
+| `category_group` | string | yes | — | — | internal | — | `Retail` |
 
 ### countries
 
-Source: `data/raw/countries.csv`  
+Databricks source: `/Volumes/<catalog>/bronze/raw_data/countries/country<NN>.csv`<br>
 Purpose: Mock source dataset for countries.  
-Grain: one row per countrie  
+Grain: one row per country<br>
 Primary key: `iso_code`
 
-| Field | Type | Required | Key / reference | Accepted values | Classification | DQ rules | Example |
+| Field | Type | Required | Key / reference | Accepted values / pattern | Classification | DQ rules | Example |
 |---|---|---:|---|---|---|---|---|
-| `iso_code` | string | yes | PK | â€” | internal | â€” | `example` |
-| `name` | string | yes | â€” | â€” | internal | â€” | `example` |
-| `region` | string | yes | â€” | â€” | internal | â€” | `example` |
+| `iso_code` | string | yes | PK | 2 uppercase letters | internal | — | `AU` |
+| `name` | string | yes | — | — | internal | — | `Australia` |
+| `region` | string | yes | — | `APAC`, `AMER`, `EMEA` | internal | — | `APAC` |
 
 ### currencies
 
-Source: `data/raw/currencies.csv`  
+Databricks source: `/Volumes/<catalog>/bronze/raw_data/currencies/currency<NN>.csv`<br>
 Purpose: Mock source dataset for currencies.  
-Grain: one row per currencie  
+Grain: one row per currency<br>
 Primary key: `currency_code`
 
-| Field | Type | Required | Key / reference | Accepted values | Classification | DQ rules | Example |
+| Field | Type | Required | Key / reference | Accepted values / pattern | Classification | DQ rules | Example |
 |---|---|---:|---|---|---|---|---|
-| `currency_code` | string | yes | PK | â€” | internal | â€” | `example` |
-| `name` | string | yes | â€” | â€” | internal | â€” | `example` |
-| `decimals` | integer | yes | â€” | â€” | internal | `DQ-CURR-DECIMALS-TYPE` | `2` |
+| `currency_code` | string | yes | PK | `AUD`, `USD`, `NZD`, `GBP`, `SGD` | internal | — | `AUD` |
+| `name` | string | yes | — | — | internal | — | `Australian Dollar` |
+| `decimals` | integer | yes | — | `2` | internal | `DQ-CURR-DECIMALS-TYPE` | `2` |
 
 ### channels
 
-Source: `data/raw/channels.csv`  
+Databricks source: `/Volumes/<catalog>/bronze/raw_data/channels/channel<NN>.csv`<br>
 Purpose: Mock source dataset for channels.  
 Grain: one row per channel  
 Primary key: `channel_code`
 
-| Field | Type | Required | Key / reference | Accepted values | Classification | DQ rules | Example |
+| Field | Type | Required | Key / reference | Accepted values / pattern | Classification | DQ rules | Example |
 |---|---|---:|---|---|---|---|---|
-| `channel_code` | string | yes | PK | â€” | internal | â€” | `example` |
-| `channel_name` | string | yes | â€” | â€” | internal | â€” | `example` |
+| `channel_code` | string | yes | PK | `pos`, `online`, `mobile`, `atm` | internal | — | `online` |
+| `channel_name` | string | yes | — | — | internal | — | `E-Commerce` |
 
 ### branches
 
-Source: `data/raw/branches.csv`  
+Databricks source: `/Volumes/<catalog>/bronze/raw_data/branches/branch<NN>.csv`<br>
 Purpose: Mock source dataset for branches.  
-Grain: one row per branche  
+Grain: one row per branch<br>
 Primary key: `branch_code`
 
-| Field | Type | Required | Key / reference | Accepted values | Classification | DQ rules | Example |
+| Field | Type | Required | Key / reference | Accepted values / pattern | Classification | DQ rules | Example |
 |---|---|---:|---|---|---|---|---|
-| `branch_code` | string | yes | PK | â€” | internal | â€” | `BR-01` |
-| `name` | string | yes | â€” | â€” | internal | â€” | `example` |
-| `country` | string | yes | FK â†’ `countries.iso_code` | â€” | internal | â€” | `example` |
-| `region` | string | yes | â€” | â€” | internal | â€” | `example` |
-| `status` | string | yes | â€” | â€” | internal | â€” | `example` |
+| `branch_code` | string | yes | PK | `BR-<2 digits>` | internal | — | `BR-01` |
+| `name` | string | yes | — | — | internal | — | `Melbourne Flagship` |
+| `country` | string | yes | FK → `countries.iso_code` | — | internal | — | `AU` |
+| `region` | string | yes | — | `VIC`, `NSW`, `QLD`, `WA` | internal | — | `VIC` |
+| `status` | string | yes | — | `active`, `closed` | internal | — | `active` |
 
 ### date_dim
 
-Source: `data/raw/date_dim.csv`  
+Databricks source: `/Volumes/<catalog>/bronze/raw_data/date_dim/date_dim<NN>.csv`<br>
 Purpose: Mock source dataset for date dim.  
 Grain: one row per calendar day  
 Primary key: `date_id`
 
-| Field | Type | Required | Key / reference | Accepted values | Classification | DQ rules | Example |
+| Field | Type | Required | Key / reference | Accepted values / pattern | Classification | DQ rules | Example |
 |---|---|---:|---|---|---|---|---|
-| `date_id` | date | yes | PK | â€” | internal | `DQ-DATE-ID-TYPE` | `20260706` |
-| `year` | integer | yes | â€” | â€” | internal | `DQ-DATE-YEAR-TYPE` | `2` |
-| `month` | integer | yes | â€” | â€” | internal | `DQ-DATE-MONTH-TYPE` | `2` |
-| `quarter` | integer | yes | â€” | â€” | internal | `DQ-DATE-QUARTER-TYPE` | `2` |
-| `is_weekend` | boolean | yes | â€” | â€” | internal | `DQ-DATE-WEEKEND-TYPE` | `true` |
+| `date_id` | date | yes | PK | source `YYYYMMDD`; Silver date | internal | `DQ-DATE-ID-TYPE` | `20260706` |
+| `year` | integer | yes | — | `2023`–`2030` | internal | `DQ-DATE-YEAR-TYPE` | `2026` |
+| `month` | integer | yes | — | `1`–`12` | internal | `DQ-DATE-MONTH-TYPE` | `7` |
+| `quarter` | integer | yes | — | `1`–`4` | internal | `DQ-DATE-QUARTER-TYPE` | `3` |
+| `is_weekend` | boolean | yes | — | `true`, `false` | internal | `DQ-DATE-WEEKEND-TYPE` | `false` |
 
 ### transactions
 
-Source: `data/raw/transactions.csv`  
+Databricks source: `/Volumes/<catalog>/bronze/raw_data/transactions/transaction<NN>.csv`<br>
 Purpose: Mock source dataset for transactions.  
 Grain: one row per transaction  
 Primary key: `transaction_id`
 
-| Field | Type | Required | Key / reference | Accepted values | Classification | DQ rules | Example |
+| Field | Type | Required | Key / reference | Accepted values / pattern | Classification | DQ rules | Example |
 |---|---|---:|---|---|---|---|---|
-| `transaction_id` | string | yes | PK | â€” | internal | `DQ-TXN-ID-DUP` | `TXN-000001` |
-| `account_id` | string | yes | FK â†’ `accounts.account_id` | â€” | internal | `DQ-TXN-ACCT-FK` | `ACC-0001` |
-| `card_id` | string | yes | FK â†’ `cards.card_id` | â€” | internal | `DQ-TXN-CARD-ACTIVE`, `DQ-TXN-CARD-FK` | `CARD-0001` |
-| `merchant_id` | string | yes | FK â†’ `merchants.merchant_id` | â€” | internal | `DQ-TXN-MERCH-REQ`, `DQ-TXN-MERCH-FK` | `MCH-0001` |
-| `channel` | string | yes | FK â†’ `channels.channel_code` | â€” | internal | â€” | `example` |
-| `amount` | decimal(18,2) | yes | â€” | â€” | internal | `DQ-TXN-AMT-POS`, `DQ-TXN-AMOUNT-TYPE` | `100.00` |
-| `currency` | string | yes | FK â†’ `currencies.currency_code` | â€” | internal | â€” | `example` |
-| `txn_ts` | timestamp | yes | â€” | â€” | internal | `DQ-TXN-TS-FUTURE`, `DQ-TXN-TS-TYPE` | `2026-07-06T10:00:00Z` |
-| `status` | string | yes | â€” | `authorized`, `settled`, `declined`, `reversed`, `refunded` | internal | â€” | `authorized` |
+| `transaction_id` | string | yes | PK | `TXN-<digits>` | internal | `DQ-TXN-ID-DUP` | `TXN-000001` |
+| `account_id` | string | yes | FK → `accounts.account_id` | — | internal | `DQ-TXN-ACCT-FK` | `ACC-0001` |
+| `card_id` | string | yes | FK → `cards.card_id` | — | internal | `DQ-TXN-CARD-ACTIVE`, `DQ-TXN-CARD-FK` | `CARD-0001` |
+| `merchant_id` | string | yes | FK → `merchants.merchant_id` | — | internal | `DQ-TXN-MERCH-REQ`, `DQ-TXN-MERCH-FK` | `MCH-0001` |
+| `channel` | string | yes | FK → `channels.channel_code` | `pos`, `online`, `mobile`, `atm` | internal | — | `online` |
+| `amount` | decimal(12,2) | yes | — | greater than `0` | internal | `DQ-TXN-AMT-POS`, `DQ-TXN-AMOUNT-TYPE` | `100.00` |
+| `currency` | string | yes | FK → `currencies.currency_code` | `AUD`, `USD`, `NZD`, `GBP`, `SGD` | internal | — | `AUD` |
+| `txn_ts` | timestamp | yes | — | ISO-8601; not after `2026-07-06` | internal | `DQ-TXN-TS-FUTURE`, `DQ-TXN-TS-TYPE` | `2026-07-06T10:00:00Z` |
+| `status` | string | yes | — | `authorized`, `settled`, `declined`, `reversed`, `refunded` | internal | — | `authorized` |
 
 ### auth_attempts
 
-Source: `data/raw/auth_attempts.csv`  
+Databricks source: `/Volumes/<catalog>/bronze/raw_data/auth_attempts/auth_attempt<NN>.csv`<br>
 Purpose: Mock source dataset for auth attempts.  
-Grain: one row per auth_attempt  
+Grain: one row per authorization attempt<br>
 Primary key: `attempt_id`
 
-| Field | Type | Required | Key / reference | Accepted values | Classification | DQ rules | Example |
+| Field | Type | Required | Key / reference | Accepted values / pattern | Classification | DQ rules | Example |
 |---|---|---:|---|---|---|---|---|
-| `attempt_id` | string | yes | PK | â€” | internal | â€” | `AUTH-000001` |
-| `transaction_id` | string | yes | FK â†’ `transactions.transaction_id` | â€” | internal | `DQ-AUTH-TXN-FK` | `TXN-000001` |
-| `decision` | string | yes | â€” | `approved`, `declined` | internal | â€” | `approved` |
-| `decline_reason` | string | no | â€” | â€” | internal | â€” | `example` |
-| `auth_ts` | string | yes | â€” | â€” | internal | `DQ-AUTH-TS-ORDER`, `DQ-AUTH-TS-TYPE` | `example` |
+| `attempt_id` | string | yes | PK | `AUTH-<digits>` | internal | — | `AUTH-000001` |
+| `transaction_id` | string | yes | FK → `transactions.transaction_id` | — | internal | `DQ-AUTH-TXN-FK` | `TXN-000001` |
+| `decision` | string | yes | — | `approved`, `declined` | internal | — | `approved` |
+| `decline_reason` | string | no | — | `insufficient_funds`, `incorrect_pin`, `suspected_fraud`, `expired_card`, `do_not_honour`; blank when approved | internal | — | `suspected_fraud` |
+| `auth_ts` | timestamp | yes | — | ISO-8601; no later than related `txn_ts` | internal | `DQ-AUTH-TS-ORDER`, `DQ-AUTH-TS-TYPE` | `2026-07-06T09:59:00Z` |
 
 ### transaction_devices
 
-Source: `data/raw/transaction_devices.csv`  
+Databricks source: `/Volumes/<catalog>/bronze/raw_data/transaction_devices/transaction_device<NN>.csv`<br>
 Purpose: Mock source dataset for transaction devices.  
-Grain: one row per transaction_device  
+Grain: one row per transaction device<br>
 Primary key: `device_id`
 
-| Field | Type | Required | Key / reference | Accepted values | Classification | DQ rules | Example |
+| Field | Type | Required | Key / reference | Accepted values / pattern | Classification | DQ rules | Example |
 |---|---|---:|---|---|---|---|---|
-| `device_id` | string | yes | PK | â€” | device_identifier | â€” | `DEV-000001` |
-| `transaction_id` | string | yes | FK â†’ `transactions.transaction_id` | â€” | internal | `DQ-DEV-TXN-FK` | `TXN-000001` |
-| `device_type` | string | yes | â€” | â€” | internal | `DQ-DEV-TYPE-REQ` | `example` |
-| `ip` | string | yes | â€” | â€” | network_identifier | â€” | `example` |
-| `geo_country` | string | yes | FK â†’ `countries.iso_code` | â€” | internal | â€” | `example` |
+| `device_id` | string | yes | PK | `DEV-<digits>` | device_identifier | — | `DEV-000001` |
+| `transaction_id` | string | yes | FK → `transactions.transaction_id` | — | internal | `DQ-DEV-TXN-FK` | `TXN-000001` |
+| `device_type` | string | yes | — | `mobile_ios`, `mobile_android`, `web`, `pos_terminal`, `atm` | internal | `DQ-DEV-TYPE-REQ` | `mobile_ios` |
+| `ip` | string | yes | — | public IPv4 address | network_identifier | — | `203.0.113.10` |
+| `geo_country` | string | yes | FK → `countries.iso_code` | 2 uppercase letters | internal | — | `AU` |
 
 ### disputes
 
-Source: `data/raw/disputes.csv`  
+Databricks source: `/Volumes/<catalog>/bronze/raw_data/disputes/dispute<NN>.csv`<br>
 Purpose: Mock source dataset for disputes.  
 Grain: one row per dispute  
 Primary key: `dispute_id`
 
-| Field | Type | Required | Key / reference | Accepted values | Classification | DQ rules | Example |
+| Field | Type | Required | Key / reference | Accepted values / pattern | Classification | DQ rules | Example |
 |---|---|---:|---|---|---|---|---|
-| `dispute_id` | string | yes | PK | â€” | internal | â€” | `DSP-0001` |
-| `transaction_id` | string | yes | FK â†’ `transactions.transaction_id` | â€” | internal | `DQ-DISP-TXN-FK` | `TXN-000001` |
-| `reason_code` | string | yes | FK â†’ `dispute_reason_codes.reason_code` | â€” | internal | `DQ-DISP-REASON-REQ` | `example` |
-| `amount` | decimal(18,2) | yes | â€” | â€” | internal | `DQ-DISP-AMOUNT-TYPE` | `100.00` |
-| `status` | string | yes | â€” | `open`, `in_review`, `resolved`, `rejected`, `withdrawn` | internal | `DQ-DISP-STATUS-ENUM` | `open` |
-| `raised_at` | timestamp | yes | â€” | â€” | internal | `DQ-DISP-RAISED-TYPE` | `2026-07-06T10:00:00Z` |
+| `dispute_id` | string | yes | PK | `DSP-<digits>` | internal | — | `DSP-0001` |
+| `transaction_id` | string | yes | FK → `transactions.transaction_id` | — | internal | `DQ-DISP-TXN-FK` | `TXN-000001` |
+| `reason_code` | string | yes | FK → `dispute_reason_codes.reason_code` | `10.4`, `13.1`, `13.7` | internal | `DQ-DISP-REASON-REQ` | `10.4` |
+| `amount` | decimal(18,2) | yes | — | decimal numeric value | internal | `DQ-DISP-AMOUNT-TYPE` | `100.00` |
+| `status` | string | yes | — | `open`, `in_review`, `resolved`, `rejected`, `withdrawn` | internal | `DQ-DISP-STATUS-ENUM` | `open` |
+| `raised_at` | timestamp | yes | — | ISO-8601 timestamp | internal | `DQ-DISP-RAISED-TYPE` | `2026-07-06T10:00:00Z` |
 
 ### dispute_reason_codes
 
-Source: `data/raw/dispute_reason_codes.csv`  
+Databricks source: `/Volumes/<catalog>/bronze/raw_data/dispute_reason_codes/dispute_reason_code<NN>.csv`<br>
 Purpose: Mock source dataset for dispute reason codes.  
-Grain: one row per dispute_reason_code  
+Grain: one row per dispute reason code<br>
 Primary key: `reason_code`
 
-| Field | Type | Required | Key / reference | Accepted values | Classification | DQ rules | Example |
+| Field | Type | Required | Key / reference | Accepted values / pattern | Classification | DQ rules | Example |
 |---|---|---:|---|---|---|---|---|
-| `reason_code` | string | yes | PK | â€” | internal | â€” | `example` |
-| `description` | string | yes | â€” | â€” | internal | â€” | `example` |
+| `reason_code` | string | yes | PK | `10.4`, `13.1`, `13.7` | internal | — | `10.4` |
+| `description` | string | yes | — | — | internal | — | `Fraud - Card Absent` |
 
 ### chargebacks
 
-Source: `data/raw/chargebacks.csv`  
+Databricks source: `/Volumes/<catalog>/bronze/raw_data/chargebacks/chargeback<NN>.csv`<br>
 Purpose: Mock source dataset for chargebacks.  
 Grain: one row per chargeback  
 Primary key: `chargeback_id`
 
-| Field | Type | Required | Key / reference | Accepted values | Classification | DQ rules | Example |
+| Field | Type | Required | Key / reference | Accepted values / pattern | Classification | DQ rules | Example |
 |---|---|---:|---|---|---|---|---|
-| `chargeback_id` | string | yes | PK | â€” | internal | â€” | `CBK-0001` |
-| `dispute_id` | string | yes | FK â†’ `disputes.dispute_id` | â€” | internal | `DQ-CBK-DISP-FK` | `DSP-0001` |
-| `scheme` | string | yes | â€” | â€” | internal | â€” | `example` |
-| `amount` | decimal(18,2) | yes | â€” | â€” | internal | `DQ-CBK-AMOUNT-TYPE` | `100.00` |
-| `stage` | string | yes | â€” | â€” | internal | â€” | `example` |
-| `processed_at` | timestamp | yes | â€” | â€” | internal | `DQ-CBK-PROCESSED-TYPE` | `2026-07-06T10:00:00Z` |
+| `chargeback_id` | string | yes | PK | `CBK-<digits>` | internal | — | `CBK-0001` |
+| `dispute_id` | string | yes | FK → `disputes.dispute_id` | — | internal | `DQ-CBK-DISP-FK` | `DSP-0001` |
+| `scheme` | string | yes | — | `visa`, `mastercard`, `amex` | internal | — | `visa` |
+| `amount` | double | yes | — | numeric value | internal | `DQ-CBK-AMOUNT-TYPE` | `100.00` |
+| `stage` | string | yes | — | `representment`, `pre_arbitration`, `won`, `lost`, `reversed` | internal | — | `representment` |
+| `processed_at` | timestamp | yes | — | ISO-8601 timestamp | internal | `DQ-CBK-PROCESSED-TYPE` | `2026-07-06T10:00:00Z` |
 
 ### fraud_alerts
 
-Source: `data/raw/fraud_alerts.csv`  
+Databricks source: `/Volumes/<catalog>/bronze/raw_data/fraud_alerts/fraud_alert<NN>.csv`<br>
 Purpose: Mock source dataset for fraud alerts.  
-Grain: one row per fraud_alert  
+Grain: one row per fraud alert<br>
 Primary key: `alert_id`
 
-| Field | Type | Required | Key / reference | Accepted values | Classification | DQ rules | Example |
+| Field | Type | Required | Key / reference | Accepted values / pattern | Classification | DQ rules | Example |
 |---|---|---:|---|---|---|---|---|
-| `alert_id` | string | yes | PK | â€” | internal | â€” | `ALT-0001` |
-| `transaction_id` | string | yes | FK â†’ `transactions.transaction_id` | â€” | internal | `DQ-ALT-TXN-FK` | `TXN-000001` |
-| `rule_name` | string | yes | â€” | â€” | internal | â€” | `example` |
-| `score` | double | yes | â€” | â€” | internal | `DQ-ALT-SCORE-RANGE`, `DQ-ALT-SCORE-TYPE` | `0.85` |
-| `triggered_at` | timestamp | yes | â€” | â€” | internal | `DQ-ALT-TRIGGERED-TYPE` | `2026-07-06T10:00:00Z` |
-| `disposition` | string | yes | â€” | `open`, `escalated_to_case`, `dismissed`, `true_positive`, `false_positive` | internal | â€” | `open` |
+| `alert_id` | string | yes | PK | `ALT-<digits>` | internal | — | `ALT-0001` |
+| `transaction_id` | string | yes | FK → `transactions.transaction_id` | — | internal | `DQ-ALT-TXN-FK` | `TXN-000001` |
+| `rule_name` | string | yes | — | `velocity_5min`, `geo_mismatch`, `high_value_night`, `new_device_high_value` | internal | — | `high_value_night` |
+| `score` | double | yes | — | `0.0`–`1.0` | internal | `DQ-ALT-SCORE-RANGE`, `DQ-ALT-SCORE-TYPE` | `0.85` |
+| `triggered_at` | timestamp | yes | — | ISO-8601 timestamp | internal | `DQ-ALT-TRIGGERED-TYPE` | `2026-07-06T10:00:00Z` |
+| `disposition` | string | yes | — | `open`, `escalated_to_case`, `dismissed`, `true_positive`, `false_positive` | internal | — | `open` |
 
 ### fraud_types
 
-Source: `data/raw/fraud_types.csv`  
+Databricks source: `/Volumes/<catalog>/bronze/raw_data/fraud_types/fraud_type<NN>.csv`<br>
 Purpose: Mock source dataset for fraud types.  
-Grain: one row per fraud_type  
+Grain: one row per fraud type<br>
 Primary key: `fraud_type_code`
 
-| Field | Type | Required | Key / reference | Accepted values | Classification | DQ rules | Example |
+| Field | Type | Required | Key / reference | Accepted values / pattern | Classification | DQ rules | Example |
 |---|---|---:|---|---|---|---|---|
-| `fraud_type_code` | string | yes | PK | â€” | internal | â€” | `example` |
-| `description` | string | yes | â€” | â€” | internal | â€” | `example` |
-| `severity` | string | yes | â€” | â€” | internal | â€” | `example` |
+| `fraud_type_code` | string | yes | PK | `card_fraud`, `account_takeover`, `sar`, `none` | internal | — | `card_fraud` |
+| `description` | string | yes | — | — | internal | — | `Card compromise` |
+| `severity` | string | yes | — | `low`, `high`, `critical` | internal | — | `high` |
 
 ### investigation_cases
 
-Source: `data/raw/investigation_cases.csv`  
+Databricks source: `/Volumes/<catalog>/bronze/raw_data/investigation_cases/investigation_case<NN>.csv`<br>
 Purpose: Mock source dataset for investigation cases.  
-Grain: one row per investigation_case  
+Grain: one row per investigation case<br>
 Primary key: `case_id`
 
-| Field | Type | Required | Key / reference | Accepted values | Classification | DQ rules | Example |
+| Field | Type | Required | Key / reference | Accepted values / pattern | Classification | DQ rules | Example |
 |---|---|---:|---|---|---|---|---|
-| `case_id` | string | yes | PK | â€” | internal | â€” | `CASE-0001` |
-| `priority` | string | yes | â€” | `low`, `medium`, `high`, `critical` | internal | â€” | `low` |
-| `status_code` | string | yes | FK â†’ `case_status_types.status_code` | â€” | internal | `DQ-CASE-STATUS-ENUM` | `example` |
-| `fraud_type_code` | string | yes | FK â†’ `fraud_types.fraud_type_code` | â€” | internal | â€” | `example` |
-| `owner_employee_id` | string | yes | FK â†’ `employees.employee_id` | â€” | internal | â€” | `example` |
-| `opened_at` | timestamp | yes | â€” | â€” | internal | `DQ-CASE-STALE`, `DQ-CASE-OPENED-TYPE` | `2026-07-06T10:00:00Z` |
-| `closed_at` | timestamp | no | â€” | â€” | internal | `DQ-CASE-CLOSED-TYPE` | `2026-07-06T10:00:00Z` |
-| `legal_hold` | boolean | yes | â€” | â€” | restricted | `DQ-CASE-LEGALHOLD`, `DQ-CASE-LEGALHOLD-TYPE` | `true` |
+| `case_id` | string | yes | PK | `CASE-<digits>` | internal | — | `CASE-0001` |
+| `priority` | string | yes | — | `low`, `medium`, `high`, `critical` | internal | — | `low` |
+| `status_code` | string | yes | FK → `case_status_types.status_code` | `open`, `in_progress`, `suspended`, `closed` | internal | `DQ-CASE-STATUS-ENUM` | `open` |
+| `fraud_type_code` | string | yes | FK → `fraud_types.fraud_type_code` | `card_fraud`, `account_takeover`, `sar`, `none` | internal | — | `card_fraud` |
+| `owner_employee_id` | string | yes | FK → `employees.employee_id` | — | internal | — | `EMP-0001` |
+| `opened_at` | timestamp | yes | — | ISO-8601; open cases older than 180 days fail | internal | `DQ-CASE-STALE`, `DQ-CASE-OPENED-TYPE` | `2026-07-06T10:00:00Z` |
+| `closed_at` | timestamp | no | — | ISO-8601 timestamp if present | internal | `DQ-CASE-CLOSED-TYPE` | `2026-07-06T10:00:00Z` |
+| `legal_hold` | boolean | yes | — | `true`, `false` | restricted | `DQ-CASE-LEGALHOLD`, `DQ-CASE-LEGALHOLD-TYPE` | `true` |
 
 ### case_status_types
 
-Source: `data/raw/case_status_types.csv`  
+Databricks source: `/Volumes/<catalog>/bronze/raw_data/case_status_types/case_status_type<NN>.csv`<br>
 Purpose: Mock source dataset for case status types.  
-Grain: one row per case_status_type  
+Grain: one row per case status type<br>
 Primary key: `status_code`
 
-| Field | Type | Required | Key / reference | Accepted values | Classification | DQ rules | Example |
+| Field | Type | Required | Key / reference | Accepted values / pattern | Classification | DQ rules | Example |
 |---|---|---:|---|---|---|---|---|
-| `status_code` | string | yes | PK | â€” | internal | â€” | `example` |
-| `description` | string | yes | â€” | â€” | internal | â€” | `example` |
+| `status_code` | string | yes | PK | `open`, `in_progress`, `suspended`, `closed` | internal | — | `open` |
+| `description` | string | yes | — | — | internal | — | `Case open` |
 
 ### employees
 
-Source: `data/raw/employees.csv`  
+Databricks source: `/Volumes/<catalog>/bronze/raw_data/employees/employee<NN>.csv`<br>
 Purpose: Mock source dataset for employees.  
 Grain: one row per employee  
 Primary key: `employee_id`
 
-| Field | Type | Required | Key / reference | Accepted values | Classification | DQ rules | Example |
+| Field | Type | Required | Key / reference | Accepted values / pattern | Classification | DQ rules | Example |
 |---|---|---:|---|---|---|---|---|
-| `employee_id` | string | yes | PK | â€” | internal | â€” | `EMP-0001` |
-| `full_name` | string | yes | â€” | â€” | staff_identifier | â€” | `example` |
-| `email` | string | yes | â€” | â€” | staff_identifier | â€” | `example` |
-| `team` | string | yes | â€” | â€” | internal | â€” | `example` |
-| `role` | string | yes | â€” | â€” | internal | â€” | `example` |
+| `employee_id` | string | yes | PK | `EMP-<digits>` | internal | — | `EMP-0001` |
+| `full_name` | string | yes | — | non-empty text | staff_identifier | `DQ-EMP-NAME-NEAR-DUP` | `Sample Investigator` |
+| `email` | string | yes | — | `<name>@nab-mock.dev`; unique | staff_identifier | `DQ-EMP-EMAIL-UNIQ` | `sample.investigator@nab-mock.dev` |
+| `team` | string | yes | — | `Fraud Ops`, `QA`, `Compliance` | internal | — | `Fraud Ops` |
+| `role` | string | yes | — | `investigator`, `supervisor`, `analyst` | internal | — | `investigator` |
 
 ### investigation_notes
 
-Source: `data/raw/investigation_notes.csv`  
+Databricks source: `/Volumes/<catalog>/bronze/raw_data/investigation_notes/investigation_note<NN>.csv`<br>
 Purpose: Mock source dataset for investigation notes.  
-Grain: one row per investigation_note  
+Grain: one row per investigation note<br>
 Primary key: `note_id`
 
-| Field | Type | Required | Key / reference | Accepted values | Classification | DQ rules | Example |
+| Field | Type | Required | Key / reference | Accepted values / pattern | Classification | DQ rules | Example |
 |---|---|---:|---|---|---|---|---|
-| `note_id` | string | yes | PK | â€” | internal | â€” | `NOTE-0001` |
-| `case_id` | string | yes | FK â†’ `investigation_cases.case_id` | â€” | internal | `DQ-NOTE-CASE-FK` | `CASE-0001` |
-| `author_employee_id` | string | yes | FK â†’ `employees.employee_id` | â€” | internal | `DQ-NOTE-EMP-FK` | `example` |
-| `note_text` | string | yes | â€” | â€” | sensitive_free_text | `DQ-NOTE-PII-LEAK` | `example` |
-| `created_at` | timestamp | yes | â€” | â€” | internal | `DQ-NOTE-CREATED-TYPE` | `2026-07-06T10:00:00Z` |
+| `note_id` | string | yes | PK | `NOTE-<digits>` | internal | — | `NOTE-00001` |
+| `case_id` | string | yes | FK → `investigation_cases.case_id` | — | internal | `DQ-NOTE-CASE-FK`, `DQ-NOTE-LEGALHOLD` | `CASE-0001` |
+| `author_employee_id` | string | yes | FK → `employees.employee_id` | — | internal | `DQ-NOTE-EMP-FK` | `EMP-0001` |
+| `note_text` | string | yes | — | free text; must not contain raw email, phone, or PAN | sensitive_free_text | `DQ-NOTE-PII-LEAK` | `Customer contact reviewed; no further action.` |
+| `created_at` | timestamp | yes | — | ISO-8601 timestamp | internal | `DQ-NOTE-CREATED-TYPE` | `2026-07-06T10:00:00Z` |
 
 ### case_transactions
 
-Source: `data/raw/case_transactions.csv`  
+Databricks source: `/Volumes/<catalog>/bronze/raw_data/case_transactions/case_transaction<NN>.csv`<br>
 Purpose: Mock source dataset for case transactions.  
 Grain: one row per case-to-transaction link  
 Primary key: `case_id`, `transaction_id`
 
-| Field | Type | Required | Key / reference | Accepted values | Classification | DQ rules | Example |
+| Field | Type | Required | Key / reference | Accepted values / pattern | Classification | DQ rules | Example |
 |---|---|---:|---|---|---|---|---|
-| `case_id` | string | yes | PK; FK â†’ `investigation_cases.case_id` | â€” | internal | `DQ-CASETXN-CASE-FK` | `CASE-0001` |
-| `transaction_id` | string | yes | PK; FK â†’ `transactions.transaction_id` | â€” | internal | `DQ-CASETXN-TXN-FK` | `TXN-000001` |
-| `linked_at` | timestamp | yes | â€” | â€” | internal | `DQ-CASETXN-LINKED-TYPE` | `2026-07-06T10:00:00Z` |
+| `case_id` | string | yes | PK; FK → `investigation_cases.case_id` | — | internal | `DQ-CASETXN-CASE-FK` | `CASE-0001` |
+| `transaction_id` | string | yes | PK; FK → `transactions.transaction_id` | — | internal | `DQ-CASETXN-TXN-FK` | `TXN-000001` |
+| `linked_at` | timestamp | yes | — | ISO-8601 timestamp | internal | `DQ-CASETXN-LINKED-TYPE` | `2026-07-06T10:00:00Z` |
 
 ### case_parties
 
-Source: `data/raw/case_parties.csv`  
+Databricks source: `/Volumes/<catalog>/bronze/raw_data/case_parties/case_party<NN>.csv`<br>
 Purpose: Mock source dataset for case parties.  
 Grain: one row per case-to-party link  
 Primary key: `case_id`, `party_type`, `party_id`
 
-| Field | Type | Required | Key / reference | Accepted values | Classification | DQ rules | Example |
+| Field | Type | Required | Key / reference | Accepted values / pattern | Classification | DQ rules | Example |
 |---|---|---:|---|---|---|---|---|
-| `case_id` | string | yes | PK; FK â†’ `investigation_cases.case_id` | â€” | internal | `DQ-CASEPARTY-CASE-FK` | `CASE-0001` |
+| `case_id` | string | yes | PK; FK → `investigation_cases.case_id` | — | internal | `DQ-CASEPARTY-CASE-FK` | `CASE-0001` |
 | `party_type` | string | yes | PK | `customer`, `merchant`, `third_party` | internal | `DQ-CASEPARTY-TYPE-ENUM` | `customer` |
-| `party_id` | string | yes | PK | â€” | internal | `DQ-CASEPARTY-RESOLVE` | `example` |
-| `role` | string | yes | â€” | `subject`, `reporter`, `witness`, `merchant` | internal | â€” | `subject` |
+| `party_id` | string | yes | PK | `CUST-<digits>`, `MCH-<digits>`, or `TP-<digits>` according to `party_type` | internal | `DQ-CASEPARTY-RESOLVE` | `CUST-0001` |
+| `role` | string | yes | — | `subject`, `reporter`, `witness`, `merchant` | internal | — | `subject` |
 
 `party_id` has a conditional relationship implemented by the DQ rule rather
 than a single YAML `references` value: customer IDs resolve to `customers`,
@@ -745,38 +819,49 @@ merchant IDs resolve to `merchants`, and third-party IDs are synthetic.
 
 ### customer_contact_logs
 
-Source: `data/raw/customer_contact_logs.csv`  
+Databricks source: `/Volumes/<catalog>/bronze/raw_data/customer_contact_logs/customer_contact_log<NN>.csv`<br>
 Purpose: Mock source dataset for customer contact logs.  
-Grain: one row per customer_contact_log  
+Grain: one row per customer contact log<br>
 Primary key: `contact_id`
 
-| Field | Type | Required | Key / reference | Accepted values | Classification | DQ rules | Example |
+| Field | Type | Required | Key / reference | Accepted values / pattern | Classification | DQ rules | Example |
 |---|---|---:|---|---|---|---|---|
-| `contact_id` | string | yes | PK | â€” | internal | â€” | `CTL-0001` |
-| `customer_id` | string | yes | FK â†’ `customers.customer_id` | â€” | internal | `DQ-CTL-CUST-FK` | `CUST-0001` |
-| `direction` | string | yes | â€” | `inbound`, `outbound` | internal | â€” | `inbound` |
-| `contact_method` | string | yes | â€” | `phone`, `email`, `sms`, `post` | internal | â€” | `phone` |
-| `do_not_contact` | boolean | yes | â€” | â€” | internal | `DQ-CTL-DNC-TYPE`, `DQ-CTL-DNC-VIOLATION` | `true` |
-| `contacted_at` | timestamp | yes | â€” | â€” | internal | `DQ-CTL-CONTACTED-TYPE` | `2026-07-06T10:00:00Z` |
-| `employee_id` | string | yes | FK â†’ `employees.employee_id` | â€” | internal | `DQ-CTL-EMP-FK` | `EMP-0001` |
-| `note` | string | yes | â€” | â€” | sensitive_free_text | `DQ-CTL-NOTE-PII` | `example` |
+| `contact_id` | string | yes | PK | `CTL-<digits>` | internal | — | `CTL-0001` |
+| `customer_id` | string | yes | FK → `customers.customer_id` | — | internal | `DQ-CTL-CUST-FK` | `CUST-0001` |
+| `direction` | string | yes | — | `inbound`, `outbound` | internal | — | `inbound` |
+| `contact_method` | string | yes | — | `phone`, `email`, `sms`, `post` | internal | — | `phone` |
+| `do_not_contact` | boolean | yes | — | `true`, `false`; `true` forbids outbound contact | internal | `DQ-CTL-DNC-TYPE`, `DQ-CTL-DNC-VIOLATION` | `true` |
+| `contacted_at` | timestamp | yes | — | ISO-8601 timestamp | internal | `DQ-CTL-CONTACTED-TYPE` | `2026-07-06T10:00:00Z` |
+| `employee_id` | string | yes | FK → `employees.employee_id` | — | internal | `DQ-CTL-EMP-FK` | `EMP-0001` |
+| `note` | string | yes | — | free text; must not contain raw email, phone, or PAN | sensitive_free_text | `DQ-CTL-NOTE-PII` | `Customer requested a follow-up call.` |
 
 ### 14. Contract ownership and validation
 
-The contract tables above are a human-readable view; the YAML files remain the
-machine-readable source of truth. Contract drift is checked with:
+The contract tables above reconcile four project sources: physical column order
+from `mock.config.TABLE_SCHEMAS`, metadata from `docs/contracts/sources`,
+executable rules from `pipeline/dq/dq_02_load_dq_rules.py`, and runtime casts and
+transformations from `pipeline/silver`. The YAML files remain the
+machine-readable metadata contracts, but they are not treated as more
+authoritative than executable runtime behavior when the two differ.
 
-```powershell
-python -m unittest tests.test_source_contracts
-```
+Run the following Databricks validation notebooks as part of the standard
+pipeline sequence:
 
-That test verifies:
+| Validation notebook | Contract coverage |
+|---|---|
+| `pipeline/validation/validate_m1_bronze.py` | Source columns, file/batch lineage, and Bronze ingestion. |
+| `pipeline/validation/validate_m2_dq.py` | DQ registry, quarantine output, manifest reconciliation, and DQ-to-Silver exclusion. |
+| `pipeline/validation/validate_m2_silver.py` | Silver schemas, casts, integrity, masking, current-batch consistency, and Gold inputs. |
+| `pipeline/validation/validate_m3_gold.py` | Downstream Gold contracts, natural grains, metadata, AI policy, and referential integrity. |
+
+The repository's static contract checks additionally verify:
 
 - every table in `mock.config.TABLE_SCHEMAS` has exactly one YAML contract;
-- the dataset and source path match the filename;
+- the dataset and logical source metadata match the YAML filename;
 - grain and primary key are present;
 - fields appear in the physical CSV-header order; and
 - every declared DQ rule exists in the executable DQ registry.
 
 Gold and AI-output contracts are separately versioned under
-`docs/models/gold`; they are outside this source-contract scope.
+`docs/models/gold`; M3 validates those downstream contracts, while the 25
+field-level tables in this document remain source-to-Silver contracts.
