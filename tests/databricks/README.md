@@ -46,7 +46,8 @@ SELECT
   currency,
   risk_score,
   _batch_id,
-  _rescued_data
+  _rescued_data,
+  _corrupt_record
 FROM g3_test.bronze.schema_evolution_test
 ORDER BY _batch_id;
 ```
@@ -66,7 +67,8 @@ The expected evidence includes:
 - `risk_score` added as a Bronze `STRING`;
 - historical `risk_score` and missing `currency` values represented by `NULL`;
 - reordered values mapped by header name;
-- malformed CSV content retained in `_rescued_data`;
+- malformed CSV content retained in `_corrupt_record`;
+- schema/type mismatches retained separately in `_rescued_data`;
 - raw `not-a-number` retained in Bronze and rejected by Silver `try_cast`;
 - a standard quarantine row containing the invalid raw value;
 - structured `SCHEMA_EVOLUTION` warnings printed in the notebook run.

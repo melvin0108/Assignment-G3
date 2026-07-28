@@ -61,6 +61,7 @@ BRONZE_METADATA_COLUMNS = {
     "_source_record_id",
     "_record_hash",
     "_rescued_data",
+    "_corrupt_record",
 }
 
 
@@ -168,7 +169,11 @@ def ingest_table(table_name):
     inspected_files = _inspect_headers(
         table_name, target, source_cols, pending_files
     )
-    schema_hints = ", ".join(f"`{column}` STRING" for column in source_cols)
+    hinted_columns = [
+        *(f"`{column}` STRING" for column in source_cols),
+        "`_corrupt_record` STRING",
+    ]
+    schema_hints = ", ".join(hinted_columns)
 
     def run_stream_once():
         raw_df = (
@@ -179,12 +184,18 @@ def ingest_table(table_name):
             .option("cloudFiles.schemaHints", schema_hints)
             .option("cloudFiles.inferColumnTypes", "false")
             .option("rescuedDataColumn", "_rescued_data")
+            .option("columnNameOfCorruptRecord", "_corrupt_record")
+            .option("mode", "PERMISSIVE")
             .option("header", "true")
             .option("multiLine", "true")
             .load(source_path)
         )
 
-        data_columns = [column for column in raw_df.columns if column != "_rescued_data"]
+        parser_metadata_columns = {"_rescued_data", "_corrupt_record"}
+        data_columns = [
+            column for column in raw_df.columns
+            if column not in parser_metadata_columns
+        ]
         batch_id = F.regexp_extract(
             F.col("_metadata.file_name"), r"(\d+)\.csv$", 1
         ).cast("long")
@@ -193,7 +204,10 @@ def ingest_table(table_name):
             *[F.coalesce(F.col(column), F.lit("<NULL>")) for column in record_id_cols],
         )
         raw_json = F.to_json(
-            F.struct(*[F.col(column) for column in data_columns]),
+            F.struct(
+                *[F.col(column) for column in data_columns],
+                F.col("_corrupt_record"),
+            ),
             {"ignoreNullFields": "false"},
         )
         bronze_df = raw_df.select(
@@ -206,6 +220,7 @@ def ingest_table(table_name):
             record_id.alias("_source_record_id"),
             F.sha2(raw_json, 256).alias("_record_hash"),
             F.col("_rescued_data").cast("string").alias("_rescued_data"),
+            F.col("_corrupt_record").cast("string").alias("_corrupt_record"),
         )
 
         query = (
@@ -244,11 +259,27 @@ def ingest_table(table_name):
         )
         for row in rescued_counts:
             _warning(
-                "malformed_csv_rows",
+                "rescued_data_rows",
                 table_name,
                 file_path=paths_by_name.get(row["_source_file"], row["_source_file"]),
                 batch_id=row["_batch_id"],
                 rescued_rows=row["count"],
+            )
+        corrupt_counts = (
+            spark.read.table(target)
+            .filter(F.col("_source_file").isin(list(paths_by_name)))
+            .filter(F.col("_corrupt_record").isNotNull())
+            .groupBy("_source_file", "_batch_id")
+            .count()
+            .collect()
+        )
+        for row in corrupt_counts:
+            _warning(
+                "malformed_csv_rows",
+                table_name,
+                file_path=paths_by_name.get(row["_source_file"], row["_source_file"]),
+                batch_id=row["_batch_id"],
+                corrupt_rows=row["count"],
             )
 
     print(f"Auto Loader completed for {target}")

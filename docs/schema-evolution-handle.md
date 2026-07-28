@@ -1,53 +1,56 @@
 # Schema Evolution — Handling Rules (Bronze → Silver, CSV Input)
 
-## Định nghĩa
-Schema evolution: cấu trúc dữ liệu nguồn thay đổi theo thời gian. Pipeline phải xử lý mà không mất dữ liệu, không crash toàn hệ thống, không âm thầm sai lệch dữ liệu.
+## Definition
+Schema evolution is the change in source data structure over time. The pipeline must handle these changes without losing data, crashing the entire system, or silently corrupting data.
 
-## Kiến trúc
+## Architecture
 ```
-Landing (CSV) → Bronze (permissive, không bao giờ chặn) → Silver (enforce contract, output cuối)
+Landing (CSV) → Bronze (permissive, never blocks ingestion) → Silver (contract enforcement, final output)
 ```
 
-## Auto Loader config (CSV)
+## Auto Loader Configuration (CSV)
 ```python
 .format("cloudFiles")
 .option("cloudFiles.format", "csv")
 .option("cloudFiles.schemaLocation", "/schema/orders_bronze")
 .option("cloudFiles.schemaEvolutionMode", "addNewColumns")
-.option("cloudFiles.inferColumnTypes", "false")   # toàn bộ cột đọc dạng string
-.option("header", "true")                          # bắt buộc có header
+.option("cloudFiles.inferColumnTypes", "false")   # read all columns as strings
+.option("header", "true")                          # header is required
 ```
 
-**Lưu ý riêng cho CSV:**
-- Không có nested structure (không struct/array) → không có case "structural mismatch" như JSON.
-- Phụ thuộc header để xác định tên cột, luôn bắt buộc `header=true`.
-- Số lượng cột lệch so với header (thừa/thiếu delimiter) là lỗi phổ biến riêng của CSV.
+**CSV-specific considerations:**
+- CSV has no nested structures (no structs or arrays), so there is no "structural mismatch" scenario as there is with JSON.
+- Column names depend on the header, so `header=true` is always required.
+- A column count that does not match the header because of extra or missing delimiters is a common CSV-specific error.
 
-## Quy tắc xử lý theo scenario
+## Handling Rules by Scenario
 
-**Add column** → `addNewColumns` tự xử lý: fail 1 lần, cập nhật schema log, tự restart, cột mới ghi thẳng vào bronze dạng string.
-→ Log warning: "Schema evolved: cột mới [tên cột] được thêm, batch [batch_id], timestamp [ts]."
-→ Silver: review, chỉ đưa vào contract khi cần dùng.
+**Added column** → `addNewColumns` handles the change automatically: the stream fails once, updates the schema log, restarts automatically, and writes the new column directly to Bronze as a string.
+→ Log warning: "Schema evolved: new column [column_name] was added, batch [batch_id], timestamp [ts]."
+→ Silver: review the column and add it to the contract only when it is needed.
 
-**Missing column** → Delta tự fill NULL.
-→ Log warning: "Schema evolved: cột [tên cột] không xuất hiện trong batch [batch_id], giá trị NULL."
-→ Silver: theo dõi null rate, alert nếu spike bất thường so với baseline.
+**Missing column** → Delta automatically fills the column with NULL.
+→ Log warning: "Schema evolved: column [column_name] was not present in batch [batch_id]; value set to NULL."
+→ Silver: monitor the null rate and alert on abnormal spikes relative to the baseline.
 
-**Column reordering** → Không ảnh hưởng, Delta đọc theo tên cột (header), không theo vị trí.
-→ Không cần log.
+**Column reordering** → No impact. Delta reads columns by header name, not by position.
+→ No log entry is required.
 
-**Row lệch số cột so với header** (malformed CSV: thừa/thiếu delimiter, ký tự đặc biệt không escape) → dòng bị đẩy vào `_rescued_data`.
-→ Log warning: "CSV malformed row: [file_path], lệch số cột so với header, đã rescue."
+**Unparseable CSV row** (malformed CSV with invalid quoting or escaping) → The raw row
+is retained in `_corrupt_record`.
+→ Log warning: "Malformed CSV row: [file_path]; raw payload retained."
 
-**Type change (scalar)** → Không xảy ra ở bronze (đã all-string). Convert ở silver bằng `try_cast()`, không dùng `cast()` cứng.
-→ Parse fail → NULL, đẩy record sang bảng quarantine (nằm ở silver, không đẩy tiếp xuống gold).
-→ Log warning: "Type cast failed: cột [tên cột], giá trị gốc [value], batch [batch_id]."
+**Scalar type change** → This does not occur in Bronze because all values are strings. Convert types in Silver with `try_cast()` rather than a strict `cast()`.
+→ Parse failure → NULL; route the record to a quarantine table in Silver and do not propagate it to Gold.
+→ Log warning: "Type cast failed: column [column_name], raw value [value], batch [batch_id]."
 
-## Vai trò `_rescued_data`
-Với CSV, chỉ bắt dòng malformed (số cột không khớp header). Không liên quan add/missing column — 2 case này do Auto Loader/Delta tự xử lý riêng.
+## Roles of `_rescued_data` and `_corrupt_record`
+`_rescued_data` retains fields that do not match the schema, type, or case. `_corrupt_record`
+retains the entire raw CSV row when the parser cannot parse it. Added and missing columns
+are still handled separately by Auto Loader and Delta.
 
-## Nguyên tắc log/warning
-Mọi sự kiện schema evolution đều phải log warning, gồm: loại sự kiện, tên bảng/cột, timestamp/batch_id/file_path, và giá trị gốc nếu là type cast fail.
+## Logging and Warning Principles
+Every schema evolution event must produce a warning that includes the event type, table or column name, timestamp, batch ID, file path, and the raw value when a type cast fails.
 
 ```python
 def check_schema_drift(current_schema, previous_schema, batch_id):
@@ -60,13 +63,13 @@ def check_schema_drift(current_schema, previous_schema, batch_id):
 ```
 
 ```python
-rescued_count = bronze_df.filter(F.col("_rescued_data").isNotNull()).count()
-if rescued_count > 0:
-    log.warning(f"[SCHEMA_EVOLUTION] rescued_rows={rescued_count} — kiểm tra _rescued_data (malformed row)")
+corrupt_count = bronze_df.filter(F.col("_corrupt_record").isNotNull()).count()
+if corrupt_count > 0:
+    log.warning(f"[SCHEMA_EVOLUTION] corrupt_rows={corrupt_count} — inspect _corrupt_record")
 ```
 
 ```python
-# Silver type cast + quarantine, log warning theo record
+# Silver type casting and quarantine with a warning for each record
 silver_df = bronze_df.withColumn("amount_clean", F.expr("try_cast(amount as decimal(18,2))"))
 
 fail_df = silver_df.filter(F.col("amount").isNotNull() & F.col("amount_clean").isNull())
@@ -79,16 +82,16 @@ valid_df = silver_df.filter(~(F.col("amount").isNotNull() & F.col("amount_clean"
 valid_df.write.mode("append").saveAsTable("silver.orders")
 ```
 
-## Nguyên tắc chung
-1. Bronze: ưu tiên tuyệt đối không mất dữ liệu, không chặn pipeline, cột scalar lưu dạng string.
-2. Silver: nơi duy nhất enforce type, validate, business rule — là **output cuối cùng của pipeline**.
-3. Record lỗi → quarantine table nằm trong silver, không raise exception làm chết batch, không âm thầm drop.
-4. Mọi sự kiện schema evolution đều phải log warning, kèm đủ context để trace lại.
-5. Không có gold layer — silver chính là điểm dừng, downstream (nếu có) tự đọc trực tiếp từ silver + silver_quarantine.
+## General Principles
+1. Bronze: prioritize preventing data loss, avoid blocking the pipeline, and store scalar columns as strings.
+2. Silver: the only layer that enforces types, validation, and business rules; it is the **final output of the pipeline**.
+3. Invalid records → route them to a quarantine table in Silver. Do not raise an exception that terminates the batch, and do not silently drop them.
+4. Every schema evolution event must produce a warning with enough context for traceability.
+5. There is no Gold layer; Silver is the final stage. Downstream consumers, if any, read directly from Silver and `silver_quarantine`.
 
-## Áp dụng cho dự án G3
+## Application to the G3 Project
 
-Dự án G3 vẫn giữ Gold AI-ready vì đây là yêu cầu bắt buộc của assignment.
-Schema evolution chỉ tự động mở rộng Bronze; Silver và Gold dùng explicit
-allow-list, vì vậy cột mới chỉ được đưa xuống từng layer sau khi contract, DQ,
-PII và access policy đã được review.
+The G3 project retains an AI-ready Gold layer because it is a mandatory assignment
+requirement. Schema evolution expands Bronze automatically only; Silver and Gold use
+explicit allowlists. Therefore, a new column is propagated to each subsequent layer
+only after its contract, data quality, PII, and access policies have been reviewed.

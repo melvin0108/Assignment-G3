@@ -15,7 +15,8 @@ Run order after Bronze and DQ notebooks:
 
 - All contract fields remain present and all source/evolved Bronze fields are `STRING`.
 - Required Bronze metadata is present and file/batch lineage is valid.
-- Rows with `_rescued_data` are reported as malformed CSV warnings.
+- Rows with `_rescued_data` are reported as schema/type mismatches, while rows
+  with `_corrupt_record` are reported as malformed CSV warnings.
 - M1 Bronze tables exist.
 - Required Bronze metadata columns exist on ingested Bronze source tables.
 - Important Bronze tables have rows.

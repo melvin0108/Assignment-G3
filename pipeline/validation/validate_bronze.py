@@ -57,6 +57,7 @@ BRONZE_METADATA_COLS = [
     "_source_record_id",
     "_record_hash",
     "_rescued_data",
+    "_corrupt_record",
 ]
 
 
@@ -151,11 +152,22 @@ for table_name in INGESTED_BRONZE_TABLES:
         """,
     )
     warn_if_rows(
-        f"bronze.{table_name} malformed CSV rows rescued",
+        f"bronze.{table_name} schema/type mismatches rescued",
         f"""
         SELECT _source_file, _batch_id, COUNT(*) AS rescued_rows
         FROM {catalog}.bronze.{table_name}
         WHERE _rescued_data IS NOT NULL
+        GROUP BY _source_file, _batch_id
+        ORDER BY _batch_id DESC, _source_file
+        LIMIT 20
+        """,
+    )
+    warn_if_rows(
+        f"bronze.{table_name} malformed CSV rows retained",
+        f"""
+        SELECT _source_file, _batch_id, COUNT(*) AS corrupt_rows
+        FROM {catalog}.bronze.{table_name}
+        WHERE _corrupt_record IS NOT NULL
         GROUP BY _source_file, _batch_id
         ORDER BY _batch_id DESC, _source_file
         LIMIT 20

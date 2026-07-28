@@ -27,9 +27,11 @@ perform row-level deduplication.
 - Missing columns are retained in the Bronze schema and populated with `NULL`.
 - Column reordering is accepted because Auto Loader reads inferred CSV files
   by header.
-- Malformed CSV rows are retained through `_rescued_data`.
-- Added columns, missing columns, retries, and rescued-row counts are emitted
-  as structured `SCHEMA_EVOLUTION` warnings in the notebook run log.
+- Schema/type mismatches are retained through `_rescued_data`; malformed CSV
+  rows are retained separately through `_corrupt_record`.
+- Added columns, missing columns, retries, rescued-field counts, and corrupt-row
+  counts are emitted as structured `SCHEMA_EVOLUTION` warnings in the notebook
+  run log.
 
 Silver uses explicit allow-lists, so an evolved Bronze column does not enter
 Silver or Gold until its contract and governance treatment are reviewed.
