@@ -1,0 +1,40 @@
+resources:
+  jobs:
+    Mock_data_and_DQ_Rules_Setup_Job:
+      name: Mock data and DQ Rules Setup Job
+      tasks:
+        - task_key: generate_mock_data
+          notebook_task:
+            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/generate_mock_databricks
+            base_parameters:
+              catalog: "{{job.parameters.catalog}}"
+            source: WORKSPACE
+          environment_key: Default
+        - task_key: setup_dq_rules_table
+          depends_on:
+            - task_key: generate_mock_data
+          notebook_task:
+            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/dq/dq_01_setup
+            base_parameters:
+              catalog: "{{job.parameters.catalog}}"
+            source: WORKSPACE
+          environment_key: Default
+        - task_key: load_dq_rules
+          depends_on:
+            - task_key: setup_dq_rules_table
+          notebook_task:
+            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/dq/dq_02_load_dq_rules
+            base_parameters:
+              catalog: "{{job.parameters.catalog}}"
+            source: WORKSPACE
+          environment_key: Default
+      queue:
+        enabled: true
+      parameters:
+        - name: catalog
+          default: g3_dev
+      environments:
+        - environment_key: Default
+          spec:
+            environment_version: "5"
+      performance_target: PERFORMANCE_OPTIMIZED
