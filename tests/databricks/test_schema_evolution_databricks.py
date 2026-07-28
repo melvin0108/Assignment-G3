@@ -171,6 +171,16 @@ def row_for(record_id):
     return rows[0] if rows else None
 
 
+def row_for_batch(batch_id):
+    rows = (
+        spark.read.table(BRONZE_TABLE)
+        .filter(F.col("_batch_id") == batch_id)
+        .limit(1)
+        .collect()
+    )
+    return rows[0] if rows else None
+
+
 def persist_results():
     spark.sql(f"CREATE SCHEMA IF NOT EXISTS {catalog}.gov")
     result_df = spark.createDataFrame(results, RESULT_SCHEMA)
@@ -334,19 +344,37 @@ try:
             )
 
         elif fixture.scenario == "malformed_csv":
-            current = row_for("SE-005")
-            rescued_events = warning_events("malformed_csv_rows", batch_id=5)
-            record_check(
-                "malformed CSV payload is rescued",
-                current is not None and current["_rescued_data"] is not None,
-                "_rescued_data is populated",
-                current["_rescued_data"] if current is not None else "missing row",
+            current = row_for_batch(5)
+            corrupt_events = warning_events("malformed_csv_rows", batch_id=5)
+            corrupt_record = (
+                current["_corrupt_record"] if current is not None else None
+            )
+            rescued_data = (
+                current["_rescued_data"] if current is not None else None
             )
             record_check(
-                "malformed-row warning contains rescued count",
-                any(event.get("rescued_rows", 0) >= 1 for event in rescued_events),
-                {"event_type": "malformed_csv_rows", "batch_id": 5, "rescued_rows": ">=1"},
-                rescued_events,
+                "malformed CSV payload uses corrupt-record channel",
+                corrupt_record is not None
+                and "SE-005" in corrupt_record
+                and rescued_data is None,
+                {
+                    "_corrupt_record": "contains SE-005",
+                    "_rescued_data": None,
+                },
+                {
+                    "_corrupt_record": corrupt_record,
+                    "_rescued_data": rescued_data,
+                },
+            )
+            record_check(
+                "malformed-row warning contains corrupt count",
+                any(event.get("corrupt_rows", 0) >= 1 for event in corrupt_events),
+                {
+                    "event_type": "malformed_csv_rows",
+                    "batch_id": 5,
+                    "corrupt_rows": ">=1",
+                },
+                corrupt_events,
             )
 
         elif fixture.scenario == "invalid_typed_value":

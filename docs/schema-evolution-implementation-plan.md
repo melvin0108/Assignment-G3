@@ -10,13 +10,17 @@ This document records the implemented interpretation of
 | Added CSV column | Auto Loader updates its schema log, the loader retries, and Delta gains a `STRING` column. | Ignored until added to an explicit Silver contract. |
 | Missing CSV column | Existing Bronze column is `NULL`; a structured warning identifies the file and column. | Requiredness and null-rate DQ rules decide whether the row is accepted. |
 | Reordered columns | Read by CSV header without a drift warning. | No change. |
-| Malformed CSV row | Row is retained and `_rescued_data` is populated; a warning reports file/batch/count. | Existing contract fields are processed; rescued payload is not promoted. |
+| Malformed CSV row | Row is retained and `_corrupt_record` is populated; a warning reports file/batch/count. | Corrupt payload is retained for investigation and is not promoted. |
 | Scalar type change | Raw text remains a Bronze `STRING`. | `try_cast` produces a typed value or a type-specific quarantine row. |
 
 Bronze uses `cloudFiles.schemaHints` for known all-string fields rather than an
 explicit Spark schema, because Databricks does not permit `addNewColumns` with
 `.schema(...)`. `ingest_table` retries only `UnknownFieldException`; unrelated
 stream or storage errors still fail normally.
+
+`_rescued_data` stores fields rejected because of schema, type, or case
+mismatches. `_corrupt_record` separately stores CSV rows that the parser cannot
+parse. Both columns are nullable Bronze metadata.
 
 ## Observability and governance
 

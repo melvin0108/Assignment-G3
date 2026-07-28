@@ -79,6 +79,7 @@ _ingest_ts
 _run_id
 _batch_id
 _rescued_data
+_corrupt_record
 ```
 
 Recommended additions:

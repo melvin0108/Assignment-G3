@@ -14,8 +14,8 @@ Bronze is the **immutable landing zone**. It makes **one promise** and nothing m
 |---|---|
 | **Raw & complete** | Source data is written **exactly as received**. No cleansing, no filtering, no type coercion beyond what Delta needs. Bad rows are **kept**, never dropped. |
 | **Append-only** | Bronze tables are never overwritten or updated in place. Reruns add new files/batches, never mutate history (full auditability). |
-| **Schema-validated, drift-tolerant** | Expected schema is enforced; **unexpected/malformed columns are captured**, not rejected, via a rescue column. |
-| **Metadata-enriched** | Every row gets traceability columns: `_source_file`, `_source_file_mod_time`, `_ingest_ts`, `_run_id`, `_batch_id`, `_rescued_data`, plus `_source_record_id` and `_record_hash` for dedup / replay / quarantine joins. |
+| **Schema-validated, drift-tolerant** | Expected schema is enforced; unexpected fields and malformed records are captured, not rejected. |
+| **Metadata-enriched** | Every row gets traceability columns: `_source_file`, `_source_file_mod_time`, `_ingest_ts`, `_run_id`, `_batch_id`, `_rescued_data`, `_corrupt_record`, plus `_source_record_id` and `_record_hash` for dedup / replay / quarantine joins. |
 | **Idempotent** | Re-running ingestion does not duplicate rows already loaded (COPY INTO / Auto Loader track consumed files). |
 
 > Quarantining, masking, dedup, and type-fixing are **Silver's** job. Bronze only *captures* everything so Silver has the raw truth to clean.
@@ -195,14 +195,16 @@ none,Not fraud,low
 
 Bronze stores the source columns **unchanged**, plus traceability columns. Example — `bronze.transactions`:
 
-| transaction_id | amount | status | `_source_file` | `_source_file_mod_time` | `_ingest_ts` | `_run_id` | `_batch_id` | `_source_record_id` | `_record_hash` | `_rescued_data` |
-|---|---|---|---|---|---|---|---|---|---|---|
-| TXN-500001 | 129.50 | settled | transactions.csv | 2026-07-06T08:00 | 2026-07-06T08:05 | RUN-20260706-1 | 1 | TXN-500001 | 9a2f…c1 | null |
-| TXN-500002 | -50.00 | settled | transactions.csv | … | … | RUN-20260706-1 | 1 | TXN-500002 | 7b1e…0a | null |
-| … | … | … | … | … | … | … | … | … | … | `{extra_col:"x"}` |
+| transaction_id | amount | status | `_source_file` | `_source_file_mod_time` | `_ingest_ts` | `_run_id` | `_batch_id` | `_source_record_id` | `_record_hash` | `_rescued_data` | `_corrupt_record` |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| TXN-500001 | 129.50 | settled | transactions.csv | 2026-07-06T08:00 | 2026-07-06T08:05 | RUN-20260706-1 | 1 | TXN-500001 | 9a2f…c1 | null | null |
+| TXN-500002 | -50.00 | settled | transactions.csv | … | … | RUN-20260706-1 | 1 | TXN-500002 | 7b1e…0a | null | null |
+| … | … | … | … | … | … | … | … | … | … | `{extra_col:"x"}` | null |
 
 - All 7 source rows are present (Bronze keeps the dirty ones).
-- Auto Loader adds newly observed header columns to Bronze as `STRING`; `_rescued_data` is reserved for incomplete or malformed CSV records.
+- Auto Loader adds newly observed header columns to Bronze as `STRING`;
+  `_rescued_data` retains schema/type mismatches and `_corrupt_record` retains
+  CSV rows that cannot be parsed.
 - All columns are stored as **strings** in Bronze (typing is deferred to Silver) — this is intentional: it preserves the raw shape and lets Silver own type coercion + the resulting quarantine decisions.
 
 ---
@@ -240,7 +242,8 @@ CREATE TABLE tx_inv.bronze.transactions (
   _batch_id           BIGINT,
   _source_record_id   STRING,   -- stable per source row (source PK) for dedup & quarantine joins
   _record_hash        STRING,   -- sha256 of the raw source row, for change/replay detection
-  _rescued_data       STRING
+  _rescued_data       STRING,
+  _corrupt_record     STRING
 ) USING DELTA;
 ```
 
@@ -284,7 +287,11 @@ SELECT
 FROM cloud_files(
   '/Volumes/tx_inv/landing/transactions',
   'csv',
-  map('header', 'true', 'rescuedDataColumn', '_rescued_data'));
+  map(
+    'header', 'true',
+    'rescuedDataColumn', '_rescued_data',
+    'columnNameOfCorruptRecord', '_corrupt_record'
+  ));
 ```
 
 ### Option C — Auto Loader (near-real-time / micro-batch)
@@ -295,6 +302,8 @@ FROM cloud_files(
      .option("cloudFiles.schemaEvolutionMode", "addNewColumns")
      .option("cloudFiles.inferColumnTypes", "false")
      .option("rescuedDataColumn", "_rescued_data")
+     .option("columnNameOfCorruptRecord", "_corrupt_record")
+     .option("mode", "PERMISSIVE")
      .option("header", "true")
      .load("/Volumes/tx_inv/landing/transactions")
      .writeStream.format("delta")
@@ -314,7 +323,7 @@ FROM cloud_files(
  ┌──────────────────┐   COPY INTO /    ┌─────────────────────────────────────┐
  │ Source mock files│   Auto Loader /  │  Delta tables (raw + metadata)      │
  │ (CSV/JSON)       │ ──── DLT ──────▶ │  append-only, schema-validated,     │
- │ /Volumes/.../    │   idempotent     │  _rescued_data for drift            │
+ │ /Volumes/.../    │   idempotent     │  rescued + corrupt payload columns  │
  │   landing/       │                  │  all columns STRING                 │
  └──────────────────┘                  └─────────────────────────────────────┘
         tx_inv.bronze.customers · accounts · cards · merchants ·
@@ -334,7 +343,7 @@ FROM cloud_files(
 
 - **Namespace:** `tx_inv.bronze.<table>` (table name = source file stem, singular).
 - **All bronze columns are `STRING`** — type coercion is Silver's responsibility, with failures → quarantine.
-- **Mandatory metadata columns on every bronze table:** `_source_file`, `_source_file_mod_time`, `_ingest_ts`, `_run_id`, `_batch_id`, `_source_record_id`, `_record_hash`, plus `_rescued_data` for malformed CSV preservation.
+- **Mandatory metadata columns on every bronze table:** `_source_file`, `_source_file_mod_time`, `_ingest_ts`, `_run_id`, `_batch_id`, `_source_record_id`, `_record_hash`, `_rescued_data` for schema/type mismatches, and `_corrupt_record` for malformed CSV preservation.
 - **Append-only:** never `UPDATE`/`DELETE`/`OVERWRITE` a bronze table.
 - **Idempotent reruns:** use `COPY INTO` or checkpointed Auto Loader so re-running the pipeline from a clean state reproduces the same bronze content.
 - **Deterministic mock data:** the generator is seeded, so re-generating source files reproduces the same defects (required for reproducible tests).

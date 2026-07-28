@@ -36,15 +36,18 @@ Landing (CSV) → Bronze (permissive, không bao giờ chặn) → Silver (enfor
 **Column reordering** → Không ảnh hưởng, Delta đọc theo tên cột (header), không theo vị trí.
 → Không cần log.
 
-**Row lệch số cột so với header** (malformed CSV: thừa/thiếu delimiter, ký tự đặc biệt không escape) → dòng bị đẩy vào `_rescued_data`.
-→ Log warning: "CSV malformed row: [file_path], lệch số cột so với header, đã rescue."
+**Row CSV không parse được** (malformed CSV: quote/escape không hợp lệ) → raw row
+được giữ trong `_corrupt_record`.
+→ Log warning: "CSV malformed row: [file_path], đã giữ raw payload."
 
 **Type change (scalar)** → Không xảy ra ở bronze (đã all-string). Convert ở silver bằng `try_cast()`, không dùng `cast()` cứng.
 → Parse fail → NULL, đẩy record sang bảng quarantine (nằm ở silver, không đẩy tiếp xuống gold).
 → Log warning: "Type cast failed: cột [tên cột], giá trị gốc [value], batch [batch_id]."
 
-## Vai trò `_rescued_data`
-Với CSV, chỉ bắt dòng malformed (số cột không khớp header). Không liên quan add/missing column — 2 case này do Auto Loader/Delta tự xử lý riêng.
+## Vai trò `_rescued_data` và `_corrupt_record`
+`_rescued_data` giữ field không khớp schema/type/case. `_corrupt_record` giữ
+toàn bộ raw CSV row khi parser không thể parse. Add/missing column vẫn do Auto
+Loader/Delta xử lý riêng.
 
 ## Nguyên tắc log/warning
 Mọi sự kiện schema evolution đều phải log warning, gồm: loại sự kiện, tên bảng/cột, timestamp/batch_id/file_path, và giá trị gốc nếu là type cast fail.
@@ -60,9 +63,9 @@ def check_schema_drift(current_schema, previous_schema, batch_id):
 ```
 
 ```python
-rescued_count = bronze_df.filter(F.col("_rescued_data").isNotNull()).count()
-if rescued_count > 0:
-    log.warning(f"[SCHEMA_EVOLUTION] rescued_rows={rescued_count} — kiểm tra _rescued_data (malformed row)")
+corrupt_count = bronze_df.filter(F.col("_corrupt_record").isNotNull()).count()
+if corrupt_count > 0:
+    log.warning(f"[SCHEMA_EVOLUTION] corrupt_rows={corrupt_count} — kiểm tra _corrupt_record")
 ```
 
 ```python

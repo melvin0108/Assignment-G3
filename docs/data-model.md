@@ -10,7 +10,7 @@
 - **Naming (CTA 1): plural** everywhere — `customers`, `accounts`, `transactions`, … Reference/lookup tables plural (`channels`, `countries`); calendar dimension kept as `date_dim` by convention. Governance tables plural: `dq_rules`, `dq_results`, `quarantine_records`, `pipeline_runs`, `metadata_lineage`, `masking_policies`, `access_policies`.
 - **Grain (CTA 5):** every table has an explicit grain (§3 + §4).
 - **Bronze typing:** all source fields land as `STRING`; type coercion is Silver's job (failures → quarantine).
-- **Bronze metadata (CTA 4), on every bronze table:** `_source_file`, `_source_file_mod_time`, `_ingest_ts`, `_run_id`, `_batch_id`, `_rescued_data`, plus `_source_record_id` and `_record_hash` for dedup/replay/quarantine joins. Defined in `bronze-layer.md`.
+- **Bronze metadata (CTA 4), on every bronze table:** `_source_file`, `_source_file_mod_time`, `_ingest_ts`, `_run_id`, `_batch_id`, `_rescued_data`, `_corrupt_record`, plus `_source_record_id` and `_record_hash` for dedup/replay/quarantine joins. Defined in `bronze-layer.md`.
 - **PII (CTA 7):** handled per layer — Bronze keeps raw, Silver masks, Gold redacts. Full matrix in §6.
 - Mock PII/tax_id/PAN values are **synthetic** — no real customer/NAB data.
 

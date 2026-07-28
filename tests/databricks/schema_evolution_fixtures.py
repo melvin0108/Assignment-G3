@@ -61,7 +61,7 @@ FIXTURES = (
         batch_id=5,
         csv_text=(
             "id,amount,currency,risk_score\n"
-            "SE-005,500.00,USD,0.50,UNEXPECTED_EXTRA_FIELD\n"
+            "SE-005,\"500.00\\\",USD,0.50\n"
         ),
     ),
     CsvFixture(
