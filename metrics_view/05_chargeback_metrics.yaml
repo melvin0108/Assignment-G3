@@ -1,0 +1,39 @@
+version: 1.1
+comment: Chargeback activity metrics by case, currency, scheme, stage, and processed date.
+source: g3_catalog.gold.fact_chargeback
+
+joins:
+  - name: currency
+    source: g3_catalog.gold.dim_currency
+    'on': source.currency_code = currency.currency_code
+  - name: processed_date
+    source: g3_catalog.gold.dim_date
+    'on': source.processed_date_key = processed_date.date_key
+
+fields:
+  - name: case_id
+    expr: source.case_id
+    synonyms: [case, hồ sơ]
+  - name: currency_code
+    expr: source.currency_code
+    comment: Monetary measures must be grouped or filtered by this field.
+    synonyms: [currency, tiền tệ]
+  - name: scheme
+    expr: source.scheme
+    synonyms: [card scheme]
+  - name: chargeback_stage
+    expr: source.chargeback_stage
+    synonyms: [stage, giai đoạn]
+  - name: processed_date_key
+    expr: source.processed_date_key
+    synonyms: [processed date, ngày xử lý]
+
+measures:
+  - name: chargeback_count
+    expr: COUNT(*)
+    comment: Number of case-linked chargebacks.
+    synonyms: [number of chargebacks, số chargeback]
+  - name: chargeback_amount_total
+    expr: SUM(source.amount)
+    comment: Total chargeback amount; group or filter by currency_code.
+    synonyms: [total chargeback amount, tổng số tiền chargeback]

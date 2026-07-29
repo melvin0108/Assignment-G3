@@ -1,0 +1,42 @@
+version: 1.1
+comment: Dispute activity metrics by case, reason, currency, status, and raised date.
+source: g3_catalog.gold.fact_dispute
+
+joins:
+  - name: dispute_reason
+    source: g3_catalog.gold.dim_dispute_reason
+    'on': source.reason_code = dispute_reason.reason_code
+  - name: currency
+    source: g3_catalog.gold.dim_currency
+    'on': source.currency_code = currency.currency_code
+  - name: raised_date
+    source: g3_catalog.gold.dim_date
+    'on': source.raised_date_key = raised_date.date_key
+
+fields:
+  - name: case_id
+    expr: source.case_id
+    synonyms: [case, hồ sơ]
+  - name: reason_code
+    expr: source.reason_code
+    synonyms: [dispute reason, lý do]
+  - name: currency_code
+    expr: source.currency_code
+    comment: Monetary measures must be grouped or filtered by this field.
+    synonyms: [currency, tiền tệ]
+  - name: dispute_status
+    expr: source.dispute_status
+    synonyms: [status, trạng thái tranh chấp]
+  - name: raised_date_key
+    expr: source.raised_date_key
+    synonyms: [raised date, ngày tranh chấp]
+
+measures:
+  - name: dispute_count
+    expr: COUNT(*)
+    comment: Number of case-linked disputes.
+    synonyms: [number of disputes, số tranh chấp]
+  - name: dispute_amount_total
+    expr: SUM(source.amount)
+    comment: Total disputed amount; group or filter by currency_code.
+    synonyms: [total disputed amount, tổng số tiền tranh chấp]

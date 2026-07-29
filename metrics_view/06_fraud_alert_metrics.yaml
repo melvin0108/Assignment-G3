@@ -1,0 +1,32 @@
+version: 1.1
+comment: Fraud-alert activity metrics by case, rule, disposition, and date.
+source: g3_catalog.gold.fact_fraud_alert
+
+joins:
+  - name: triggered_date
+    source: g3_catalog.gold.dim_date
+    'on': source.triggered_date_key = triggered_date.date_key
+
+fields:
+  - name: case_id
+    expr: source.case_id
+    synonyms: [case, hồ sơ]
+  - name: rule_name
+    expr: source.rule_name
+    synonyms: [alert rule, quy tắc]
+  - name: disposition
+    expr: source.disposition
+    synonyms: [outcome, xử lý]
+  - name: triggered_date_key
+    expr: source.triggered_date_key
+    synonyms: [alert date, ngày cảnh báo]
+
+measures:
+  - name: fraud_alert_count
+    expr: COUNT(*)
+    comment: Number of case-linked fraud alerts.
+    synonyms: [fraud alert count, số cảnh báo gian lận]
+  - name: fraud_alert_score_average
+    expr: AVG(source.score)
+    comment: Average fraud-alert score.
+    synonyms: [average alert score, điểm cảnh báo trung bình]

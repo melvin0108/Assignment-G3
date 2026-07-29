@@ -1,0 +1,34 @@
+version: 1.1
+comment: Case overview and closure metrics by status, priority, fraud type, opened date, and closed date.
+source: g3_catalog.gold.dim_case
+
+joins:
+  - name: opened_date
+    source: g3_catalog.gold.dim_date
+    'on': source.opened_date_key = opened_date.date_key
+  - name: closed_date
+    source: g3_catalog.gold.dim_date
+    'on': source.closed_date_key = closed_date.date_key
+
+fields:
+  - name: priority
+    expr: source.priority
+    synonyms: [case priority, mức ưu tiên]
+  - name: status_code
+    expr: source.status_code
+    synonyms: [case status, trạng thái]
+  - name: fraud_type_code
+    expr: source.fraud_type_code
+    synonyms: [fraud type, loại gian lận]
+  - name: opened_date_key
+    expr: source.opened_date_key
+    synonyms: [opened date, ngày mở]
+  - name: closed_date_key
+    expr: source.closed_date_key
+    synonyms: [closed date, closure date, ngày đóng]
+
+measures:
+  - name: case_count
+    expr: COUNT(DISTINCT source.case_id)
+    comment: Distinct number of eligible investigation cases.
+    synonyms: [case count, investigation count, số hồ sơ]
