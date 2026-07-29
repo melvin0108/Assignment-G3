@@ -1,0 +1,22 @@
+version: 1.1
+comment: Safe-note metrics for PII-screened investigation notes by case and created date.
+source: g3_catalog.gold.fact_investigation_note
+
+joins:
+  - name: created_date
+    source: g3_catalog.gold.dim_date
+    'on': source.created_date_key = created_date.date_key
+
+fields:
+  - name: case_id
+    expr: source.case_id
+    synonyms: [case, hồ sơ]
+  - name: created_date_key
+    expr: source.created_date_key
+    synonyms: [note date, ngày ghi chú]
+
+measures:
+  - name: safe_note_count
+    expr: COUNT(*)
+    comment: Number of PII-screened investigation notes.
+    synonyms: [safe note count, screened notes, số ghi chú an toàn]

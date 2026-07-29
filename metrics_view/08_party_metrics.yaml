@@ -1,0 +1,25 @@
+version: 1.1
+comment: Safe party-composition metrics by case, party type, and role.
+source: g3_catalog.gold.fact_case_party_summary
+
+joins:
+  - name: investigation_case
+    source: g3_catalog.gold.dim_case
+    'on': source.case_id = investigation_case.case_id
+
+fields:
+  - name: case_id
+    expr: source.case_id
+    synonyms: [case, hồ sơ]
+  - name: party_type
+    expr: source.party_type
+    synonyms: [party type, loại bên]
+  - name: role
+    expr: source.role
+    synonyms: [party role, vai trò]
+
+measures:
+  - name: party_count
+    expr: SUM(source.party_count)
+    comment: Number of parties across the selected safe groups.
+    synonyms: [party total, number of parties, số bên]

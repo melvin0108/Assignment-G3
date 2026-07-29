@@ -32,7 +32,7 @@ resources:
         enabled: true
       parameters:
         - name: catalog
-          default: g3_dev
+          default: g3_catalog
       environments:
         - environment_key: Default
           spec:

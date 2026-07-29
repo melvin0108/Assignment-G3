@@ -1,0 +1,36 @@
+version: 1.1
+comment: Authorization outcome metrics for attempts, approvals, and declines.
+source: g3_catalog.gold.fact_authorization_attempt
+
+joins:
+  - name: authorization_date
+    source: g3_catalog.gold.dim_date
+    'on': source.authorization_date_key = authorization_date.date_key
+
+fields:
+  - name: case_id
+    expr: source.case_id
+    synonyms: [case, hồ sơ]
+  - name: decision
+    expr: source.decision
+    synonyms: [authorization outcome, kết quả]
+  - name: decline_reason
+    expr: source.decline_reason
+    synonyms: [decline reason, lý do từ chối]
+  - name: authorization_date_key
+    expr: source.authorization_date_key
+    synonyms: [authorization date, ngày cấp phép]
+
+measures:
+  - name: authorization_attempt_count
+    expr: COUNT(*)
+    comment: Number of authorization attempts.
+    synonyms: [authorization attempts, lần thử cấp phép]
+  - name: authorization_approval_rate
+    expr: AVG(CASE WHEN source.decision = 'approved' THEN 1.0 ELSE 0.0 END)
+    comment: Approved attempts divided by all authorization attempts.
+    synonyms: [approval rate, tỷ lệ phê duyệt]
+  - name: authorization_decline_rate
+    expr: AVG(CASE WHEN source.decision = 'declined' THEN 1.0 ELSE 0.0 END)
+    comment: Declined attempts divided by all authorization attempts.
+    synonyms: [decline rate, tỷ lệ từ chối]

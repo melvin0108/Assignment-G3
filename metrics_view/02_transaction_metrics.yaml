@@ -1,0 +1,70 @@
+version: 1.1
+comment: Transaction activity and merchant-risk exposure metrics.
+source: g3_catalog.gold.fact_case_transaction
+
+joins:
+  - name: merchant
+    source: g3_catalog.gold.dim_merchant
+    'on': source.merchant_id = merchant.merchant_id
+  - name: channel
+    source: g3_catalog.gold.dim_channel
+    'on': source.channel_code = channel.channel_code
+  - name: currency
+    source: g3_catalog.gold.dim_currency
+    'on': source.currency_code = currency.currency_code
+  - name: transaction_date
+    source: g3_catalog.gold.dim_date
+    'on': source.transaction_date_key = transaction_date.date_key
+
+fields:
+  - name: case_id
+    expr: source.case_id
+    synonyms: [case, hồ sơ]
+  - name: channel_code
+    expr: source.channel_code
+    synonyms: [channel, kênh]
+  - name: currency_code
+    expr: source.currency_code
+    comment: Monetary measures must be grouped or filtered by this field.
+    synonyms: [currency, tiền tệ]
+  - name: transaction_status
+    expr: source.transaction_status
+    synonyms: [status, trạng thái giao dịch]
+  - name: transaction_date_key
+    expr: source.transaction_date_key
+    synonyms: [transaction date, ngày giao dịch]
+  - name: merchant_id
+    expr: source.merchant_id
+    synonyms: [merchant, người bán]
+  - name: mcc
+    expr: merchant.mcc
+    synonyms: [merchant category code]
+  - name: category_name
+    expr: merchant.category_name
+    synonyms: [merchant category, danh mục]
+  - name: category_group
+    expr: merchant.category_group
+    synonyms: [category group, nhóm danh mục]
+  - name: country
+    expr: merchant.country
+    synonyms: [merchant country, quốc gia]
+  - name: risk_rating
+    expr: merchant.risk_rating
+    synonyms: [merchant risk, risk level, rủi ro]
+  - name: merchant_status
+    expr: merchant.merchant_status
+    synonyms: [merchant status, trạng thái người bán]
+
+measures:
+  - name: transaction_count
+    expr: COUNT(DISTINCT source.case_id, source.transaction_id)
+    comment: Distinct case-linked transaction count.
+    synonyms: [transaction count, number of transactions, số giao dịch]
+  - name: transaction_amount_total
+    expr: SUM(source.amount)
+    comment: Total transaction amount; group or filter by currency_code.
+    synonyms: [total transaction amount, transaction value, tổng số tiền]
+  - name: transaction_amount_average
+    expr: AVG(source.amount)
+    comment: Average transaction amount; group or filter by currency_code.
+    synonyms: [average transaction amount, số tiền trung bình]
