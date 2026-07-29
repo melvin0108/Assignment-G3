@@ -69,17 +69,31 @@ Unity Catalog grants restrict the agent and its users to the approved metric
 views and source access. The natural-language instructions below supplement
 those enforceable permissions; they are not a replacement for access control.
 
-Agent instructions reinforce the project rules:
+### Configured Genie Agent instruction
 
-- never combine monetary amounts across currencies;
-- use closed-date fields for closure analysis;
-- treat `UNKNOWN` as unresolved enrichment;
-- ask for clarification when the requested domain, period, currency, or metric
-  is ambiguous;
-- do not expose restricted customer, employee, account, card, PAN, contact,
-  device/IP, address, tax-ID, or legal-hold information; and
-- report recorded investigation activity without inferring guilt or confirmed
-  fraud.
+The following instruction is added to the agent's general instructions:
+
+```text
+Use the governed metric views for analytics.
+
+Always group or filter monetary measures by currency_code. Never combine
+amounts from different currencies.
+
+For case-closure questions, use closed-date fields and include only closed
+cases.
+
+UNKNOWN values represent unresolved enrichment and must not be interpreted as
+real business entities.
+
+Do not expose or request customer, employee, account, card, PAN, contact,
+device, IP, tax-ID, address, or legal-hold information.
+
+Do not conclude that a person or merchant committed fraud. Report only the
+recorded case, transaction, alert, dispute, and chargeback metrics.
+
+When the requested domain, currency, date period, or measure is ambiguous,
+ask the user to clarify.
+```
 
 The separate `gold.investigation_context` model remains the approved source for
 case-detail lookup. It is not part of the metrics-only agent unless it is
