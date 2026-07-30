@@ -1,25 +1,19 @@
 version: 1.1
-comment: Safe party-composition metrics by case, party type, and role.
+comment: Safe party-composition metrics with joined case attributes.
 source: g3_catalog.gold.fact_case_party_summary
-
 joins:
-  - name: investigation_case
-    source: g3_catalog.gold.dim_case
-    'on': source.case_id = investigation_case.case_id
-
+  - {name: investigation_case, source: g3_catalog.gold.dim_case, 'on': source.case_id = investigation_case.case_id}
 fields:
-  - name: case_id
-    expr: source.case_id
-    synonyms: [case, hồ sơ]
-  - name: party_type
-    expr: source.party_type
-    synonyms: [party type, loại bên]
-  - name: role
-    expr: source.role
-    synonyms: [party role, vai trò]
-
+  - {name: case_id, expr: source.case_id, comment: Natural investigation case identifier., synonyms: [case]}
+  - {name: party_type, expr: source.party_type, comment: Safe party classification., synonyms: [party type]}
+  - {name: role, expr: source.role, comment: Safe party role., synonyms: [party role]}
+  - {name: party_count, expr: source.party_count, comment: Number of parties in the safe group., synonyms: [party count]}
+  - {name: pipeline_run_id, expr: source.pipeline_run_id, comment: Gold pipeline run identifier., synonyms: [run id]}
+  - {name: batch_id, expr: source.batch_id, comment: Source snapshot batch identifier., synonyms: [batch]}
+  - {name: last_refreshed_at, expr: source.last_refreshed_at, comment: Gold row refresh time., synonyms: [refresh time]}
+  - {name: quality_status, expr: source.quality_status, comment: Row quality outcome., synonyms: [data quality]}
+  - {name: usage_restrictions, expr: source.usage_restrictions, comment: Consumer access classification., synonyms: [AI access]}
+  - {name: case_priority, expr: investigation_case.priority, comment: Joined case priority., synonyms: [case priority]}
+  - {name: case_status_code, expr: investigation_case.status_code, comment: Joined case status., synonyms: [case status]}
 measures:
-  - name: party_count
-    expr: SUM(source.party_count)
-    comment: Number of parties across the selected safe groups.
-    synonyms: [party total, number of parties, số bên]
+  - {name: party_count, expr: SUM(source.party_count), comment: Number of parties across selected safe groups., synonyms: [party total]}

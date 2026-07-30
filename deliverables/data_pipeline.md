@@ -66,7 +66,7 @@ flowchart TD
     end
 
     subgraph M3_GATE ["6. Gold Acceptance Validation"]
-        V3["validate_m3_gold<br/>(Contract & Grain Validation)"]:::gate
+        V3["validate_gold<br/>(Contract & Grain Validation)"]:::gate
     end
 
     subgraph AI_CONTEXT ["7. Final AI Data Product"]
@@ -285,12 +285,12 @@ The end-to-end data pipeline is structured into 8 modular, sequential implementa
 
 ### 3.8. Write Metadata and Lineage Output
 
-- **Module Source**: [`pipeline/silver/silver_metadata_lineage.py`](file:///home/duckthihn/Assignment-G3/pipeline/silver/silver_metadata_lineage.py) and [`pipeline/validation/validate_m3_gold.py`](file:///home/duckthihn/Assignment-G3/pipeline/validation/validate_m3_gold.py)
+- **Module Source**: [`pipeline/silver/silver_metadata_lineage.py`](file:///home/duckthihn/Assignment-G3/pipeline/silver/silver_metadata_lineage.py) and [`pipeline/validation/validate_gold.py`](file:///home/duckthihn/Assignment-G3/pipeline/validation/validate_gold.py)
 - **Mechanism**:
   - Maintains explicit column-level data lineage in `<catalog>.gov.metadata_lineage`.
   - Records field-by-field source-to-target mappings: `source_catalog`, `source_schema`, `source_table`, `source_field` → `target_catalog`, `target_schema`, `target_table`, `target_field`, along with `transformation_logic` (e.g. *"Direct copy"*, *"Tokenized with SHA256 and salt"*, *"Generalized into age bands"*).
   - Integrates automatically with **Databricks Unity Catalog Lineage Explorer**, enabling visual graph inspection of table dependencies, pipeline transformations, and field derivations at runtime.
-  - Validates end-to-end data integrity via automated test suites in `validate_m1_bronze.py`, `validate_m2_dq.py`, `validate_m2_silver.py`, and `validate_m3_gold.py`.
+  - Validates end-to-end data integrity via automated test suites in `validate_bronze.py`, `validate_dq.py`, `validate_silver.py`, and `validate_gold.py`.
 
 ---
 
@@ -301,5 +301,5 @@ To run and verify the full pipeline implementation on Databricks:
 1. **Ingest Raw Data**: Run [`generate_mock_databricks.py`](file:///home/duckthihn/Assignment-G3/generate_mock_databricks.py) then `pipeline/bronze/bronze_all_tables.py`. Verify with [`pipeline/validation/validate_m1_bronze.py`](file:///home/duckthihn/Assignment-G3/pipeline/validation/validate_m1_bronze.py).
 2. **Run Data Quality & Quarantine**: Run `pipeline/dq/dq_01_setup.py`, `pipeline/dq/dq_02_load_dq_rules.py`, and [`pipeline/dq/dq_03_failures_all_rules.py`](file:///home/duckthihn/Assignment-G3/pipeline/dq/dq_03_failures_all_rules.py).
 3. **Execute Silver & Masking**: Run [`pipeline/silver/silver_all_tables.py`](file:///home/duckthihn/Assignment-G3/pipeline/silver/silver_all_tables.py). Verify with [`pipeline/validation/validate_m2_dq.py`](file:///home/duckthihn/Assignment-G3/pipeline/validation/validate_m2_dq.py) and [`pipeline/validation/validate_m2_silver.py`](file:///home/duckthihn/Assignment-G3/pipeline/validation/validate_m2_silver.py).
-4. **Build Gold & AI Context**: Run [`pipeline/gold/gold_all_tables.py`](file:///home/duckthihn/Assignment-G3/pipeline/gold/gold_all_tables.py). Verify with [`pipeline/validation/validate_m3_gold.py`](file:///home/duckthihn/Assignment-G3/pipeline/validation/validate_m3_gold.py).
+4. **Build Gold & AI Context**: Run [`pipeline/gold/gold_all_tables.py`](file:///home/duckthihn/Assignment-G3/pipeline/gold/gold_all_tables.py). Verify with [`pipeline/validation/validate_gold.py`](file:///home/duckthihn/Assignment-G3/pipeline/validation/validate_gold.py).
 

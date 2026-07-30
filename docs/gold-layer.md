@@ -42,7 +42,7 @@ device/IP, PAN, contact details, legal-hold records, or unsupported conclusions.
 ## Run and validate
 
 Run `pipeline/gold/gold_all_tables.py` after Silver, then
-`pipeline/validation/validate_m3_gold.py`. The runner publishes output policy
+`pipeline/validation/validate_gold.py`. The runner publishes output policy
 labels only; it does not manage Databricks principals or grants. Model-level
 grain, source, key, safety, and use-case contracts are in `docs/models/gold/`.
 

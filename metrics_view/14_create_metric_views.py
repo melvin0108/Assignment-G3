@@ -19,6 +19,11 @@ DEFINITIONS = [
     ("06_fraud_alert_metrics.yaml", "mv_fraud_alert_metrics"),
     ("07_safe_note_metrics.yaml", "mv_safe_note_metrics"),
     ("08_party_metrics.yaml", "mv_party_metrics"),
+    ("09_date_fields.yaml", "mv_dim_date"),
+    ("10_merchant_fields.yaml", "mv_dim_merchant"),
+    ("11_channel_fields.yaml", "mv_dim_channel"),
+    ("12_currency_fields.yaml", "mv_dim_currency"),
+    ("13_dispute_reason_fields.yaml", "mv_dim_dispute_reason"),
 ]
 
 

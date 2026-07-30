@@ -1,32 +1,25 @@
 version: 1.1
-comment: Fraud-alert activity metrics by case, rule, disposition, and date.
+comment: Fraud-alert activity metrics with case and calendar attributes.
 source: g3_catalog.gold.fact_fraud_alert
-
 joins:
-  - name: triggered_date
-    source: g3_catalog.gold.dim_date
-    'on': source.triggered_date_key = triggered_date.date_key
-
+  - {name: investigation_case, source: g3_catalog.gold.dim_case, 'on': source.case_id = investigation_case.case_id}
+  - {name: triggered_date, source: g3_catalog.gold.dim_date, 'on': source.triggered_date_key = triggered_date.date_key}
 fields:
-  - name: case_id
-    expr: source.case_id
-    synonyms: [case, hồ sơ]
-  - name: rule_name
-    expr: source.rule_name
-    synonyms: [alert rule, quy tắc]
-  - name: disposition
-    expr: source.disposition
-    synonyms: [outcome, xử lý]
-  - name: triggered_date_key
-    expr: source.triggered_date_key
-    synonyms: [alert date, ngày cảnh báo]
-
+  - {name: case_id, expr: source.case_id, comment: Natural investigation case identifier., synonyms: [case]}
+  - {name: transaction_id, expr: source.transaction_id, comment: Natural transaction identifier., synonyms: [transaction]}
+  - {name: alert_id, expr: source.alert_id, comment: Natural fraud alert identifier., synonyms: [fraud alert]}
+  - {name: triggered_date_key, expr: source.triggered_date_key, comment: Alert triggered date key., synonyms: [alert date]}
+  - {name: rule_name, expr: source.rule_name, comment: Fraud rule name., synonyms: [alert rule]}
+  - {name: score, expr: source.score, comment: Fraud alert score., synonyms: [alert score]}
+  - {name: disposition, expr: source.disposition, comment: Alert disposition., synonyms: [alert outcome]}
+  - {name: triggered_at, expr: source.triggered_at, comment: Alert triggered timestamp., synonyms: [alert time]}
+  - {name: pipeline_run_id, expr: source.pipeline_run_id, comment: Gold pipeline run identifier., synonyms: [run id]}
+  - {name: batch_id, expr: source.batch_id, comment: Source snapshot batch identifier., synonyms: [batch]}
+  - {name: last_refreshed_at, expr: source.last_refreshed_at, comment: Gold row refresh time., synonyms: [refresh time]}
+  - {name: quality_status, expr: source.quality_status, comment: Row quality outcome., synonyms: [data quality]}
+  - {name: usage_restrictions, expr: source.usage_restrictions, comment: Consumer access classification., synonyms: [AI access]}
+  - {name: case_priority, expr: investigation_case.priority, comment: Joined case priority., synonyms: [case priority]}
+  - {name: triggered_calendar_date, expr: triggered_date.date_id, comment: Joined alert calendar date., synonyms: [calendar date]}
 measures:
-  - name: fraud_alert_count
-    expr: COUNT(*)
-    comment: Number of case-linked fraud alerts.
-    synonyms: [fraud alert count, số cảnh báo gian lận]
-  - name: fraud_alert_score_average
-    expr: AVG(source.score)
-    comment: Average fraud-alert score.
-    synonyms: [average alert score, điểm cảnh báo trung bình]
+  - {name: fraud_alert_count, expr: COUNT(*), comment: Number of case-linked fraud alerts., synonyms: [fraud alert count]}
+  - {name: fraud_alert_score_average, expr: AVG(source.score), comment: Average fraud-alert score., synonyms: [average alert score]}

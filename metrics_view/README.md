@@ -17,9 +17,16 @@ use-case and routing definition and is not modified.
 | `06_fraud_alert_metrics.yaml` | `mv_fraud_alert_metrics` | `fraud_alert_activity` |
 | `07_safe_note_metrics.yaml` | `mv_safe_note_metrics` | `safe_notes` |
 | `08_party_metrics.yaml` | `mv_party_metrics` | `party_composition` |
+| `09_date_fields.yaml` | `mv_dim_date` | Calendar reference fields |
+| `10_merchant_fields.yaml` | `mv_dim_merchant` | Merchant reference fields |
+| `11_channel_fields.yaml` | `mv_dim_channel` | Channel reference fields |
+| `12_currency_fields.yaml` | `mv_dim_currency` | Currency reference fields |
+| `13_dispute_reason_fields.yaml` | `mv_dim_dispute_reason` | Dispute-reason reference fields |
 
 `case_detail_lookup` is intentionally not converted. It is a detail route with
-no metric IDs and continues to use `g3_catalog.gold.investigation_context`.
+no metric IDs and uses `gold.investigation_context` as a direct Genie source;
+its nested arrays and structs cannot be faithfully represented as metric-view
+fields.
 
 ## Deploy from a Databricks Git folder
 
@@ -29,9 +36,9 @@ no metric IDs and continues to use `g3_catalog.gold.investigation_context`.
 4. Select the target catalog with the `catalog` widget.
 5. Run all cells.
 
-The runner creates `<catalog>.metrics` if needed, reads all eight YAML files,
+The runner creates `<catalog>.metrics` if needed, reads all 13 YAML files,
 and executes `CREATE OR REPLACE VIEW ... WITH METRICS LANGUAGE YAML`. It
-replaces only the eight metric views listed above and does not replace Gold
+replaces only the 13 metric views listed above and does not replace Gold
 tables.
 
 The compute must support metric views and YAML specification 1.1. The executing

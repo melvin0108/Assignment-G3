@@ -1,0 +1,13 @@
+version: 1.1
+comment: Currency reference fields for governed filtering and grouping; intentionally no artificial measures.
+source: g3_catalog.gold.dim_currency
+fields:
+  - {name: currency_code, expr: source.currency_code, comment: Natural currency identifier., synonyms: [currency code]}
+  - {name: currency_name, expr: source.currency_name, comment: Currency name., synonyms: [currency]}
+  - {name: decimals, expr: source.decimals, comment: Currency decimal precision., synonyms: [decimal places]}
+  - {name: is_unknown, expr: source.is_unknown, comment: Whether this is the UNKNOWN currency member., synonyms: [unknown currency]}
+  - {name: pipeline_run_id, expr: source.pipeline_run_id, comment: Gold pipeline run identifier., synonyms: [run id]}
+  - {name: batch_id, expr: source.batch_id, comment: Source snapshot batch identifier., synonyms: [batch]}
+  - {name: last_refreshed_at, expr: source.last_refreshed_at, comment: Gold row refresh time., synonyms: [refresh time]}
+  - {name: quality_status, expr: source.quality_status, comment: Row quality outcome., synonyms: [data quality]}
+  - {name: usage_restrictions, expr: source.usage_restrictions, comment: Consumer access classification., synonyms: [AI access]}

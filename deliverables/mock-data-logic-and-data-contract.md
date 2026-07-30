@@ -941,7 +941,7 @@ pipeline sequence:
 | `pipeline/validation/validate_m1_bronze.py` | Source columns, file/batch lineage, and Bronze ingestion. |
 | `pipeline/validation/validate_m2_dq.py` | DQ registry, quarantine output, manifest reconciliation, and DQ-to-Silver exclusion. |
 | `pipeline/validation/validate_m2_silver.py` | Silver schemas, casts, integrity, masking, current-batch consistency, and Gold inputs. |
-| `pipeline/validation/validate_m3_gold.py` | Downstream Gold contracts, natural grains, metadata, AI policy, and referential integrity. |
+| `pipeline/validation/validate_gold.py` | Downstream Gold contracts, natural grains, metadata, AI policy, and referential integrity. |
 
 The repository's static contract checks additionally verify:
 

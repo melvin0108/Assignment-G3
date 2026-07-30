@@ -1,0 +1,19 @@
+version: 1.1
+comment: Merchant reference fields for governed filtering and grouping; intentionally no artificial measures.
+source: g3_catalog.gold.dim_merchant
+fields:
+  - {name: merchant_id, expr: source.merchant_id, comment: Natural merchant identifier., synonyms: [merchant code]}
+  - {name: merchant_name, expr: source.merchant_name, comment: Business-facing merchant name., synonyms: [merchant]}
+  - {name: mcc, expr: source.mcc, comment: Merchant category code., synonyms: [merchant category code]}
+  - {name: category_name, expr: source.category_name, comment: Merchant category name., synonyms: [merchant category]}
+  - {name: category_group, expr: source.category_group, comment: Higher-level merchant category grouping., synonyms: [category group]}
+  - {name: country, expr: source.country, comment: Merchant country code., synonyms: [merchant country]}
+  - {name: risk_rating, expr: source.risk_rating, comment: Merchant risk rating., synonyms: [merchant risk]}
+  - {name: merchant_status, expr: source.merchant_status, comment: Current merchant status., synonyms: [merchant status]}
+  - {name: effective_at, expr: source.effective_at, comment: Merchant record effective time., synonyms: [effective time]}
+  - {name: is_unknown, expr: source.is_unknown, comment: Whether this is the UNKNOWN merchant member., synonyms: [unknown merchant]}
+  - {name: pipeline_run_id, expr: source.pipeline_run_id, comment: Gold pipeline run identifier., synonyms: [run id]}
+  - {name: batch_id, expr: source.batch_id, comment: Source snapshot batch identifier., synonyms: [batch]}
+  - {name: last_refreshed_at, expr: source.last_refreshed_at, comment: Gold row refresh time., synonyms: [refresh time]}
+  - {name: quality_status, expr: source.quality_status, comment: Row quality outcome., synonyms: [data quality]}
+  - {name: usage_restrictions, expr: source.usage_restrictions, comment: Consumer access classification., synonyms: [AI access]}

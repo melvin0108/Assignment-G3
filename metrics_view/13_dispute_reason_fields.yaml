@@ -1,0 +1,12 @@
+version: 1.1
+comment: Dispute-reason reference fields for governed filtering and grouping; intentionally no artificial measures.
+source: g3_catalog.gold.dim_dispute_reason
+fields:
+  - {name: reason_code, expr: source.reason_code, comment: Natural dispute reason identifier., synonyms: [dispute reason code]}
+  - {name: description, expr: source.description, comment: Business dispute reason description., synonyms: [dispute reason]}
+  - {name: is_unknown, expr: source.is_unknown, comment: Whether this is the UNKNOWN reason member., synonyms: [unknown reason]}
+  - {name: pipeline_run_id, expr: source.pipeline_run_id, comment: Gold pipeline run identifier., synonyms: [run id]}
+  - {name: batch_id, expr: source.batch_id, comment: Source snapshot batch identifier., synonyms: [batch]}
+  - {name: last_refreshed_at, expr: source.last_refreshed_at, comment: Gold row refresh time., synonyms: [refresh time]}
+  - {name: quality_status, expr: source.quality_status, comment: Row quality outcome., synonyms: [data quality]}
+  - {name: usage_restrictions, expr: source.usage_restrictions, comment: Consumer access classification., synonyms: [AI access]}

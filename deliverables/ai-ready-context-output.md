@@ -136,7 +136,7 @@ use `source_references` for verification. A context record labelled
 - Question-routing contract: `docs/models/gold/questions-to-metrics.yaml`
 - Supporting Gold model contracts: `docs/models/gold/*.yml`
 - Gold-layer policy and implementation overview: `docs/gold-layer.md`
-- Gold validation: `pipeline/validation/validate_m3_gold.py`
+- Gold validation: `pipeline/validation/validate_gold.py`
 
 The catalog prefix may differ between environments. This deliverable uses
 `g3_dev` because it is the submission environment; the model contracts use

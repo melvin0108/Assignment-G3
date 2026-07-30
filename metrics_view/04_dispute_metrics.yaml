@@ -1,42 +1,30 @@
 version: 1.1
-comment: Dispute activity metrics by case, reason, currency, status, and raised date.
+comment: Dispute activity metrics with case, reason, currency, and calendar attributes.
 source: g3_catalog.gold.fact_dispute
-
 joins:
-  - name: dispute_reason
-    source: g3_catalog.gold.dim_dispute_reason
-    'on': source.reason_code = dispute_reason.reason_code
-  - name: currency
-    source: g3_catalog.gold.dim_currency
-    'on': source.currency_code = currency.currency_code
-  - name: raised_date
-    source: g3_catalog.gold.dim_date
-    'on': source.raised_date_key = raised_date.date_key
-
+  - {name: investigation_case, source: g3_catalog.gold.dim_case, 'on': source.case_id = investigation_case.case_id}
+  - {name: dispute_reason, source: g3_catalog.gold.dim_dispute_reason, 'on': source.reason_code = dispute_reason.reason_code}
+  - {name: currency, source: g3_catalog.gold.dim_currency, 'on': source.currency_code = currency.currency_code}
+  - {name: raised_date, source: g3_catalog.gold.dim_date, 'on': source.raised_date_key = raised_date.date_key}
 fields:
-  - name: case_id
-    expr: source.case_id
-    synonyms: [case, hồ sơ]
-  - name: reason_code
-    expr: source.reason_code
-    synonyms: [dispute reason, lý do]
-  - name: currency_code
-    expr: source.currency_code
-    comment: Monetary measures must be grouped or filtered by this field.
-    synonyms: [currency, tiền tệ]
-  - name: dispute_status
-    expr: source.dispute_status
-    synonyms: [status, trạng thái tranh chấp]
-  - name: raised_date_key
-    expr: source.raised_date_key
-    synonyms: [raised date, ngày tranh chấp]
-
+  - {name: case_id, expr: source.case_id, comment: Natural investigation case identifier., synonyms: [case]}
+  - {name: transaction_id, expr: source.transaction_id, comment: Natural transaction identifier., synonyms: [transaction]}
+  - {name: dispute_id, expr: source.dispute_id, comment: Natural dispute identifier., synonyms: [dispute]}
+  - {name: reason_code, expr: source.reason_code, comment: Dispute reason code., synonyms: [dispute reason]}
+  - {name: currency_code, expr: source.currency_code, comment: Currency required for monetary aggregation., synonyms: [currency]}
+  - {name: raised_date_key, expr: source.raised_date_key, comment: Dispute raised date key., synonyms: [raised date]}
+  - {name: amount, expr: source.amount, comment: Disputed amount in currency., synonyms: [disputed amount]}
+  - {name: dispute_status, expr: source.dispute_status, comment: Current dispute status., synonyms: [dispute status]}
+  - {name: raised_at, expr: source.raised_at, comment: Dispute raised timestamp., synonyms: [raised time]}
+  - {name: pipeline_run_id, expr: source.pipeline_run_id, comment: Gold pipeline run identifier., synonyms: [run id]}
+  - {name: batch_id, expr: source.batch_id, comment: Source snapshot batch identifier., synonyms: [batch]}
+  - {name: last_refreshed_at, expr: source.last_refreshed_at, comment: Gold row refresh time., synonyms: [refresh time]}
+  - {name: quality_status, expr: source.quality_status, comment: Row quality outcome., synonyms: [data quality]}
+  - {name: usage_restrictions, expr: source.usage_restrictions, comment: Consumer access classification., synonyms: [AI access]}
+  - {name: case_priority, expr: investigation_case.priority, comment: Joined case priority., synonyms: [case priority]}
+  - {name: reason_description, expr: dispute_reason.description, comment: Joined dispute reason description., synonyms: [reason description]}
+  - {name: currency_name, expr: currency.currency_name, comment: Joined currency name., synonyms: [currency name]}
+  - {name: raised_calendar_date, expr: raised_date.date_id, comment: Joined raised calendar date., synonyms: [calendar date]}
 measures:
-  - name: dispute_count
-    expr: COUNT(*)
-    comment: Number of case-linked disputes.
-    synonyms: [number of disputes, số tranh chấp]
-  - name: dispute_amount_total
-    expr: SUM(source.amount)
-    comment: Total disputed amount; group or filter by currency_code.
-    synonyms: [total disputed amount, tổng số tiền tranh chấp]
+  - {name: dispute_count, expr: COUNT(*), comment: Number of case-linked disputes., synonyms: [number of disputes]}
+  - {name: dispute_amount_total, expr: SUM(source.amount), comment: Total disputed amount; group or filter by currency., synonyms: [total disputed amount]}

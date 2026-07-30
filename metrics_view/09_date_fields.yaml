@@ -1,0 +1,16 @@
+version: 1.1
+comment: Calendar reference fields for governed filtering and grouping; intentionally no artificial measures.
+source: g3_catalog.gold.dim_date
+fields:
+  - {name: date_key, expr: source.date_key, comment: Calendar key in yyyyMMdd form., synonyms: [date id]}
+  - {name: date_id, expr: source.date_id, comment: Calendar date., synonyms: [calendar date]}
+  - {name: year, expr: source.year, comment: Calendar year., synonyms: [year]}
+  - {name: month, expr: source.month, comment: Calendar month number., synonyms: [month]}
+  - {name: quarter, expr: source.quarter, comment: Calendar quarter number., synonyms: [quarter]}
+  - {name: is_weekend, expr: source.is_weekend, comment: Whether the date is a weekend., synonyms: [weekend]}
+  - {name: is_unknown, expr: source.is_unknown, comment: Whether this is the UNKNOWN date member., synonyms: [unknown date]}
+  - {name: pipeline_run_id, expr: source.pipeline_run_id, comment: Gold pipeline run identifier., synonyms: [run id]}
+  - {name: batch_id, expr: source.batch_id, comment: Source snapshot batch identifier., synonyms: [batch]}
+  - {name: last_refreshed_at, expr: source.last_refreshed_at, comment: Gold row refresh time., synonyms: [refresh time]}
+  - {name: quality_status, expr: source.quality_status, comment: Row quality outcome., synonyms: [data quality]}
+  - {name: usage_restrictions, expr: source.usage_restrictions, comment: Consumer access classification., synonyms: [AI access]}

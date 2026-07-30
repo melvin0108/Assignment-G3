@@ -697,7 +697,7 @@ resources:
             - task_key: fact_fraud_alert
             - task_key: dim_case
           notebook_task:
-            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/validation/validate_m3_gold
+            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/validation/validate_gold
             base_parameters:
               catalog: "{{job.parameters.catalog}}"
             source: WORKSPACE

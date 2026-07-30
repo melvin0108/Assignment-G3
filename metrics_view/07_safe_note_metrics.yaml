@@ -1,22 +1,21 @@
 version: 1.1
-comment: Safe-note metrics for PII-screened investigation notes by case and created date.
+comment: PII-screened investigation-note metrics with case and calendar attributes.
 source: g3_catalog.gold.fact_investigation_note
-
 joins:
-  - name: created_date
-    source: g3_catalog.gold.dim_date
-    'on': source.created_date_key = created_date.date_key
-
+  - {name: investigation_case, source: g3_catalog.gold.dim_case, 'on': source.case_id = investigation_case.case_id}
+  - {name: created_date, source: g3_catalog.gold.dim_date, 'on': source.created_date_key = created_date.date_key}
 fields:
-  - name: case_id
-    expr: source.case_id
-    synonyms: [case, hồ sơ]
-  - name: created_date_key
-    expr: source.created_date_key
-    synonyms: [note date, ngày ghi chú]
-
+  - {name: case_id, expr: source.case_id, comment: Natural investigation case identifier., synonyms: [case]}
+  - {name: note_id, expr: source.note_id, comment: Natural note identifier., synonyms: [note]}
+  - {name: created_date_key, expr: source.created_date_key, comment: Note created date key., synonyms: [note date]}
+  - {name: safe_note_text, expr: source.safe_note_text, comment: PII-screened investigation note text., synonyms: [safe note]}
+  - {name: created_at, expr: source.created_at, comment: Note creation timestamp., synonyms: [note time]}
+  - {name: pipeline_run_id, expr: source.pipeline_run_id, comment: Gold pipeline run identifier., synonyms: [run id]}
+  - {name: batch_id, expr: source.batch_id, comment: Source snapshot batch identifier., synonyms: [batch]}
+  - {name: last_refreshed_at, expr: source.last_refreshed_at, comment: Gold row refresh time., synonyms: [refresh time]}
+  - {name: quality_status, expr: source.quality_status, comment: Row quality outcome., synonyms: [data quality]}
+  - {name: usage_restrictions, expr: source.usage_restrictions, comment: Consumer access classification., synonyms: [AI access]}
+  - {name: case_priority, expr: investigation_case.priority, comment: Joined case priority., synonyms: [case priority]}
+  - {name: created_calendar_date, expr: created_date.date_id, comment: Joined note calendar date., synonyms: [calendar date]}
 measures:
-  - name: safe_note_count
-    expr: COUNT(*)
-    comment: Number of PII-screened investigation notes.
-    synonyms: [safe note count, screened notes, số ghi chú an toàn]
+  - {name: safe_note_count, expr: COUNT(*), comment: Number of PII-screened investigation notes., synonyms: [safe note count]}

@@ -78,7 +78,7 @@ Collections use typed `ARRAY<STRUCT>` values and typed empty arrays rather than 
 4. Build facts from eligible case links first, then join the larger transaction tables. This limits processing to investigation-related records rather than scanning and publishing the entire two-million-row transaction domain.
 5. Build `dim_case` after the facts so it can aggregate fact warnings, removed-link warnings, redacted-note evidence, and missing-transaction conditions.
 6. Build `investigation_context` only after every Gold dimension and fact reports the same run and batch.
-7. Execute Gold notebooks through an ordered `gold_all_tables.py` runner, following the existing Silver runner pattern. Replace the stale single-context job task with `gold_all_tables`, then run `validate_m3_gold`.
+7. Execute Gold notebooks through an ordered `gold_all_tables.py` runner, following the existing Silver runner pattern. Replace the stale single-context job task with `gold_all_tables`, then run `validate_gold`.
 8. Add a job-level `catalog` parameter defaulting to `g3_catalog` and pass it explicitly to Gold and validation tasks.
 9. Label the six dimensions and seven facts as `internal_only`, and label only `investigation_context` as `ai_allowed`. Document Bronze, Silver, and quarantine as non-AI operational outputs; do not provision users, groups, or Unity Catalog grants in this prototype.
 

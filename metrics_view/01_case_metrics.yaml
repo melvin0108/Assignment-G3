@@ -1,34 +1,28 @@
 version: 1.1
-comment: Case overview and closure metrics by status, priority, fraud type, opened date, and closed date.
+comment: Case overview and closure metrics with Gold contract and calendar attributes.
 source: g3_catalog.gold.dim_case
-
 joins:
-  - name: opened_date
-    source: g3_catalog.gold.dim_date
-    'on': source.opened_date_key = opened_date.date_key
-  - name: closed_date
-    source: g3_catalog.gold.dim_date
-    'on': source.closed_date_key = closed_date.date_key
-
+  - {name: opened_date, source: g3_catalog.gold.dim_date, 'on': source.opened_date_key = opened_date.date_key}
+  - {name: closed_date, source: g3_catalog.gold.dim_date, 'on': source.closed_date_key = closed_date.date_key}
 fields:
-  - name: priority
-    expr: source.priority
-    synonyms: [case priority, mức ưu tiên]
-  - name: status_code
-    expr: source.status_code
-    synonyms: [case status, trạng thái]
-  - name: fraud_type_code
-    expr: source.fraud_type_code
-    synonyms: [fraud type, loại gian lận]
-  - name: opened_date_key
-    expr: source.opened_date_key
-    synonyms: [opened date, ngày mở]
-  - name: closed_date_key
-    expr: source.closed_date_key
-    synonyms: [closed date, closure date, ngày đóng]
-
+  - {name: case_id, expr: source.case_id, comment: Natural investigation case identifier., synonyms: [case, case number]}
+  - {name: priority, expr: source.priority, comment: Operational case priority., synonyms: [case priority]}
+  - {name: status_code, expr: source.status_code, comment: Current case workflow status., synonyms: [case status]}
+  - {name: status_description, expr: source.status_description, comment: Business description of case status., synonyms: [status meaning]}
+  - {name: fraud_type_code, expr: source.fraud_type_code, comment: Recorded fraud classification., synonyms: [fraud type]}
+  - {name: fraud_type_severity, expr: source.fraud_type_severity, comment: Fraud type severity., synonyms: [fraud severity]}
+  - {name: opened_at, expr: source.opened_at, comment: Time the case was opened., synonyms: [open time]}
+  - {name: closed_at, expr: source.closed_at, comment: Time the case was closed., synonyms: [close time]}
+  - {name: opened_date_key, expr: source.opened_date_key, comment: Opening calendar key., synonyms: [opened date]}
+  - {name: closed_date_key, expr: source.closed_date_key, comment: Closing calendar key., synonyms: [closed date]}
+  - {name: pipeline_run_id, expr: source.pipeline_run_id, comment: Gold pipeline run identifier., synonyms: [run id]}
+  - {name: batch_id, expr: source.batch_id, comment: Source snapshot batch identifier., synonyms: [batch]}
+  - {name: last_refreshed_at, expr: source.last_refreshed_at, comment: Gold row refresh time., synonyms: [refresh time]}
+  - {name: quality_status, expr: source.quality_status, comment: Case quality outcome., synonyms: [data quality]}
+  - {name: usage_restrictions, expr: source.usage_restrictions, comment: Consumer access classification., synonyms: [AI access]}
+  - {name: opened_calendar_date, expr: opened_date.date_id, comment: Calendar date on which the case opened., synonyms: [opened calendar date]}
+  - {name: opened_year, expr: opened_date.year, comment: Year in which the case opened., synonyms: [opened year]}
+  - {name: closed_calendar_date, expr: closed_date.date_id, comment: Calendar date on which the case closed., synonyms: [closed calendar date]}
+  - {name: closed_year, expr: closed_date.year, comment: Year in which the case closed., synonyms: [closed year]}
 measures:
-  - name: case_count
-    expr: COUNT(DISTINCT source.case_id)
-    comment: Distinct number of eligible investigation cases.
-    synonyms: [case count, investigation count, số hồ sơ]
+  - {name: case_count, expr: COUNT(DISTINCT source.case_id), comment: Distinct number of eligible investigation cases., synonyms: [case count, investigation count]}

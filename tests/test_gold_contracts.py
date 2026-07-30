@@ -1,5 +1,6 @@
 """Local semantic contract checks for the Databricks-only Gold implementation."""
 
+import re
 import unittest
 from pathlib import Path
 
@@ -11,6 +12,24 @@ from pipeline.gold import gold_common
 ROOT = Path(__file__).parents[1]
 MODEL_DIR = ROOT / "docs" / "models" / "gold"
 ROUTING_PATH = MODEL_DIR / "questions-to-metrics.yaml"
+METRIC_VIEW_DIR = ROOT / "metrics_view"
+
+SEMANTIC_OBJECTS = {
+    "dim_case": "01_case_metrics.yaml",
+    "fact_case_transaction": "02_transaction_metrics.yaml",
+    "fact_authorization_attempt": "03_authorization_metrics.yaml",
+    "fact_dispute": "04_dispute_metrics.yaml",
+    "fact_chargeback": "05_chargeback_metrics.yaml",
+    "fact_fraud_alert": "06_fraud_alert_metrics.yaml",
+    "fact_investigation_note": "07_safe_note_metrics.yaml",
+    "fact_case_party_summary": "08_party_metrics.yaml",
+    "dim_date": "09_date_fields.yaml",
+    "dim_merchant": "10_merchant_fields.yaml",
+    "dim_channel": "11_channel_fields.yaml",
+    "dim_currency": "12_currency_fields.yaml",
+    "dim_dispute_reason": "13_dispute_reason_fields.yaml",
+    "investigation_context": "direct_genie_source",
+}
 
 EXPECTED_PRIMARY_KEYS = {
     "dim_date": ["date_key"],
@@ -122,12 +141,12 @@ class GoldContractTests(unittest.TestCase):
         self.assertNotIn("GRANT ", runner)
 
     def test_gold_validation_allows_empty_optional_facts_and_reconciles_chargebacks(self):
-        source = (Path(__file__).parents[1] / "pipeline" / "validation" / "validate_m3_gold.py").read_text(encoding="utf-8")
+        source = (Path(__file__).parents[1] / "pipeline" / "validation" / "validate_gold.py").read_text(encoding="utf-8")
         self.assertIn('OPTIONAL_FACT_MODELS = {model for model in GOLD_MODELS if model.startswith("fact_")}', source)
         self.assertIn("fact_chargeback does not reconcile to case-scoped disputes", source)
 
     def test_gold_validation_resolves_contracts_without_dunder_file(self):
-        source = (Path(__file__).parents[1] / "pipeline" / "validation" / "validate_m3_gold.py").read_text(encoding="utf-8")
+        source = (Path(__file__).parents[1] / "pipeline" / "validation" / "validate_gold.py").read_text(encoding="utf-8")
         self.assertNotIn("__file__", source)
         self.assertIn("def gold_model_dir():", source)
         self.assertIn("current = Path.cwd().resolve()", source)
@@ -225,7 +244,7 @@ class GoldSemanticContractTests(unittest.TestCase):
         routing = yaml.safe_load(ROUTING_PATH.read_text(encoding="utf-8"))
         self.assertEqual(routing["schema_version"], "1.0.0")
         self.assertEqual(routing["supported_languages"], ["vi", "en"])
-        self.assertEqual(len(routing["patterns"]), 9)
+        self.assertEqual(len(routing["patterns"]), 11)
 
         metric_locations = {
             metric["id"]: model
@@ -284,11 +303,111 @@ class GoldSemanticContractTests(unittest.TestCase):
                     routed_contracts[0]["ai_access"]["classification"], "ai_allowed"
                 )
 
+    def test_question_routing_has_a_case_closure_trend_route(self):
+        routing = yaml.safe_load(ROUTING_PATH.read_text(encoding="utf-8"))
+        patterns = {pattern["id"]: pattern for pattern in routing["patterns"]}
+
+        self.assertIn("case_closure_trends", patterns)
+        self.assertEqual(patterns["case_closure_trends"]["query_mode"], "analytics")
+        self.assertEqual(patterns["case_closure_trends"]["metric_ids"], ["case_count"])
+        self.assertEqual(patterns["case_closure_trends"]["primary_table"], "gold.dim_case")
+        self.assertEqual(patterns["case_closure_trends"]["supporting_tables"], ["gold.dim_date"])
+        self.assertEqual(patterns["case_closure_trends"]["time_dimension"], "closed_date_key")
+
+    def test_question_routing_has_a_merchant_risk_exposure_route(self):
+        routing = yaml.safe_load(ROUTING_PATH.read_text(encoding="utf-8"))
+        patterns = {pattern["id"]: pattern for pattern in routing["patterns"]}
+
+        self.assertIn("merchant_risk_exposure", patterns)
+        self.assertEqual(patterns["merchant_risk_exposure"]["query_mode"], "analytics")
+        self.assertEqual(
+            patterns["merchant_risk_exposure"]["metric_ids"],
+            ["transaction_count", "transaction_amount_total", "transaction_amount_average"],
+        )
+        self.assertEqual(patterns["merchant_risk_exposure"]["primary_table"], "gold.fact_case_transaction")
+        self.assertIn("gold.dim_merchant", patterns["merchant_risk_exposure"]["supporting_tables"])
+        self.assertIn("risk_rating", patterns["merchant_risk_exposure"]["dimensions"])
+
+        self.assertNotIn("gold.dim_merchant", patterns["transaction_activity"]["supporting_tables"])
+        self.assertNotIn("merchant_id", patterns["transaction_activity"]["dimensions"])
+
     def test_m3_validation_covers_natural_grain_schema_and_ai_policy(self):
-        source = (ROOT / "pipeline" / "validation" / "validate_m3_gold.py").read_text(encoding="utf-8")
+        source = (ROOT / "pipeline" / "validation" / "validate_gold.py").read_text(encoding="utf-8")
         for token in (
             "EXPECTED_PRIMARY_KEYS", "EXPECTED_USAGE_RESTRICTIONS", "physical_type",
             "usage_restrictions", "UNKNOWN",
             "legacy hashed columns", "investigation_context must have one row per case_id",
         ):
             self.assertIn(token, source)
+
+    def test_semantic_inventory_has_one_object_per_gold_contract(self):
+        self.assertEqual(set(SEMANTIC_OBJECTS), set(self.contracts))
+
+        metric_files = {
+            path.name for path in METRIC_VIEW_DIR.glob("*.yaml")
+            if path.name != "questions-to-metrics.yaml"
+        }
+        expected_files = {value for value in SEMANTIC_OBJECTS.values() if value.endswith(".yaml")}
+        self.assertEqual(metric_files, expected_files)
+
+        deliverable = (ROOT / "deliverables" / "metric-views-and-genie-agent.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("`gold.investigation_context`", deliverable)
+        self.assertIn("direct Genie source", deliverable)
+
+    def test_metric_views_preserve_gold_scalar_columns_joins_and_metrics(self):
+        for model, filename in SEMANTIC_OBJECTS.items():
+            if filename == "direct_genie_source":
+                continue
+
+            contract = self.contracts[model]
+            definition = yaml.safe_load((METRIC_VIEW_DIR / filename).read_text(encoding="utf-8"))
+            self.assertEqual(definition["source"], f"g3_catalog.gold.{model}", model)
+
+            scalar_columns = {
+                column["name"]
+                for column in contract["columns"]
+                if not column["physical_type"].lower().startswith(("array", "struct"))
+            }
+            source_fields = {
+                field["expr"].removeprefix("source.")
+                for field in definition["fields"]
+                if field["expr"].startswith("source.")
+            }
+            self.assertEqual(source_fields, scalar_columns, model)
+
+            documented_joins = {
+                (f"g3_catalog.{relationship['target_model']}", join["from"], join["to"])
+                for relationship in contract["relationships"]
+                for join in relationship["join_columns"]
+            }
+            semantic_joins = {
+                (
+                    join["source"],
+                    clause.split(" = ", 1)[0].removeprefix("source."),
+                    clause.split(" = ", 1)[1].rsplit(".", 1)[1],
+                )
+                for join in definition.get("joins", [])
+                for clause in join["on"].split(" AND ")
+            }
+            self.assertEqual(semantic_joins, documented_joins, model)
+
+            def qualify_source_columns(expression):
+                for column in sorted(scalar_columns, key=len, reverse=True):
+                    expression = re.sub(
+                        rf"(?<![\w.]){re.escape(column)}\b",
+                        f"source.{column}",
+                        expression,
+                    )
+                return expression
+
+            expected_metrics = {
+                metric["id"]: qualify_source_columns(metric["expression"])
+                for metric in contract["metrics"]
+            }
+            actual_metrics = {
+                metric["name"]: metric["expr"]
+                for metric in definition.get("measures", [])
+            }
+            self.assertEqual(actual_metrics, expected_metrics, model)
