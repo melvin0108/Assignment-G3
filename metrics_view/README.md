@@ -32,9 +32,9 @@ fields.
 
 1. Push this directory to Git and pull the repository into Databricks.
 2. Run the Gold pipeline and Gold validation.
-3. Open `09_create_metric_views.py` as a Databricks notebook.
-4. Select the target catalog with the `catalog` widget.
-5. Run all cells.
+3. Open `14_create_metric_views.py` as a Databricks notebook.
+4. Run the first cell to create the `catalog` widget, then select the target catalog.
+5. Run the second cell to create or replace the metric views.
 
 The runner creates `<catalog>.metrics` if needed, reads all 13 YAML files,
 and executes `CREATE OR REPLACE VIEW ... WITH METRICS LANGUAGE YAML`. It

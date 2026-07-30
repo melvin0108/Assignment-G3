@@ -37,8 +37,14 @@ def find_definition_dir() -> Path:
     raise FileNotFoundError(f"Cannot find metric_view definitions from {current}")
 
 
+# COMMAND ----------
+
 spark = SparkSession.builder.getOrCreate()
 dbutils = DBUtils(spark)
+catalog_widget(dbutils)
+
+# COMMAND ----------
+
 CATALOG = catalog_widget(dbutils)
 TARGET_SCHEMA = "metrics"
 DEFINITION_DIR = find_definition_dir()
