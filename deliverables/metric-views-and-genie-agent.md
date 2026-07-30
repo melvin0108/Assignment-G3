@@ -19,7 +19,7 @@ models. The routing contract defines question coverage; the files under
 `metrics_view/` are the executable Databricks semantic definitions.
 
 The analytics routes are consolidated by business domain and fact grain into
-13 Databricks metric-view definitions under
+14 Databricks metric-view definitions under
 [`metrics_view/`](../metrics_view/README.md):
 
 | Metric view | Supported analytics |
@@ -37,6 +37,7 @@ The analytics routes are consolidated by business domain and fact grain into
 | `mv_dim_channel` | Channel reference fields |
 | `mv_dim_currency` | Currency reference fields |
 | `mv_dim_dispute_reason` | Dispute-reason reference fields |
+| `mv_investigation_context_metrics` | AI-allowed investigation-context fields and case count |
 
 Each YAML definition declares a Gold source, safe dimensional joins, exposed
 fields, business measures, comments, and bilingual synonyms. Shared measures
@@ -50,7 +51,7 @@ routes. Monetary measures explicitly require grouping or filtering by
 Databricks deployment notebook. After the repository is pulled into a
 Databricks Git folder, the notebook:
 
-1. reads the 13 version-controlled YAML definitions;
+1. reads the 14 version-controlled YAML definitions;
 2. validates their metric-view specification version and Gold source;
 3. applies the catalog selected through the standard `catalog` widget;
 4. creates the `<catalog>.metrics` schema when required; and
@@ -66,7 +67,7 @@ with the equivalent direct Gold aggregation before it is exposed to the agent.
 ## Genie Agent setup
 
 After deployment and metric reconciliation, a Genie Agent is created with the
-13 objects from `<catalog>.metrics` plus `gold.investigation_context` as a
+14 objects from `<catalog>.metrics` plus `gold.investigation_context` as a
 direct Genie source, using a Serverless or Pro SQL warehouse.
 The agent inherits the measures, field descriptions, synonyms, and
 relationships stored in the metric views.
@@ -101,9 +102,10 @@ When the requested domain, currency, date period, or measure is ambiguous,
 ask the user to clarify.
 ```
 
-The separate `gold.investigation_context` model remains the approved direct
-Genie source for case-detail lookup. Its nested arrays and structs are not
-represented as metric-view fields; the metric views serve aggregate analytics.
+`mv_investigation_context_metrics` exposes the AI-allowed context table's safe
+scalar case fields and case count. The separate `gold.investigation_context`
+model remains the approved direct Genie source for case-detail lookup, where
+its nested arrays and structs remain available.
 
 ## Example questions
 

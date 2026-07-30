@@ -42,4 +42,11 @@ columns:
 dimensions:
   - {id: case_id, column: case_id, description: Investigation case identifier used for detail lookup., synonyms: [case, hồ sơ]}
   - {id: context_category, column: context_category, description: Context document category., synonyms: [context type]}
-metrics: []
+metrics:
+  - id: investigation_context_count
+    description: Distinct number of AI-allowed investigation contexts.
+    expression: COUNT(DISTINCT case_id)
+    aggregation: count_distinct
+    format: integer
+    supported_dimensions: [case_id, context_category]
+    time_field: null

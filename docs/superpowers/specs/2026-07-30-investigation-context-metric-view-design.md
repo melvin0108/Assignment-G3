@@ -10,8 +10,8 @@ deployment. The source table is the only Gold model classified `ai_allowed`.
 
 The view exposes the context's scalar retrieval and governance fields,
 including `case_id`, `context_category`, selected `case_detail` attributes,
-quality and access status, and refresh metadata. It provides a `case_count`
-measure using `COUNT(DISTINCT source.case_id)`.
+quality and access status, and refresh metadata. It provides an
+`investigation_context_count` measure using `COUNT(DISTINCT source.case_id)`.
 
 Nested arrays and structs representing transactions, disputes, fraud alerts,
 authorizations, safe notes, party summaries, warnings, and source references

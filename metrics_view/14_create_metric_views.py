@@ -24,6 +24,7 @@ DEFINITIONS = [
     ("11_channel_fields.yaml", "mv_dim_channel"),
     ("12_currency_fields.yaml", "mv_dim_currency"),
     ("13_dispute_reason_fields.yaml", "mv_dim_dispute_reason"),
+    ("14_investigation_context_metrics.yaml", "mv_investigation_context_metrics"),
 ]
 
 

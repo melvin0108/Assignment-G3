@@ -22,11 +22,11 @@ use-case and routing definition and is not modified.
 | `11_channel_fields.yaml` | `mv_dim_channel` | Channel reference fields |
 | `12_currency_fields.yaml` | `mv_dim_currency` | Currency reference fields |
 | `13_dispute_reason_fields.yaml` | `mv_dim_dispute_reason` | Dispute-reason reference fields |
+| `14_investigation_context_metrics.yaml` | `mv_investigation_context_metrics` | AI-allowed investigation-context fields and case counts |
 
-`case_detail_lookup` is intentionally not converted. It is a detail route with
-no metric IDs and uses `gold.investigation_context` as a direct Genie source;
-its nested arrays and structs cannot be faithfully represented as metric-view
-fields.
+`case_detail_lookup` continues to use `gold.investigation_context` as a direct
+Genie source for its nested arrays and structs. The metric view exposes the
+same table's safe scalar case attributes and aggregate case count.
 
 ## Deploy from a Databricks Git folder
 
@@ -36,9 +36,9 @@ fields.
 4. Run the first cell to create the `catalog` widget, then select the target catalog.
 5. Run the second cell to create or replace the metric views.
 
-The runner creates `<catalog>.metrics` if needed, reads all 13 YAML files,
+The runner creates `<catalog>.metrics` if needed, reads all 14 YAML files,
 and executes `CREATE OR REPLACE VIEW ... WITH METRICS LANGUAGE YAML`. It
-replaces only the 13 metric views listed above and does not replace Gold
+replaces only the 14 metric views listed above and does not replace Gold
 tables.
 
 The compute must support metric views and YAML specification 1.1. The executing

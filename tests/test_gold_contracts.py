@@ -28,7 +28,7 @@ SEMANTIC_OBJECTS = {
     "dim_channel": "11_channel_fields.yaml",
     "dim_currency": "12_currency_fields.yaml",
     "dim_dispute_reason": "13_dispute_reason_fields.yaml",
-    "investigation_context": "direct_genie_source",
+    "investigation_context": "14_investigation_context_metrics.yaml",
 }
 
 EXPECTED_PRIMARY_KEYS = {
@@ -55,6 +55,7 @@ EXPECTED_METRICS = {
     "transaction_amount_average", "authorization_attempt_count",
     "authorization_approval_rate", "authorization_decline_rate", "dispute_count",
     "dispute_amount_total", "chargeback_count", "chargeback_amount_total",
+    "investigation_context_count",
     "fraud_alert_count", "fraud_alert_score_average", "safe_note_count", "party_count",
 }
 
@@ -370,6 +371,18 @@ class GoldSemanticContractTests(unittest.TestCase):
                 for column in contract["columns"]
                 if not column["physical_type"].lower().startswith(("array", "struct"))
             }
+            if model == "investigation_context":
+                scalar_columns.update(
+                    {
+                        "case_detail.priority",
+                        "case_detail.status_code",
+                        "case_detail.status_description",
+                        "case_detail.fraud_type_code",
+                        "case_detail.fraud_type_severity",
+                        "case_detail.opened_at",
+                        "case_detail.closed_at",
+                    }
+                )
             source_fields = {
                 field["expr"].removeprefix("source.")
                 for field in definition["fields"]
@@ -391,7 +404,10 @@ class GoldSemanticContractTests(unittest.TestCase):
                 for join in definition.get("joins", [])
                 for clause in join["on"].split(" AND ")
             }
-            self.assertEqual(semantic_joins, documented_joins, model)
+            if contract["type"] == "materialized_context":
+                self.assertEqual(semantic_joins, set(), model)
+            else:
+                self.assertEqual(semantic_joins, documented_joins, model)
 
             def qualify_source_columns(expression):
                 for column in sorted(scalar_columns, key=len, reverse=True):

@@ -1,0 +1,23 @@
+version: 1.1
+comment: AI-allowed investigation-context fields and case metrics.
+source: g3_catalog.gold.investigation_context
+fields:
+  - {name: case_id, expr: source.case_id, comment: Natural investigation case identifier., synonyms: [case, case number]}
+  - {name: context_category, expr: source.context_category, comment: Stable category for investigation retrieval., synonyms: [context type]}
+  - {name: priority, expr: source.case_detail.priority, comment: Operational case priority., synonyms: [case priority]}
+  - {name: status_code, expr: source.case_detail.status_code, comment: Current case workflow status., synonyms: [case status]}
+  - {name: status_description, expr: source.case_detail.status_description, comment: Business description of case status., synonyms: [status meaning]}
+  - {name: fraud_type_code, expr: source.case_detail.fraud_type_code, comment: Recorded fraud classification., synonyms: [fraud type]}
+  - {name: fraud_type_severity, expr: source.case_detail.fraud_type_severity, comment: Fraud type severity., synonyms: [fraud severity]}
+  - {name: opened_at, expr: source.case_detail.opened_at, comment: Time the case was opened., synonyms: [open time]}
+  - {name: closed_at, expr: source.case_detail.closed_at, comment: Time the case was closed., synonyms: [close time]}
+  - {name: case_summary, expr: source.case_summary, comment: Deterministic PII-safe case summary., synonyms: [summary, case summary]}
+  - {name: quality_status, expr: source.quality_status, comment: Context quality outcome., synonyms: [data quality]}
+  - {name: usage_restrictions, expr: source.usage_restrictions, comment: Consumer access classification., synonyms: [AI access]}
+  - {name: masking_status, expr: source.masking_status, comment: PII protection status for the context., synonyms: [masking]}
+  - {name: context_version, expr: source.context_version, comment: Breaking schema version of the context document., synonyms: [version]}
+  - {name: pipeline_run_id, expr: source.pipeline_run_id, comment: Gold pipeline run identifier., synonyms: [run id]}
+  - {name: batch_id, expr: source.batch_id, comment: Source snapshot batch identifier., synonyms: [batch]}
+  - {name: last_refreshed_at, expr: source.last_refreshed_at, comment: Time the context was refreshed., synonyms: [refresh time]}
+measures:
+  - {name: investigation_context_count, expr: COUNT(DISTINCT source.case_id), comment: Distinct number of AI-allowed investigation contexts., synonyms: [case count, investigation count]}
