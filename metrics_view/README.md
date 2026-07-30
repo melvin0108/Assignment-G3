@@ -32,7 +32,7 @@ fields.
 
 1. Push this directory to Git and pull the repository into Databricks.
 2. Run the Gold pipeline and Gold validation.
-3. Open `09_create_metric_views.py` as a Databricks notebook.
+3. Open `14_create_metric_views.py` as a Databricks notebook.
 4. Select the target catalog with the `catalog` widget.
 5. Run all cells.
 
