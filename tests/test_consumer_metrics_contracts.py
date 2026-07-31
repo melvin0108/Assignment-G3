@@ -212,7 +212,7 @@ def test_consumer_metric_views_require_customer_scope_and_only_narrow_it():
         assert "source.customer_id = scope_customer_id" in filter_expression
 
         for parameter in parameters[1:]:
-            assert parameter["default"] == "__all_owned__"
+            assert parameter["default"] == "'__all_owned__'"
             key = parameter["name"].removeprefix("scope_")
             assert f"source.{key} = {parameter['name']}" in filter_expression
 

@@ -3,7 +3,7 @@ comment: "customer_facing account fields and measures for an authenticated bank-
 source: g3_catalog.gold.dim_consumer_account
 parameters:
   - {name: scope_customer_id, data_type: string}
-  - {name: scope_account_id, data_type: string, default: __all_owned__}
+  - {name: scope_account_id, data_type: string, default: "'__all_owned__'"}
 filter: >
   source.customer_id = scope_customer_id
   AND (

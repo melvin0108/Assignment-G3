@@ -3,8 +3,8 @@ comment: "customer_facing transaction fields and currency-safe measures for an a
 source: g3_catalog.gold.fact_consumer_transaction
 parameters:
   - {name: scope_customer_id, data_type: string}
-  - {name: scope_account_id, data_type: string, default: __all_owned__}
-  - {name: scope_card_id, data_type: string, default: __all_owned__}
+  - {name: scope_account_id, data_type: string, default: "'__all_owned__'"}
+  - {name: scope_card_id, data_type: string, default: "'__all_owned__'"}
 filter: >
   source.customer_id = scope_customer_id
   AND (
