@@ -12,6 +12,7 @@ from pyspark.dbutils import DBUtils
 from pipeline.gold.gold_common import (
     FORBIDDEN_AI_COLUMNS,
     GOLD_MODELS,
+    PROTECTED_CONSUMER_BROKER_COLUMNS,
     STANDARD_METADATA_COLUMNS,
     catalog_widget,
 )
@@ -46,6 +47,10 @@ EXPECTED_PRIMARY_KEYS = {
     "fact_investigation_note": ["case_id", "note_id"],
     "fact_case_party_summary": ["case_id", "party_type", "role"],
     "investigation_context": ["case_id"],
+    "dim_consumer_account": ["customer_id", "account_id"],
+    "dim_consumer_card": ["customer_id", "card_id"],
+    "fact_consumer_transaction": ["customer_id", "transaction_reference"],
+    "fact_consumer_dispute": ["customer_id", "dispute_reference"],
 }
 EXPECTED_USAGE_RESTRICTIONS = {
     model: "ai_allowed" if model == "investigation_context" else "internal_only"
@@ -88,7 +93,15 @@ for model in sorted(target_models):
         if col_name in actual_types:
             require(actual_types[col_name] == expected_type, f"{model} column '{col_name}' type mismatch: actual={actual_types[col_name]}, expected={expected_type}")
     require(STANDARD_METADATA_COLUMNS <= set(df.columns), f"{model} has incomplete metadata")
-    require(not (set(df.columns) & FORBIDDEN_AI_COLUMNS), f"{model} exposes forbidden AI columns")
+    allowed_broker_columns = PROTECTED_CONSUMER_BROKER_COLUMNS.get(model, set())
+    forbidden_columns = (set(df.columns) & FORBIDDEN_AI_COLUMNS) - allowed_broker_columns
+    require(not forbidden_columns, f"{model} exposes forbidden AI columns: {sorted(forbidden_columns)}")
+    if model in PROTECTED_CONSUMER_BROKER_COLUMNS:
+        actual_broker_columns = set(df.columns) & FORBIDDEN_AI_COLUMNS
+        require(
+            actual_broker_columns == allowed_broker_columns,
+            f"{model} ownership broker columns do not match policy: {sorted(actual_broker_columns)}",
+        )
     require(not (set(df.columns) & LEGACY_HASHED_COLUMNS), f"{model} contains legacy hashed columns")
     expected_restriction = EXPECTED_USAGE_RESTRICTIONS[model]
     restriction_column = next(column for column in contract["columns"] if column["name"] == "usage_restrictions")
@@ -154,4 +167,87 @@ expected_chargebacks = (spark.read.table(f"{CATALOG}.silver.chargebacks")
 actual_chargebacks = spark.read.table(f"{CATALOG}.gold.fact_chargeback").count()
 require(actual_chargebacks == expected_chargebacks, "fact_chargeback does not reconcile to case-scoped disputes")
 
-print("M3 Gold validation passed: contracts, natural grains, metadata, AI policy, UNKNOWN members, context, and business-key referential integrity")
+consumer_accounts = spark.read.table(f"{CATALOG}.gold.dim_consumer_account")
+consumer_cards = spark.read.table(f"{CATALOG}.gold.dim_consumer_card")
+consumer_transactions = spark.read.table(f"{CATALOG}.gold.fact_consumer_transaction")
+consumer_disputes = spark.read.table(f"{CATALOG}.gold.fact_consumer_dispute")
+
+expected_consumer_accounts = (spark.read.table(f"{CATALOG}.silver.accounts")
+    .join(spark.read.table(f"{CATALOG}.silver.customers").select("customer_id").distinct(), "customer_id")
+    .count())
+require(consumer_accounts.count() == expected_consumer_accounts, "Consumer accounts do not reconcile to clean Silver ownership")
+require(
+    consumer_accounts.filter(F.col("account_reference") == F.col("account_id")).isEmpty(),
+    "Consumer account references expose raw account identifiers",
+)
+
+expected_consumer_cards = (spark.read.table(f"{CATALOG}.silver.cards")
+    .join(consumer_accounts.select("customer_id", "account_id"), "account_id")
+    .count())
+require(consumer_cards.count() == expected_consumer_cards, "Consumer cards do not reconcile to customer-owned accounts")
+require(
+    consumer_cards.filter(
+        (F.col("account_reference") == F.col("account_id"))
+        | (F.col("card_reference") == F.col("card_id"))
+        | ~F.col("card_last_four").rlike("^[0-9]{4}$")
+    ).isEmpty(),
+    "Consumer card references are not safely masked",
+)
+
+consumer_transaction_amounts = consumer_transactions.groupBy("currency_code").agg(
+    F.sum("amount").alias("amount")
+)
+silver_transaction_amounts = (spark.read.table(f"{CATALOG}.silver.transactions").alias("t")
+    .join(consumer_accounts.select("customer_id", "account_id").alias("a"), "account_id")
+    .join(
+        consumer_cards.select("customer_id", "account_id", "card_id").alias("c"),
+        (F.col("t.card_id") == F.col("c.card_id"))
+        & (F.col("t.account_id") == F.col("c.account_id"))
+        & (F.col("a.customer_id") == F.col("c.customer_id")),
+        "left",
+    )
+    .filter(F.col("t.card_id").isNull() | F.col("c.card_id").isNotNull())
+    .groupBy(F.col("t.currency").alias("currency_code"))
+    .agg(F.sum(F.col("t.amount").cast("decimal(18,2)")).alias("amount")))
+require(
+    consumer_transaction_amounts.exceptAll(silver_transaction_amounts).isEmpty()
+    and silver_transaction_amounts.exceptAll(consumer_transaction_amounts).isEmpty(),
+    "Consumer transaction amounts do not reconcile by currency",
+)
+
+expected_consumer_disputes = (spark.read.table(f"{CATALOG}.silver.disputes").alias("d")
+    .join(spark.read.table(f"{CATALOG}.silver.transactions").alias("t"), "transaction_id")
+    .join(consumer_accounts.select("customer_id", "account_id").alias("a"), "account_id")
+    .join(
+        consumer_cards.select("customer_id", "account_id", "card_id").alias("c"),
+        (F.col("t.card_id") == F.col("c.card_id"))
+        & (F.col("t.account_id") == F.col("c.account_id"))
+        & (F.col("a.customer_id") == F.col("c.customer_id")),
+        "left",
+    )
+    .filter(F.col("t.card_id").isNull() | F.col("c.card_id").isNotNull())
+    .count())
+require(consumer_disputes.count() == expected_consumer_disputes, "Consumer dispute joins duplicate or drop scoped disputes")
+consumer_dispute_amounts = consumer_disputes.groupBy("currency_code").agg(
+    F.sum("amount").alias("amount")
+)
+silver_dispute_amounts = (spark.read.table(f"{CATALOG}.silver.disputes").alias("d")
+    .join(spark.read.table(f"{CATALOG}.silver.transactions").alias("t"), "transaction_id")
+    .join(consumer_accounts.select("customer_id", "account_id").alias("a"), "account_id")
+    .join(
+        consumer_cards.select("customer_id", "account_id", "card_id").alias("c"),
+        (F.col("t.card_id") == F.col("c.card_id"))
+        & (F.col("t.account_id") == F.col("c.account_id"))
+        & (F.col("a.customer_id") == F.col("c.customer_id")),
+        "left",
+    )
+    .filter(F.col("t.card_id").isNull() | F.col("c.card_id").isNotNull())
+    .groupBy(F.col("t.currency").alias("currency_code"))
+    .agg(F.sum(F.col("d.amount").cast("decimal(18,2)")).alias("amount")))
+require(
+    consumer_dispute_amounts.exceptAll(silver_dispute_amounts).isEmpty()
+    and silver_dispute_amounts.exceptAll(consumer_dispute_amounts).isEmpty(),
+    "Consumer dispute amounts do not reconcile by currency",
+)
+
+print("M3 Gold validation passed: contracts, natural grains, metadata, AI policy, UNKNOWN members, context, Consumer ownership brokers, reconciliation, and business-key referential integrity")

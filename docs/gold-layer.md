@@ -19,14 +19,27 @@ Gold case, with typed arrays for transactions, disputes/chargebacks, alerts,
 safe notes, and party summaries. It carries no surrogate keys and uses a
 deterministic case summary; it must not infer guilt or a fraud conclusion.
 
+Four additional `internal_only` broker models support authenticated Consumer
+self-service: `dim_consumer_account`, `dim_consumer_card`,
+`fact_consumer_transaction`, and `fact_consumer_dispute`. They retain only the
+customer/account/card ownership keys required for backend scope enforcement.
+Their display references are masked, and their customer-facing metric views
+live separately in `<catalog>.consumer_metrics`.
+
 ## Output policy
 
-`investigation_context` is the only `ai_allowed` Gold table. The six dimensions
-and seven facts are PII-safe but `internal_only`; a future trusted query broker
-may use them for allowlisted analytics execution. Bronze, Silver, and quarantine
+`investigation_context` is the only `ai_allowed` Gold table. The investigation
+dimensions/facts and four protected Consumer brokers are `internal_only`.
+Only an authenticated Consumer backend service principal may query the
+Consumer brokers and their parameterized views. Bronze, Silver, and quarantine
 records are operational outputs and are never AI retrieval sources. This
 prototype documents the policy with `usage_restrictions`; those labels do not
 provision or replace Databricks users, groups, or Unity Catalog grants.
+
+The LLM and bank customers receive no Unity Catalog credentials. The backend
+derives ownership scope from the authenticated session; identifiers mentioned
+in a prompt are not an identity authority. See
+`consumer_metrics_view/README.md` for the tool and response contract.
 
 ## AI use
 

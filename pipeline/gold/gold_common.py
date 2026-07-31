@@ -22,6 +22,17 @@ GOLD_MODELS = {
     "fact_investigation_note",
     "fact_case_party_summary",
     "investigation_context",
+    "dim_consumer_account",
+    "dim_consumer_card",
+    "fact_consumer_transaction",
+    "fact_consumer_dispute",
+}
+
+PROTECTED_CONSUMER_BROKER_COLUMNS = {
+    "dim_consumer_account": {"customer_id", "account_id"},
+    "dim_consumer_card": {"customer_id", "account_id", "card_id"},
+    "fact_consumer_transaction": {"customer_id", "account_id", "card_id"},
+    "fact_consumer_dispute": {"customer_id", "account_id", "card_id"},
 }
 
 STANDARD_METADATA_COLUMNS = {
@@ -43,16 +54,21 @@ FORBIDDEN_AI_COLUMNS = {
 }
 
 SILVER_INPUTS = (
-    "date_dim", "investigation_cases", "merchants", "merchant_categories",
+    "date_dim", "customers", "accounts", "cards", "investigation_cases",
+    "merchants", "merchant_categories",
     "channels", "dispute_reason_codes", "currencies", "transactions",
     "auth_attempts", "disputes", "chargebacks", "fraud_alerts",
     "investigation_notes", "case_transactions", "case_parties",
 )
 
 
-def assert_no_forbidden_columns(columns: list[str] | set[str] | tuple[str, ...]) -> None:
+def assert_no_forbidden_columns(
+    columns: list[str] | set[str] | tuple[str, ...],
+    table_name: str | None = None,
+) -> None:
     """Reject a Gold projection that would expose a forbidden AI attribute."""
-    leaked = sorted(set(columns) & FORBIDDEN_AI_COLUMNS)
+    allowed = PROTECTED_CONSUMER_BROKER_COLUMNS.get(table_name, set())
+    leaked = sorted((set(columns) & FORBIDDEN_AI_COLUMNS) - allowed)
     if leaked:
         raise ValueError("Gold projection contains forbidden AI columns: " + ", ".join(leaked))
 
@@ -101,7 +117,7 @@ def write_gold_table(df, catalog: str, table_name: str) -> None:
     """Safely overwrite one documented Gold Delta model."""
     if table_name not in GOLD_MODELS:
         raise ValueError(f"Undeclared Gold model: {table_name}")
-    assert_no_forbidden_columns(df.columns)
+    assert_no_forbidden_columns(df.columns, table_name)
     required = STANDARD_METADATA_COLUMNS - set(df.columns)
     if required:
         raise ValueError(f"{table_name} is missing Gold metadata columns: {sorted(required)}")

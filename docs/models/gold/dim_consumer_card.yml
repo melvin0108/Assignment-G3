@@ -1,0 +1,39 @@
+schema_version: "1.0.0"
+model: dim_consumer_card
+table: gold.dim_consumer_card
+description: Protected ownership broker for authenticated Consumer card queries.
+domain: consumer_self_service
+type: dimension
+grain: one row per customer_id and card_id
+tags: [gold, consumer, protected_broker_source]
+synonyms: [consumer card, my card]
+sources: [silver.cards, gold.dim_consumer_account]
+ai_access: {classification: internal_only, pii_safe: true}
+primary_key: [customer_id, card_id]
+relationships:
+  - target_model: gold.dim_consumer_account
+    cardinality: many_to_one
+    join_columns: [{from: customer_id, to: customer_id}, {from: account_id, to: account_id}]
+columns:
+  - {name: customer_id, physical_type: string, description: Internal customer scope key; never returned to the agent., semantic_role: broker_key, tags: [restricted], synonyms: [customer scope]}
+  - {name: account_id, physical_type: string, description: Internal account scope key; never returned to the agent., semantic_role: broker_key, tags: [restricted], synonyms: [account scope]}
+  - {name: card_id, physical_type: string, description: Internal card scope key; never returned to the agent., semantic_role: broker_key, tags: [restricted], synonyms: [card scope]}
+  - {name: account_reference, physical_type: string, description: Masked account display reference., semantic_role: dimension, tags: [masked], synonyms: [account]}
+  - {name: card_reference, physical_type: string, description: Masked card display reference., semantic_role: dimension, tags: [masked], synonyms: [card]}
+  - {name: card_last_four, physical_type: string, description: Last four digits from the already-masked PAN., semantic_role: dimension, tags: [masked], synonyms: [last four]}
+  - {name: card_type, physical_type: string, description: Card product type., semantic_role: dimension, tags: [], synonyms: [type]}
+  - {name: expiry_month, physical_type: date, description: Card expiry represented as the first day of its month., semantic_role: time, tags: [], synonyms: [expiry]}
+  - {name: card_status, physical_type: string, description: Current card status., semantic_role: dimension, tags: [], synonyms: [status]}
+  - {name: pipeline_run_id, physical_type: string, description: Gold pipeline run identifier., semantic_role: lineage, tags: [metadata], synonyms: [run id]}
+  - {name: batch_id, physical_type: bigint, description: Source snapshot batch identifier., semantic_role: lineage, tags: [metadata], synonyms: [batch]}
+  - {name: last_refreshed_at, physical_type: timestamp, description: Time the Gold row was refreshed., semantic_role: time, tags: [metadata], synonyms: [data as of]}
+  - {name: quality_status, physical_type: string, description: Row quality outcome., semantic_role: quality_flag, tags: [metadata], synonyms: [data quality], allowed_values: [pass, partial]}
+  - {name: warning_flags, physical_type: "array<string>", description: Machine-readable data quality warnings., semantic_role: quality_flag, tags: [metadata], synonyms: [warnings]}
+  - {name: source_references, physical_type: "array<struct<source_table:string,source_record_id:string>>", description: Protected source lineage., semantic_role: lineage, tags: [metadata, restricted], synonyms: [lineage]}
+  - {name: usage_restrictions, physical_type: string, description: Broker source access classification., semantic_role: access_policy, tags: [metadata], synonyms: [access policy], allowed_values: [internal_only]}
+dimensions:
+  - {id: card_status, column: card_status, description: Current card status., synonyms: [status]}
+  - {id: card_type, column: card_type, description: Card product type., synonyms: [type]}
+metrics:
+  - {id: card_count, description: Number of customer-owned cards., expression: "COUNT(1)", aggregation: count, format: integer, supported_dimensions: [card_status, card_type], time_field: expiry_month}
+  - {id: active_card_count, description: Number of active customer-owned cards., expression: "COUNT(1) FILTER (WHERE card_status = 'active')", aggregation: count, format: integer, supported_dimensions: [card_status, card_type], time_field: expiry_month}

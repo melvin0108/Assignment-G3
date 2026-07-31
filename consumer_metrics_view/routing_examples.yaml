@@ -1,0 +1,41 @@
+version: "1.0.0"
+authority: authenticated_backend_session
+defaults:
+  recent_transactions_days: 30
+  detail_limit: 100
+  detail_order: newest_first
+  empty_result: no matching records
+  mixed_currency_aggregation: forbidden
+response_policy:
+  strip_fields: [scope_customer_id, scope_account_id, scope_card_id, customer_id, account_id, card_id, pipeline_run_id, batch_id, source_references, usage_restrictions]
+  disclose_fields: [quality_status, data_as_of]
+  unsupported: [balances, available_credit, card_limits, rewards, transfers, payments, fraud_scores, alerts, investigation_cases, investigator_notes, merchant_risk_ratings, employee_data, legal_hold, financial_advice, predictions]
+operations:
+  - name: list_my_accounts
+    agent_arguments: []
+    backend_injected_parameters: [scope_customer_id, scope_account_id]
+    metric_view: mv_consumer_accounts
+    detail_order_by: open_date DESC
+    limit: 100
+  - name: list_my_cards
+    agent_arguments: [account_reference]
+    backend_injected_parameters: [scope_customer_id, scope_account_id, scope_card_id]
+    metric_view: mv_consumer_cards
+    ownership_resolution: Resolve account_reference from the authenticated customer's ownership map.
+    detail_order_by: expiry_month DESC
+    limit: 100
+  - name: get_my_transactions
+    agent_arguments: [account_reference, card_reference, date_from, date_to, status]
+    backend_injected_parameters: [scope_customer_id, scope_account_id, scope_card_id]
+    metric_view: mv_consumer_transactions
+    ownership_resolution: Resolve supplied display references only within the authenticated customer's ownership map.
+    default_date_filter: transaction_at >= CURRENT_DATE() - INTERVAL 30 DAYS
+    detail_order_by: transaction_at DESC
+    limit: 100
+  - name: get_my_disputes
+    agent_arguments: [account_reference, card_reference, date_from, date_to, status]
+    backend_injected_parameters: [scope_customer_id, scope_account_id, scope_card_id]
+    metric_view: mv_consumer_disputes
+    ownership_resolution: Resolve supplied display references only within the authenticated customer's ownership map.
+    detail_order_by: raised_at DESC
+    limit: 100

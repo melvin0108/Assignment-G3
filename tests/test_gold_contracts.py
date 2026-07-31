@@ -13,6 +13,7 @@ ROOT = Path(__file__).parents[1]
 MODEL_DIR = ROOT / "docs" / "models" / "gold"
 ROUTING_PATH = MODEL_DIR / "questions-to-metrics.yaml"
 METRIC_VIEW_DIR = ROOT / "metrics_view"
+CONSUMER_METRIC_VIEW_DIR = ROOT / "consumer_metrics_view"
 
 SEMANTIC_OBJECTS = {
     "dim_case": "01_case_metrics.yaml",
@@ -29,7 +30,13 @@ SEMANTIC_OBJECTS = {
     "dim_currency": "12_currency_fields.yaml",
     "dim_dispute_reason": "13_dispute_reason_fields.yaml",
     "investigation_context": "14_investigation_context_metrics.yaml",
+    "dim_consumer_account": "mv_consumer_accounts.yaml",
+    "dim_consumer_card": "mv_consumer_cards.yaml",
+    "fact_consumer_transaction": "mv_consumer_transactions.yaml",
+    "fact_consumer_dispute": "mv_consumer_disputes.yaml",
 }
+
+CONSUMER_MODELS = set(gold_common.PROTECTED_CONSUMER_BROKER_COLUMNS)
 
 EXPECTED_PRIMARY_KEYS = {
     "dim_date": ["date_key"],
@@ -46,6 +53,10 @@ EXPECTED_PRIMARY_KEYS = {
     "fact_investigation_note": ["case_id", "note_id"],
     "fact_case_party_summary": ["case_id", "party_type", "role"],
     "investigation_context": ["case_id"],
+    "dim_consumer_account": ["customer_id", "account_id"],
+    "dim_consumer_card": ["customer_id", "card_id"],
+    "fact_consumer_transaction": ["customer_id", "transaction_reference"],
+    "fact_consumer_dispute": ["customer_id", "dispute_reference"],
 }
 
 INTERNAL_ONLY_MODELS = set(EXPECTED_PRIMARY_KEYS) - {"investigation_context"}
@@ -57,6 +68,9 @@ EXPECTED_METRICS = {
     "dispute_amount_total", "chargeback_count", "chargeback_amount_total",
     "investigation_context_count",
     "fraud_alert_count", "fraud_alert_score_average", "safe_note_count", "party_count",
+    "account_count", "active_account_count", "card_count", "active_card_count",
+    "total_transaction_amount", "average_transaction_amount",
+    "total_disputed_amount",
 }
 
 LEGACY_HASHED_COLUMNS = {
@@ -91,6 +105,10 @@ class GoldContractTests(unittest.TestCase):
         "fact_investigation_note",
         "fact_case_party_summary",
         "investigation_context",
+        "dim_consumer_account",
+        "dim_consumer_card",
+        "fact_consumer_transaction",
+        "fact_consumer_dispute",
         })
 
     def test_gold_metadata_contract_defaults_to_internal_only(self):
@@ -230,7 +248,6 @@ class GoldSemanticContractTests(unittest.TestCase):
 
             for metric in contract["metrics"]:
                 self.assertEqual(set(metric), required_metric_fields, f"{model}.{metric['id']}")
-                self.assertNotIn(metric["id"], metric_ids)
                 metric_ids.add(metric["id"])
                 self.assertTrue(set(metric["supported_dimensions"]) <= set(dimensions), metric["id"])
                 if metric["time_field"] is not None:
@@ -248,9 +265,17 @@ class GoldSemanticContractTests(unittest.TestCase):
         self.assertEqual(len(routing["patterns"]), 11)
 
         metric_locations = {
-            metric["id"]: model
-            for model, contract in self.contracts.items()
-            for metric in contract["metrics"]
+            metric_id: {
+                model
+                for model, contract in self.contracts.items()
+                for metric in contract["metrics"]
+                if metric["id"] == metric_id
+            }
+            for metric_id in {
+                metric["id"]
+                for contract in self.contracts.values()
+                for metric in contract["metrics"]
+            }
         }
         pattern_ids = [pattern["id"] for pattern in routing["patterns"]]
         self.assertEqual(len(pattern_ids), len(set(pattern_ids)))
@@ -291,10 +316,11 @@ class GoldSemanticContractTests(unittest.TestCase):
                 self.assertTrue(pattern["metric_ids"], pattern["id"])
                 self.assertTrue(set(pattern["metric_ids"]) <= set(metric_locations), pattern["id"])
                 routed_models = {table.removeprefix("gold.") for table in routed_tables}
-                self.assertTrue(
-                    {metric_locations[metric_id] for metric_id in pattern["metric_ids"]} <= routed_models,
-                    pattern["id"],
-                )
+                for metric_id in pattern["metric_ids"]:
+                    self.assertTrue(
+                        metric_locations[metric_id] & routed_models,
+                        pattern["id"],
+                    )
             else:
                 self.assertEqual(pattern["query_mode"], "detail")
                 self.assertEqual(pattern["metric_ids"], [])
@@ -344,12 +370,25 @@ class GoldSemanticContractTests(unittest.TestCase):
     def test_semantic_inventory_has_one_object_per_gold_contract(self):
         self.assertEqual(set(SEMANTIC_OBJECTS), set(self.contracts))
 
-        metric_files = {
+        banker_metric_files = {
             path.name for path in METRIC_VIEW_DIR.glob("*.yaml")
             if path.name != "questions-to-metrics.yaml"
         }
-        expected_files = {value for value in SEMANTIC_OBJECTS.values() if value.endswith(".yaml")}
-        self.assertEqual(metric_files, expected_files)
+        consumer_metric_files = {
+            path.name for path in CONSUMER_METRIC_VIEW_DIR.glob("mv_*.yaml")
+        }
+        expected_banker_files = {
+            filename
+            for model, filename in SEMANTIC_OBJECTS.items()
+            if model not in CONSUMER_MODELS
+        }
+        expected_consumer_files = {
+            filename
+            for model, filename in SEMANTIC_OBJECTS.items()
+            if model in CONSUMER_MODELS
+        }
+        self.assertEqual(banker_metric_files, expected_banker_files)
+        self.assertEqual(consumer_metric_files, expected_consumer_files)
 
         deliverable = (ROOT / "deliverables" / "metric-views-and-genie-agent.md").read_text(
             encoding="utf-8"
@@ -363,7 +402,12 @@ class GoldSemanticContractTests(unittest.TestCase):
                 continue
 
             contract = self.contracts[model]
-            definition = yaml.safe_load((METRIC_VIEW_DIR / filename).read_text(encoding="utf-8"))
+            definition_dir = (
+                CONSUMER_METRIC_VIEW_DIR
+                if model in CONSUMER_MODELS
+                else METRIC_VIEW_DIR
+            )
+            definition = yaml.safe_load((definition_dir / filename).read_text(encoding="utf-8"))
             self.assertEqual(definition["source"], f"g3_catalog.gold.{model}", model)
 
             scalar_columns = {
@@ -371,6 +415,11 @@ class GoldSemanticContractTests(unittest.TestCase):
                 for column in contract["columns"]
                 if not column["physical_type"].lower().startswith(("array", "struct"))
             }
+            if model in CONSUMER_MODELS:
+                scalar_columns -= {
+                    "customer_id", "account_id", "card_id", "pipeline_run_id",
+                    "batch_id", "usage_restrictions",
+                }
             if model == "investigation_context":
                 scalar_columns.update(
                     {
@@ -404,7 +453,7 @@ class GoldSemanticContractTests(unittest.TestCase):
                 for join in definition.get("joins", [])
                 for clause in join["on"].split(" AND ")
             }
-            if contract["type"] == "materialized_context":
+            if contract["type"] == "materialized_context" or model in CONSUMER_MODELS:
                 self.assertEqual(semantic_joins, set(), model)
             else:
                 self.assertEqual(semantic_joins, documented_joins, model)

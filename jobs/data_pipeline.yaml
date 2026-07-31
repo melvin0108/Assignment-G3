@@ -681,6 +681,53 @@ resources:
               catalog: "{{job.parameters.catalog}}"
             source: WORKSPACE
           environment_key: Default
+        - task_key: dim_consumer_account
+          depends_on:
+            - task_key: validate_m2_silver
+            - task_key: silver_accounts
+            - task_key: silver_customers
+          notebook_task:
+            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/dim_consumer_account
+            base_parameters:
+              catalog: "{{job.parameters.catalog}}"
+            source: WORKSPACE
+          environment_key: Default
+        - task_key: dim_consumer_card
+          depends_on:
+            - task_key: dim_consumer_account
+            - task_key: silver_cards
+          notebook_task:
+            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/dim_consumer_card
+            base_parameters:
+              catalog: "{{job.parameters.catalog}}"
+            source: WORKSPACE
+          environment_key: Default
+        - task_key: fact_consumer_transaction
+          depends_on:
+            - task_key: dim_consumer_account
+            - task_key: dim_consumer_card
+            - task_key: silver_transactions
+            - task_key: silver_merchants
+            - task_key: silver_merchant_categories
+          notebook_task:
+            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/fact_consumer_transaction
+            base_parameters:
+              catalog: "{{job.parameters.catalog}}"
+            source: WORKSPACE
+          environment_key: Default
+        - task_key: fact_consumer_dispute
+          depends_on:
+            - task_key: dim_consumer_account
+            - task_key: dim_consumer_card
+            - task_key: silver_disputes
+            - task_key: silver_transactions
+            - task_key: silver_dispute_reason_codes
+          notebook_task:
+            notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/gold/fact_consumer_dispute
+            base_parameters:
+              catalog: "{{job.parameters.catalog}}"
+            source: WORKSPACE
+          environment_key: Default
         - task_key: validate_m3_gold
           depends_on:
             - task_key: fact_case_transaction
@@ -696,6 +743,10 @@ resources:
             - task_key: fact_authorization_attempt
             - task_key: fact_fraud_alert
             - task_key: dim_case
+            - task_key: dim_consumer_account
+            - task_key: dim_consumer_card
+            - task_key: fact_consumer_transaction
+            - task_key: fact_consumer_dispute
           notebook_task:
             notebook_path: /Workspace/Users/thinhpham1807@gmail.com/Assignment-G3/pipeline/validation/validate_gold
             base_parameters:

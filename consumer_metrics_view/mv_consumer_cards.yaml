@@ -1,0 +1,29 @@
+version: 1.1
+comment: "customer_facing card fields and measures for an authenticated bank-app customer."
+source: g3_catalog.gold.dim_consumer_card
+parameters:
+  - {name: scope_customer_id, data_type: string}
+  - {name: scope_account_id, data_type: string, default: __all_owned__}
+  - {name: scope_card_id, data_type: string, default: __all_owned__}
+filter: >
+  source.customer_id = scope_customer_id
+  AND (
+    scope_account_id = '__all_owned__'
+    OR source.account_id = scope_account_id
+  )
+  AND (
+    scope_card_id = '__all_owned__'
+    OR source.card_id = scope_card_id
+  )
+fields:
+  - {name: account_reference, expr: source.account_reference, comment: Masked account reference.}
+  - {name: card_reference, expr: source.card_reference, comment: Masked card reference.}
+  - {name: card_last_four, expr: source.card_last_four, comment: Last four card digits.}
+  - {name: card_type, expr: source.card_type, comment: Card product type.}
+  - {name: expiry_month, expr: source.expiry_month, comment: Card expiry month.}
+  - {name: card_status, expr: source.card_status, comment: Current card status.}
+  - {name: quality_status, expr: source.quality_status, comment: Data quality outcome.}
+  - {name: data_as_of, expr: source.last_refreshed_at, comment: Time the customer data was refreshed.}
+measures:
+  - {name: card_count, expr: COUNT(1), comment: Number of scoped cards.}
+  - {name: active_card_count, expr: "COUNT(1) FILTER (WHERE source.card_status = 'active')", comment: Number of active scoped cards.}

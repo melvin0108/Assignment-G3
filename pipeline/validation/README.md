@@ -35,3 +35,9 @@ Run order after Bronze and DQ notebooks:
 
 The script raises an exception if any blocking check fails. Save the Databricks
 cell output as evidence for E2-I5, E3-I6, and E7-I1/E7-I3.
+
+After Gold, run `pipeline/validation/validate_gold.py`. If the authenticated
+Consumer semantic layer is deployed, also run
+`consumer_metrics_view/validate_consumer_metric_views.py` and save that output
+with the M3 evidence. Local tests do not establish that the parameterized
+views were deployed or that runtime grants are correct.

@@ -1,0 +1,32 @@
+version: 1.1
+comment: "customer_facing dispute fields and currency-safe measures for an authenticated bank-app customer."
+source: g3_catalog.gold.fact_consumer_dispute
+parameters:
+  - {name: scope_customer_id, data_type: string}
+  - {name: scope_account_id, data_type: string, default: __all_owned__}
+  - {name: scope_card_id, data_type: string, default: __all_owned__}
+filter: >
+  source.customer_id = scope_customer_id
+  AND (
+    scope_account_id = '__all_owned__'
+    OR source.account_id = scope_account_id
+  )
+  AND (
+    scope_card_id = '__all_owned__'
+    OR source.card_id = scope_card_id
+  )
+fields:
+  - {name: dispute_reference, expr: source.dispute_reference, comment: Masked dispute reference.}
+  - {name: transaction_reference, expr: source.transaction_reference, comment: Masked related transaction reference.}
+  - {name: account_reference, expr: source.account_reference, comment: Masked account reference.}
+  - {name: card_reference, expr: source.card_reference, comment: Masked card reference when applicable.}
+  - {name: reason_description, expr: source.reason_description, comment: Customer-safe dispute reason.}
+  - {name: currency_code, expr: source.currency_code, comment: Currency required for amount aggregation.}
+  - {name: raised_at, expr: source.raised_at, comment: Time the dispute was raised.}
+  - {name: dispute_status, expr: source.dispute_status, comment: Current dispute status.}
+  - {name: amount, expr: source.amount, comment: Disputed amount in currency_code.}
+  - {name: quality_status, expr: source.quality_status, comment: Data quality outcome.}
+  - {name: data_as_of, expr: source.last_refreshed_at, comment: Time the customer data was refreshed.}
+measures:
+  - {name: dispute_count, expr: COUNT(1), comment: Number of scoped disputes.}
+  - {name: total_disputed_amount, expr: SUM(source.amount), comment: Total disputed amount; group or filter by currency_code.}

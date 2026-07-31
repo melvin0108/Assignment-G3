@@ -1,0 +1,43 @@
+schema_version: "1.0.0"
+model: fact_consumer_dispute
+table: gold.fact_consumer_dispute
+description: Protected customer-owned dispute broker without investigation-only attributes.
+domain: consumer_self_service
+type: fact
+grain: one row per customer and masked dispute reference
+tags: [gold, consumer, protected_broker_source]
+synonyms: [consumer dispute, my dispute]
+sources: [silver.disputes, silver.transactions, gold.dim_consumer_account, gold.dim_consumer_card, silver.dispute_reason_codes]
+ai_access: {classification: internal_only, pii_safe: true}
+primary_key: [customer_id, dispute_reference]
+relationships:
+  - target_model: gold.dim_consumer_account
+    cardinality: many_to_one
+    join_columns: [{from: customer_id, to: customer_id}, {from: account_id, to: account_id}]
+columns:
+  - {name: customer_id, physical_type: string, description: Internal customer scope key; never returned to the agent., semantic_role: broker_key, tags: [restricted], synonyms: [customer scope]}
+  - {name: account_id, physical_type: string, description: Internal account scope key; never returned to the agent., semantic_role: broker_key, tags: [restricted], synonyms: [account scope]}
+  - {name: card_id, physical_type: string, description: Internal nullable card scope key; never returned to the agent., semantic_role: broker_key, tags: [restricted], synonyms: [card scope]}
+  - {name: dispute_reference, physical_type: string, description: Masked customer-visible dispute reference., semantic_role: primary_key, tags: [masked], synonyms: [dispute]}
+  - {name: transaction_reference, physical_type: string, description: Masked related transaction reference., semantic_role: dimension, tags: [masked], synonyms: [transaction]}
+  - {name: account_reference, physical_type: string, description: Masked account display reference., semantic_role: dimension, tags: [masked], synonyms: [account]}
+  - {name: card_reference, physical_type: string, description: Masked nullable card display reference., semantic_role: dimension, tags: [masked], synonyms: [card]}
+  - {name: reason_description, physical_type: string, description: Customer-safe dispute reason description., semantic_role: dimension, tags: [], synonyms: [reason]}
+  - {name: currency_code, physical_type: string, description: Dispute currency; monetary metrics must group or filter by it., semantic_role: dimension, tags: [currency], synonyms: [currency]}
+  - {name: raised_at, physical_type: timestamp, description: Time the dispute was raised., semantic_role: time, tags: [], synonyms: [raised time]}
+  - {name: dispute_status, physical_type: string, description: Current dispute status., semantic_role: dimension, tags: [], synonyms: [status]}
+  - {name: amount, physical_type: "decimal(18,2)", description: Disputed amount in currency_code., semantic_role: measure, tags: [amount, currency], synonyms: [disputed amount]}
+  - {name: pipeline_run_id, physical_type: string, description: Gold pipeline run identifier., semantic_role: lineage, tags: [metadata], synonyms: [run id]}
+  - {name: batch_id, physical_type: bigint, description: Source snapshot batch identifier., semantic_role: lineage, tags: [metadata], synonyms: [batch]}
+  - {name: last_refreshed_at, physical_type: timestamp, description: Time the Gold row was refreshed., semantic_role: time, tags: [metadata], synonyms: [data as of]}
+  - {name: quality_status, physical_type: string, description: Row quality outcome., semantic_role: quality_flag, tags: [metadata], synonyms: [data quality], allowed_values: [pass, partial]}
+  - {name: warning_flags, physical_type: "array<string>", description: Machine-readable data quality warnings., semantic_role: quality_flag, tags: [metadata], synonyms: [warnings]}
+  - {name: source_references, physical_type: "array<struct<source_table:string,source_record_id:string>>", description: Protected source lineage., semantic_role: lineage, tags: [metadata, restricted], synonyms: [lineage]}
+  - {name: usage_restrictions, physical_type: string, description: Broker source access classification., semantic_role: access_policy, tags: [metadata], synonyms: [access policy], allowed_values: [internal_only]}
+dimensions:
+  - {id: currency_code, column: currency_code, description: Required grouping for monetary aggregation., synonyms: [currency]}
+  - {id: dispute_status, column: dispute_status, description: Current dispute status., synonyms: [status]}
+  - {id: raised_at, column: raised_at, description: Dispute-raised timestamp., synonyms: [raised time]}
+metrics:
+  - {id: dispute_count, description: Number of scoped disputes., expression: "COUNT(1)", aggregation: count, format: integer, supported_dimensions: [currency_code, dispute_status, raised_at], time_field: raised_at}
+  - {id: total_disputed_amount, description: Total disputed amount; group or filter by currency_code., expression: "SUM(amount)", aggregation: sum, format: currency_by_currency_code, supported_dimensions: [currency_code, dispute_status, raised_at], time_field: raised_at}

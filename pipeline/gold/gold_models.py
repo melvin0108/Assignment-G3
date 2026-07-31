@@ -47,6 +47,14 @@ def _write(df, catalog, model):
     print(f"Published {catalog}.gold.{model}")
 
 
+def _masked_reference(label, column, suffix_length=4):
+    """Return a display reference that never contains the complete source key."""
+    return F.concat(
+        F.lit(f"{label} ••••"),
+        F.substring(F.col(column), -suffix_length, suffix_length),
+    )
+
+
 def build_dim_date(spark, catalog, run_id, batch_id):
     """Build dim_date table."""
     date = spark.read.table(f"{catalog}.silver.date_dim")
@@ -89,6 +97,203 @@ def build_dim_currency(spark, catalog, run_id, batch_id):
     currencies = spark.read.table(f"{catalog}.silver.currencies")
     dim_currency = _metadata(currencies.select("currency_code", F.col("name").alias("currency_name"), "decimals", F.lit(False).alias("is_unknown"), "_source_record_id"), run_id, batch_id, "currencies", "_source_record_id")
     _write(dim_currency.unionByName(_unknown_from(dim_currency, {"currency_code": "UNKNOWN", "currency_name": "Unknown currency", "is_unknown": True, "quality_status": "partial", "warning_flags": ["unknown_currency"], "usage_restrictions": USAGE_RESTRICTIONS})), catalog, "dim_currency")
+
+
+def build_dim_consumer_account(spark, catalog, run_id, batch_id):
+    """Build the protected customer/account ownership broker."""
+    customers = spark.read.table(f"{catalog}.silver.customers").select(
+        "customer_id"
+    ).distinct()
+    accounts = spark.read.table(f"{catalog}.silver.accounts").alias("a")
+    consumer_accounts = accounts.join(
+        customers.alias("c"), "customer_id", "inner"
+    ).select(
+        "customer_id",
+        "account_id",
+        _masked_reference("Account", "account_id").alias("account_reference"),
+        "product_type",
+        F.col("status").alias("account_status"),
+        F.upper("currency").alias("currency_code"),
+        "open_date",
+        F.col("a._source_record_id").alias("_source_record_id"),
+    )
+    _write(
+        _metadata(
+            consumer_accounts,
+            run_id,
+            batch_id,
+            "accounts",
+            "_source_record_id",
+        ),
+        catalog,
+        "dim_consumer_account",
+    )
+
+
+def build_dim_consumer_card(spark, catalog, run_id, batch_id):
+    """Build the protected customer/card ownership broker."""
+    accounts = spark.read.table(
+        f"{catalog}.gold.dim_consumer_account"
+    ).alias("a")
+    cards = spark.read.table(f"{catalog}.silver.cards").alias("c")
+    card_last_four = F.substring(F.col("c.pan"), -4, 4)
+    consumer_cards = cards.join(accounts, "account_id", "inner").select(
+        "customer_id",
+        "account_id",
+        "card_id",
+        "account_reference",
+        F.concat(F.lit("Card ••••"), card_last_four).alias("card_reference"),
+        card_last_four.alias("card_last_four"),
+        "card_type",
+        F.to_date(
+            F.concat(F.col("expiry"), F.lit("-01")), "yyyy-MM-dd"
+        ).alias("expiry_month"),
+        F.col("c.status").alias("card_status"),
+        F.col("c._source_record_id").alias("_source_record_id"),
+    )
+    _write(
+        _metadata(
+            consumer_cards,
+            run_id,
+            batch_id,
+            "cards",
+            "_source_record_id",
+        ),
+        catalog,
+        "dim_consumer_card",
+    )
+
+
+def build_fact_consumer_transaction(spark, catalog, run_id, batch_id):
+    """Build customer-scoped transaction details without raw business IDs."""
+    accounts = spark.read.table(
+        f"{catalog}.gold.dim_consumer_account"
+    ).alias("a")
+    cards = spark.read.table(f"{catalog}.gold.dim_consumer_card").alias("c")
+    transactions = spark.read.table(
+        f"{catalog}.silver.transactions"
+    ).alias("t")
+    merchants = spark.read.table(f"{catalog}.silver.merchants").alias("m")
+    categories = spark.read.table(
+        f"{catalog}.silver.merchant_categories"
+    ).alias("mc")
+    card_join = (
+        (F.col("t.card_id") == F.col("c.card_id"))
+        & (F.col("t.account_id") == F.col("c.account_id"))
+        & (F.col("a.customer_id") == F.col("c.customer_id"))
+    )
+    consumer_transactions = (
+        transactions.join(accounts, "account_id", "inner")
+        .join(cards, card_join, "left")
+        .join(merchants, "merchant_id", "inner")
+        .join(categories, "mcc", "left")
+        .filter(F.col("t.card_id").isNull() | F.col("c.card_id").isNotNull())
+        .select(
+            F.col("a.customer_id").alias("customer_id"),
+            F.col("t.account_id").alias("account_id"),
+            F.col("t.card_id").alias("card_id"),
+            _masked_reference(
+                "Transaction", "t.transaction_id", 6
+            ).alias("transaction_reference"),
+            F.col("a.account_reference").alias("account_reference"),
+            F.col("c.card_reference").alias("card_reference"),
+            F.col("m.name").alias("merchant_name"),
+            F.col("mc.category_name").alias("merchant_category"),
+            F.col("m.country").alias("merchant_country"),
+            F.col("t.channel").alias("channel"),
+            F.col("t.currency").alias("currency_code"),
+            F.col("t.txn_ts").alias("transaction_at"),
+            F.col("t.status").alias("transaction_status"),
+            F.col("t.amount").cast("decimal(18,2)").alias("amount"),
+            F.col("t._source_record_id").alias("_source_record_id"),
+            F.col("mc.category_name").isNull().alias(
+                "missing_merchant_category"
+            ),
+        )
+    )
+    consumer_transactions = _metadata(
+        consumer_transactions,
+        run_id,
+        batch_id,
+        "transactions",
+        "_source_record_id",
+        F.when(F.col("missing_merchant_category"), "partial").otherwise("pass"),
+        F.when(
+            F.col("missing_merchant_category"),
+            F.array(F.lit("missing_merchant_category")),
+        ).otherwise(_empty_string_array()),
+    ).drop("missing_merchant_category")
+    _write(
+        consumer_transactions,
+        catalog,
+        "fact_consumer_transaction",
+    )
+
+
+def build_fact_consumer_dispute(spark, catalog, run_id, batch_id):
+    """Build customer-scoped disputes without investigation-only attributes."""
+    accounts = spark.read.table(
+        f"{catalog}.gold.dim_consumer_account"
+    ).alias("a")
+    cards = spark.read.table(f"{catalog}.gold.dim_consumer_card").alias("c")
+    transactions = spark.read.table(
+        f"{catalog}.silver.transactions"
+    ).alias("t")
+    disputes = spark.read.table(f"{catalog}.silver.disputes").alias("d")
+    reasons = spark.read.table(
+        f"{catalog}.silver.dispute_reason_codes"
+    ).alias("r")
+    card_join = (
+        (F.col("t.card_id") == F.col("c.card_id"))
+        & (F.col("t.account_id") == F.col("c.account_id"))
+        & (F.col("a.customer_id") == F.col("c.customer_id"))
+    )
+    consumer_disputes = (
+        disputes.join(transactions, "transaction_id", "inner")
+        .join(accounts, "account_id", "inner")
+        .join(cards, card_join, "left")
+        .join(reasons, "reason_code", "left")
+        .filter(F.col("t.card_id").isNull() | F.col("c.card_id").isNotNull())
+        .select(
+            F.col("a.customer_id").alias("customer_id"),
+            F.col("t.account_id").alias("account_id"),
+            F.col("t.card_id").alias("card_id"),
+            _masked_reference("Dispute", "d.dispute_id", 6).alias(
+                "dispute_reference"
+            ),
+            _masked_reference(
+                "Transaction", "t.transaction_id", 6
+            ).alias("transaction_reference"),
+            F.col("a.account_reference").alias("account_reference"),
+            F.col("c.card_reference").alias("card_reference"),
+            F.col("r.description").alias("reason_description"),
+            F.col("t.currency").alias("currency_code"),
+            F.col("d.raised_at").alias("raised_at"),
+            F.col("d.status").alias("dispute_status"),
+            F.col("d.amount").cast("decimal(18,2)").alias("amount"),
+            F.col("d._source_record_id").alias("_source_record_id"),
+            F.col("r.description").isNull().alias(
+                "missing_dispute_reason"
+            ),
+        )
+    )
+    consumer_disputes = _metadata(
+        consumer_disputes,
+        run_id,
+        batch_id,
+        "disputes",
+        "_source_record_id",
+        F.when(F.col("missing_dispute_reason"), "partial").otherwise("pass"),
+        F.when(
+            F.col("missing_dispute_reason"),
+            F.array(F.lit("missing_dispute_reason")),
+        ).otherwise(_empty_string_array()),
+    ).drop("missing_dispute_reason")
+    _write(
+        consumer_disputes,
+        catalog,
+        "fact_consumer_dispute",
+    )
 
 
 def build_fact_case_transaction(spark, catalog, run_id, batch_id):
