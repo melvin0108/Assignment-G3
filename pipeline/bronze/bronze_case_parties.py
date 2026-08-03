@@ -3,5 +3,10 @@
 
 from pipeline.bronze.autoloader_common import ingest_table
 
+TABLE_NAME = "case_parties"
+SOURCE_COLUMNS = ["case_id", "party_type", "party_id", "role"]
+RECORD_ID_COLUMNS = ["case_id", "party_type", "party_id"]
 
-ingest_table("case_parties")
+
+if __name__ == "__main__":
+    ingest_table(TABLE_NAME, SOURCE_COLUMNS, RECORD_ID_COLUMNS)

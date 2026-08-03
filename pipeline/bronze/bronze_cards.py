@@ -3,5 +3,18 @@
 
 from pipeline.bronze.autoloader_common import ingest_table
 
+TABLE_NAME = "cards"
+SOURCE_COLUMNS = [
+    "card_id",
+    "account_id",
+    "card_type",
+    "pan",
+    "expiry",
+    "status",
+    "effective_at",
+]
+RECORD_ID_COLUMNS = ["card_id"]
 
-ingest_table("cards")
+
+if __name__ == "__main__":
+    ingest_table(TABLE_NAME, SOURCE_COLUMNS, RECORD_ID_COLUMNS)

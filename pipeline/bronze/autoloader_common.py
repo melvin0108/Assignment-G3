@@ -22,36 +22,6 @@ dbutils = DBUtils(spark)
 LOGGER = logging.getLogger("g3.schema_evolution")
 
 
-TABLE_CONFIG = {
-    "accounts": (["account_id", "customer_id", "product_type", "open_date", "status", "currency"], ["account_id"]),
-    "auth_attempts": (["attempt_id", "transaction_id", "decision", "decline_reason", "auth_ts"], ["attempt_id"]),
-    "branches": (["branch_code", "name", "country", "region", "status"], ["branch_code"]),
-    "cards": (["card_id", "account_id", "card_type", "pan", "expiry", "status", "effective_at"], ["card_id"]),
-    "case_parties": (["case_id", "party_type", "party_id", "role"], ["case_id", "party_type", "party_id"]),
-    "case_status_types": (["status_code", "description"], ["status_code"]),
-    "case_transactions": (["case_id", "transaction_id", "linked_at"], ["case_id", "transaction_id"]),
-    "channels": (["channel_code", "channel_name"], ["channel_code"]),
-    "chargebacks": (["chargeback_id", "dispute_id", "scheme", "amount", "stage", "processed_at"], ["chargeback_id"]),
-    "countries": (["iso_code", "name", "region"], ["iso_code"]),
-    "currencies": (["currency_code", "name", "decimals"], ["currency_code"]),
-    "customer_contact_logs": (["contact_id", "customer_id", "direction", "contact_method", "do_not_contact", "contacted_at", "employee_id", "note"], ["contact_id"]),
-    "customers": (["customer_id", "first_name", "last_name", "dob", "email", "phone", "address", "tax_id", "created_at", "effective_at"], ["customer_id"]),
-    "date_dim": (["date_id", "year", "month", "quarter", "is_weekend"], ["date_id"]),
-    "defects_manifest": (["source_table", "record_key", "rule_id", "rule_name", "failure_reason", "severity"], ["source_table", "record_key", "rule_id"]),
-    "dispute_reason_codes": (["reason_code", "description"], ["reason_code"]),
-    "disputes": (["dispute_id", "transaction_id", "reason_code", "amount", "status", "raised_at"], ["dispute_id"]),
-    "employees": (["employee_id", "full_name", "email", "team", "role"], ["employee_id"]),
-    "fraud_alerts": (["alert_id", "transaction_id", "rule_name", "score", "triggered_at", "disposition"], ["alert_id"]),
-    "fraud_types": (["fraud_type_code", "description", "severity"], ["fraud_type_code"]),
-    "investigation_cases": (["case_id", "priority", "status_code", "fraud_type_code", "owner_employee_id", "opened_at", "closed_at", "legal_hold"], ["case_id"]),
-    "investigation_notes": (["note_id", "case_id", "author_employee_id", "note_text", "created_at"], ["note_id"]),
-    "merchant_categories": (["mcc", "category_name", "category_group"], ["mcc"]),
-    "merchants": (["merchant_id", "name", "mcc", "country", "risk_rating", "status", "effective_at"], ["merchant_id"]),
-    "scd_changes_manifest": (["source_table", "natural_key", "snapshot", "changed_attribute", "old_value", "new_value", "prior_effective_at", "effective_at"], ["source_table", "natural_key", "snapshot", "changed_attribute"]),
-    "transaction_devices": (["device_id", "transaction_id", "device_type", "ip", "geo_country"], ["device_id"]),
-    "transactions": (["transaction_id", "account_id", "card_id", "merchant_id", "channel", "amount", "currency", "txn_ts", "status"], ["transaction_id"]),
-}
-
 BRONZE_METADATA_COLUMNS = {
     "_source_file",
     "_source_file_mod_time",
@@ -151,13 +121,9 @@ def _catalog_widget():
     return catalog
 
 
-def ingest_table(table_name):
+def ingest_table(table_name, source_columns, record_id_columns):
     """Ingest all unseen CSV files for one table, then stop (AvailableNow)."""
-    if table_name not in TABLE_CONFIG:
-        raise ValueError(f"Unknown Bronze table: {table_name}")
-
     catalog = _catalog_widget()
-    source_cols, record_id_cols = TABLE_CONFIG[table_name]
     source_path = f"/Volumes/{catalog}/bronze/raw_data/{table_name}"
     state_root = f"/Volumes/{catalog}/bronze/autoloader_state/{table_name}"
     target = f"{catalog}.bronze.{table_name}"
@@ -167,10 +133,10 @@ def ingest_table(table_name):
 
     pending_files = _new_csv_files(source_path, target)
     inspected_files = _inspect_headers(
-        table_name, target, source_cols, pending_files
+        table_name, target, source_columns, pending_files
     )
     hinted_columns = [
-        *(f"`{column}` STRING" for column in source_cols),
+        *(f"`{column}` STRING" for column in source_columns),
         "`_corrupt_record` STRING",
     ]
     schema_hints = ", ".join(hinted_columns)
@@ -201,7 +167,10 @@ def ingest_table(table_name):
         ).cast("long")
         record_id = F.concat_ws(
             "|",
-            *[F.coalesce(F.col(column), F.lit("<NULL>")) for column in record_id_cols],
+            *[
+                F.coalesce(F.col(column), F.lit("<NULL>"))
+                for column in record_id_columns
+            ],
         )
         raw_json = F.to_json(
             F.struct(

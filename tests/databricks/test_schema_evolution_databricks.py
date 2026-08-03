@@ -210,12 +210,6 @@ dbutils.fs.rm(SOURCE_PATH, recurse=True)
 dbutils.fs.rm(STATE_PATH, recurse=True)
 dbutils.fs.mkdirs(SOURCE_PATH)
 
-previous_config = bronze_loader.TABLE_CONFIG.get(TEST_TABLE)
-bronze_loader.TABLE_CONFIG[TEST_TABLE] = (
-    list(CONTRACT_COLUMNS),
-    list(RECORD_ID_COLUMNS),
-)
-
 fatal_error = None
 
 try:
@@ -228,7 +222,11 @@ try:
             f"publishing {fixture.file_name} ==="
         )
         dbutils.fs.put(fixture_path, fixture.csv_text, overwrite=False)
-        bronze_loader.ingest_table(TEST_TABLE)
+        bronze_loader.ingest_table(
+            TEST_TABLE,
+            list(CONTRACT_COLUMNS),
+            list(RECORD_ID_COLUMNS),
+        )
 
         if fixture.scenario == "baseline":
             baseline = row_for("SE-001")
@@ -497,7 +495,11 @@ try:
 
     # Re-running with no new files must be idempotent.
     count_before = spark.read.table(BRONZE_TABLE).count()
-    bronze_loader.ingest_table(TEST_TABLE)
+    bronze_loader.ingest_table(
+        TEST_TABLE,
+        list(CONTRACT_COLUMNS),
+        list(RECORD_ID_COLUMNS),
+    )
     count_after = spark.read.table(BRONZE_TABLE).count()
     record_check(
         "re-running ingestion without new files is idempotent",
@@ -516,10 +518,6 @@ except Exception as exc:
     )
 
 finally:
-    if previous_config is None:
-        bronze_loader.TABLE_CONFIG.pop(TEST_TABLE, None)
-    else:
-        bronze_loader.TABLE_CONFIG[TEST_TABLE] = previous_config
     schema_logger.removeHandler(warning_capture)
     schema_logger.setLevel(previous_logger_level)
     persist_results()
