@@ -6,7 +6,7 @@
 #   1. Reads from bronze.employees
 #   2. Enforces Data Quality (DQ) rules and identifies failures
 #   3. Quarantines failed records to silver.quarantine_records
-#   4. Applies PII masking (hashing full_name and email)
+#   4. Passes through clean PII (PII masking deferred to governance policies)
 #   5. Writes clean records to silver.employees
 # ============================================================================
 
@@ -133,7 +133,7 @@ else:
     print("No failed records found to quarantine.")
 
 # ---------------------------------------------------------------------------
-# 4. FILTER CLEAN RECORDS & APPLY PII MASKING
+# 4. FILTER CLEAN RECORDS & CONSTRUCT SILVER DATAFRAME
 # ---------------------------------------------------------------------------
 # Get clean records using a left anti-join on _source_record_id
 clean_df = df_ranked.join(
@@ -142,14 +142,11 @@ clean_df = df_ranked.join(
     how="left_anti"
 )
 
-# PII Masking/Hashing parameters
-salt = "NAB_SALT_2026"
-
 # Construct Silver DataFrame
 silver_employees_df = clean_df.select(
     F.col("employee_id"),
-    F.sha2(F.concat(F.lower(F.trim(F.col("full_name"))), F.lit(salt)), 256).alias("full_name"),
-    F.sha2(F.concat(F.lower(F.trim(F.col("email"))), F.lit(salt)), 256).alias("email"),
+    F.col("full_name"),
+    F.col("email"),
     F.col("team"),
     F.col("role"),
     F.col("_source_file"),
