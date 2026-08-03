@@ -3,5 +3,10 @@
 
 from pipeline.bronze.autoloader_common import ingest_table
 
+TABLE_NAME = "employees"
+SOURCE_COLUMNS = ["employee_id", "full_name", "email", "team", "role"]
+RECORD_ID_COLUMNS = ["employee_id"]
 
-ingest_table("employees")
+
+if __name__ == "__main__":
+    ingest_table(TABLE_NAME, SOURCE_COLUMNS, RECORD_ID_COLUMNS)

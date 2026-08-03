@@ -3,5 +3,10 @@
 
 from pipeline.bronze.autoloader_common import ingest_table
 
+TABLE_NAME = "merchant_categories"
+SOURCE_COLUMNS = ["mcc", "category_name", "category_group"]
+RECORD_ID_COLUMNS = ["mcc"]
 
-ingest_table("merchant_categories")
+
+if __name__ == "__main__":
+    ingest_table(TABLE_NAME, SOURCE_COLUMNS, RECORD_ID_COLUMNS)

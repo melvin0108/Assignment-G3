@@ -3,5 +3,10 @@
 
 from pipeline.bronze.autoloader_common import ingest_table
 
+TABLE_NAME = "fraud_types"
+SOURCE_COLUMNS = ["fraud_type_code", "description", "severity"]
+RECORD_ID_COLUMNS = ["fraud_type_code"]
 
-ingest_table("fraud_types")
+
+if __name__ == "__main__":
+    ingest_table(TABLE_NAME, SOURCE_COLUMNS, RECORD_ID_COLUMNS)

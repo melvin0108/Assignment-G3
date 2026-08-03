@@ -9,7 +9,7 @@
 # ============================================================================
 
 from pyspark.sql import SparkSession
-from pipeline.bronze.autoloader_common import TABLE_CONFIG
+from pipeline.bronze.table_registry import ALL_TABLE_CONFIGS
 
 spark = SparkSession.builder.getOrCreate()
 
@@ -41,7 +41,6 @@ BRONZE_TABLES = [
     "investigation_notes",
     "merchant_categories",
     "merchants",
-    "scd_changes_manifest",
     "transaction_devices",
     "transactions",
 ]
@@ -97,7 +96,7 @@ expected_ingested_bronze_values = ",".join([f"('{t}')" for t in INGESTED_BRONZE_
 expected_meta_values = ",".join([f"('{c}')" for c in BRONZE_METADATA_COLS])
 expected_source_values = ",".join(
     f"('{table_name}','{column_name}')"
-    for table_name, (columns, _record_ids) in TABLE_CONFIG.items()
+    for table_name, (columns, _record_ids) in ALL_TABLE_CONFIGS.items()
     for column_name in columns
 )
 

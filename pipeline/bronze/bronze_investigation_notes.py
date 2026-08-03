@@ -3,5 +3,16 @@
 
 from pipeline.bronze.autoloader_common import ingest_table
 
+TABLE_NAME = "investigation_notes"
+SOURCE_COLUMNS = [
+    "note_id",
+    "case_id",
+    "author_employee_id",
+    "note_text",
+    "created_at",
+]
+RECORD_ID_COLUMNS = ["note_id"]
 
-ingest_table("investigation_notes")
+
+if __name__ == "__main__":
+    ingest_table(TABLE_NAME, SOURCE_COLUMNS, RECORD_ID_COLUMNS)

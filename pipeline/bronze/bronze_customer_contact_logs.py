@@ -3,5 +3,19 @@
 
 from pipeline.bronze.autoloader_common import ingest_table
 
+TABLE_NAME = "customer_contact_logs"
+SOURCE_COLUMNS = [
+    "contact_id",
+    "customer_id",
+    "direction",
+    "contact_method",
+    "do_not_contact",
+    "contacted_at",
+    "employee_id",
+    "note",
+]
+RECORD_ID_COLUMNS = ["contact_id"]
 
-ingest_table("customer_contact_logs")
+
+if __name__ == "__main__":
+    ingest_table(TABLE_NAME, SOURCE_COLUMNS, RECORD_ID_COLUMNS)

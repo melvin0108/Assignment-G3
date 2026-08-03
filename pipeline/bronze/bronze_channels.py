@@ -3,5 +3,10 @@
 
 from pipeline.bronze.autoloader_common import ingest_table
 
+TABLE_NAME = "channels"
+SOURCE_COLUMNS = ["channel_code", "channel_name"]
+RECORD_ID_COLUMNS = ["channel_code"]
 
-ingest_table("channels")
+
+if __name__ == "__main__":
+    ingest_table(TABLE_NAME, SOURCE_COLUMNS, RECORD_ID_COLUMNS)
