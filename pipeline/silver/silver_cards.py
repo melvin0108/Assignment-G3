@@ -6,7 +6,7 @@
 #   1. Reads from bronze.cards
 #   2. Enforces Data Quality (DQ) rules and identifies failures
 #   3. Quarantines failed records to silver.quarantine_records
-#   4. Applies PII masking (masks PAN showing only the last 4 digits)
+#   4. Passes through clean PII (PII masking deferred to governance policies)
 #   5. Writes clean records to silver.cards
 # ============================================================================
 
@@ -155,7 +155,7 @@ else:
     print("No failed records found to quarantine.")
 
 # ---------------------------------------------------------------------------
-# 4. FILTER CLEAN RECORDS & APPLY PII MASKING
+# 4. FILTER CLEAN RECORDS & CONSTRUCT SILVER DATAFRAME
 # ---------------------------------------------------------------------------
 # Get clean records using a left anti-join on _source_record_id
 clean_df = df_ranked.join(
@@ -164,15 +164,12 @@ clean_df = df_ranked.join(
     how="left_anti"
 )
 
-# PII Masking logic for PAN: XXXX-XXXX-XXXX-1234 (keeping only last 4 digits)
-pan_masked = F.concat(F.lit("XXXX-XXXX-XXXX-"), F.substring(F.col("pan"), -4, 4))
-
 # Construct Silver DataFrame
 silver_cards_df = clean_df.select(
     F.col("card_id"),
     F.col("account_id"),
     F.col("card_type"),
-    pan_masked.alias("pan"),
+    F.col("pan"),
     F.col("expiry"),
     F.col("status"),
     F.col("_source_file"),

@@ -6,7 +6,7 @@
 #   1. Reads the latest bronze.transaction_devices snapshot
 #   2. Checks transaction FK and required device type
 #   3. Quarantines failed records to silver.quarantine_records
-#   4. Tokenizes device_id and protects IP values
+#   4. Passes through clean device_id and IP (protection deferred to governance policies)
 #   5. Writes clean records to silver.transaction_devices
 #   6. Appends governance rows for masking policies and lineage
 # ============================================================================
@@ -148,30 +148,17 @@ else:
     print("No failed records found to quarantine.")
 
 # ---------------------------------------------------------------------------
-# 4. FILTER CLEAN RECORDS & APPLY PROTECTION
+# 4. FILTER CLEAN RECORDS & CONSTRUCT SILVER DATAFRAME
 # ---------------------------------------------------------------------------
-is_ipv4 = F.col("ip").rlike(r"^([0-9]{1,3}\.){3}[0-9]{1,3}$")
-ip_masked = (
-    F.when(is_ipv4, F.regexp_replace(F.col("ip"), r"^(\d+\.\d+\.\d+)\.\d+$", "$1.0/24"))
-    .when(F.col("ip").isNull() | (F.trim(F.col("ip")) == ""), F.lit(None).cast("string"))
-    .otherwise(F.concat(
-        F.lit("IP_HASH_"),
-        F.substring(F.sha2(F.concat(F.lower(F.trim(F.col("ip"))), F.lit(SALT)), 256), 1, 16),
-    ))
-)
-
 silver_transaction_devices_df = checked_df.filter(
     F.col("silver_transaction_id").isNotNull() &
     F.col("device_type").isNotNull() &
     (F.trim(F.col("device_type")) != "")
 ).select(
-    F.concat(
-        F.lit("DEV_"),
-        F.substring(F.sha2(F.concat(F.lower(F.trim(F.col("device_id"))), F.lit(SALT)), 256), 1, 16),
-    ).alias("device_id"),
+    F.trim(F.col("device_id")).alias("device_id"),
     F.col("transaction_id"),
     F.lower(F.trim(F.col("device_type"))).alias("device_type"),
-    ip_masked.alias("ip"),
+    F.trim(F.col("ip")).alias("ip"),
     F.upper(F.trim(F.col("geo_country"))).alias("geo_country"),
     F.col("_source_file"),
     F.col("_source_file_mod_time").cast("timestamp").alias("_source_file_mod_time"),
@@ -229,10 +216,10 @@ lineage_schema = StructType([
 ])
 
 lineage_rows = [
-    (CATALOG, "bronze", TABLE_NAME, "device_id", CATALOG, SCHEMA, TABLE_NAME, "device_id", "Tokenized with salted SHA256 prefix from latest Bronze batch"),
+    (CATALOG, "bronze", TABLE_NAME, "device_id", CATALOG, SCHEMA, TABLE_NAME, "device_id", "Direct copy after trimming from latest Bronze batch"),
     (CATALOG, "bronze", TABLE_NAME, "transaction_id", CATALOG, SCHEMA, TABLE_NAME, "transaction_id", "Direct copy after Silver transaction relationship check"),
     (CATALOG, "bronze", TABLE_NAME, "device_type", CATALOG, SCHEMA, TABLE_NAME, "device_type", "Lowercased and trimmed; missing values quarantined"),
-    (CATALOG, "bronze", TABLE_NAME, "ip", CATALOG, SCHEMA, TABLE_NAME, "ip", "IPv4 reduced to /24-style network; non-IPv4 hashed"),
+    (CATALOG, "bronze", TABLE_NAME, "ip", CATALOG, SCHEMA, TABLE_NAME, "ip", "Direct copy after trimming from latest Bronze batch"),
     (CATALOG, "bronze", TABLE_NAME, "geo_country", CATALOG, SCHEMA, TABLE_NAME, "geo_country", "Uppercased and trimmed"),
 ]
 

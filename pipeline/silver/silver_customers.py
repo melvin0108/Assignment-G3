@@ -6,7 +6,7 @@
 #   1. Reads from bronze.customers
 #   2. Enforces Data Quality (DQ) rules and identifies failures
 #   3. Quarantines failed records to silver.quarantine_records
-#   4. Applies PII masking (FPE/tokenization, hashing, age-banding, email/phone masking)
+#   4. Passes through clean PII (PII masking deferred to governance policies)
 #   5. Writes clean records to silver.customers
 # ============================================================================
 
@@ -155,7 +155,7 @@ else:
     print("No failed records found to quarantine.")
 
 # ---------------------------------------------------------------------------
-# 4. FILTER CLEAN RECORDS & APPLY PII MASKING
+# 4. FILTER CLEAN RECORDS & CONSTRUCT SILVER DATAFRAME
 # ---------------------------------------------------------------------------
 # Get clean records using a left anti-join on _source_record_id
 clean_df = df_ranked.join(
@@ -164,61 +164,16 @@ clean_df = df_ranked.join(
     how="left_anti"
 ).filter(~any_cast_failure(CAST_RULES))
 
-# PII Masking/Hashing parameters
-salt = "NAB_SALT_2026"
-run_date_lit = F.lit("2026-07-06").cast("date")  # Pinned run date for age bands
-
-# DOB Age-banding expression
-age_expr = F.floor(F.months_between(run_date_lit, F.col("dob_typed")) / 12)
-dob_masked = F.when(F.col("dob").isNull() | (F.col("dob") == ""), "UNKNOWN") \
-    .otherwise(
-    F.when(age_expr < 18, "Under 18") \
-        .when(age_expr.between(18, 25), "18-25") \
-        .when(age_expr.between(26, 35), "26-35") \
-        .when(age_expr.between(36, 45), "36-45") \
-        .when(age_expr.between(46, 55), "46-55") \
-        .when(age_expr.between(56, 65), "56-65") \
-        .otherwise("66+")
-)
-
-# Email masking logic: show first char + mask user + mask domain name (j***@***.com)
-email_split = F.split(F.col("email"), "@")
-email_user = email_split.getItem(0)
-email_domain = email_split.getItem(1)
-masked_domain = F.regexp_replace(email_domain, "^[^.]+", "***")
-
-email_masked = F.when(F.col("email").isNull() | (F.col("email") == ""), F.lit(None).cast("string")) \
-    .when(~F.col("email").contains("@"), "invalid_masked_email") \
-    .otherwise(
-    F.concat(
-        F.substring(email_user, 1, 1),
-        F.lit("***@"),
-        masked_domain
-    )
-)
-
-# Phone masking logic: ******1234
-phone_masked = F.when(F.col("phone").isNull() | (F.col("phone") == ""), F.lit(None).cast("string")) \
-    .otherwise(F.concat(F.lit("******"), F.substring(F.col("phone"), -4, 4)))
-
-# Construct Silver DataFrame
+# Construct Silver DataFrame with unmasked clean columns
 silver_customers_df = clean_df.select(
     F.col("customer_id"),
-    F.concat(
-        F.lit("TOK_"),
-        F.substring(F.sha2(F.concat(F.lower(F.trim(F.col("first_name"))), F.lit(salt)), 256), 1, 16)
-    ).alias("first_name"),
-    F.concat(
-        F.lit("TOK_"),
-        F.substring(F.sha2(F.concat(F.lower(F.trim(F.col("last_name"))), F.lit(salt)), 256), 1, 16)
-    ).alias("last_name"),
-    dob_masked.alias("dob"),
-    email_masked.alias("email"),
-    phone_masked.alias("phone"),
-    F.when(F.col("address").isNull() | (F.col("address") == ""), F.lit(None).cast("string")) \
-        .otherwise(F.sha2(F.concat(F.lower(F.trim(F.col("address"))), F.lit(salt)), 256)).alias("address"),
-    F.when(F.col("tax_id").isNull() | (F.col("tax_id") == ""), F.lit(None).cast("string")) \
-        .otherwise(F.sha2(F.concat(F.lower(F.trim(F.col("tax_id"))), F.lit(salt)), 256)).alias("tax_id"),
+    F.trim(F.col("first_name")).alias("first_name"),
+    F.trim(F.col("last_name")).alias("last_name"),
+    F.col("dob_typed").alias("dob"),
+    F.trim(F.col("email")).alias("email"),
+    F.col("phone"),
+    F.col("address"),
+    F.col("tax_id"),
     F.col("created_at_typed").alias("created_at"),
     F.col("_source_file"),
     F.col("_source_file_mod_time").cast("timestamp").alias("_source_file_mod_time"),
