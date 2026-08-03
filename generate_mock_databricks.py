@@ -73,14 +73,14 @@ def singular_name(table_name):
     return table_name
 
 
-def next_batch_number(root_dir):
-    """Use one batch number for every table produced by this notebook run."""
+def next_batch_number(root_dir, table_names):
+    """Find the next mock batch while ignoring unrelated/test folders."""
     highest = 0
     if not os.path.isdir(root_dir):
         return 1
-    for table in os.listdir(root_dir):
+    for table in table_names:
         table_dir = os.path.join(root_dir, table)
-        if not os.path.isdir(table_dir) or table.startswith("_"):
+        if not os.path.isdir(table_dir):
             continue
         pattern = re.compile(
             rf"^{re.escape(singular_name(table))}(\d+)\.csv$"
@@ -136,7 +136,11 @@ def restore_previous_batch(root_dir, destination, batch_number):
 if not 0 <= scd_rate <= 1:
     raise ValueError("scd_rate must be between 0 and 1")
 
-batch_number = next_batch_number(OUT_DIR)
+mock_batch_tables = (
+    list(mock_config.GENERATION_ORDER)
+    + ["defects_manifest", "scd_changes_manifest"]
+)
+batch_number = next_batch_number(OUT_DIR, mock_batch_tables)
 work_dir = os.path.join(OUT_DIR, "_staging", uuid.uuid4().hex)
 staging_dir = os.path.join(work_dir, "output")
 previous_dir = os.path.join(work_dir, "previous")
