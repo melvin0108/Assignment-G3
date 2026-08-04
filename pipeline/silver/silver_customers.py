@@ -164,12 +164,23 @@ clean_df = df_ranked.join(
     how="left_anti"
 ).filter(~any_cast_failure(CAST_RULES))
 
+age_years = F.floor(F.months_between(F.current_date(), F.col("dob_typed")) / 12)
+
 # Construct Silver DataFrame with unmasked clean columns
 silver_customers_df = clean_df.select(
     F.col("customer_id"),
     F.trim(F.col("first_name")).alias("first_name"),
     F.trim(F.col("last_name")).alias("last_name"),
     F.col("dob_typed").alias("dob"),
+    F.when(F.col("dob_typed").isNull(), F.lit("Unknown"))
+     .when(age_years < 18, F.lit("Under 18"))
+     .when(age_years.between(18, 25), F.lit("18-25"))
+     .when(age_years.between(26, 35), F.lit("26-35"))
+     .when(age_years.between(36, 45), F.lit("36-45"))
+     .when(age_years.between(46, 55), F.lit("46-55"))
+     .when(age_years.between(56, 65), F.lit("56-65"))
+     .otherwise(F.lit("66+"))
+     .alias("age_band"),
     F.trim(F.col("email")).alias("email"),
     F.col("phone"),
     F.col("address"),

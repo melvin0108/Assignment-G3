@@ -1,0 +1,277 @@
+# Column classification manifest for Unity Catalog governed tags and ABAC masks.
+#
+# Scope:
+# - Table names are catalog-relative: <schema>.<table>.
+# - The tagging notebook should prepend the runtime catalog parameter, for example
+#   g3_dev.silver.customers or g3_catalog.gold.dim_consumer_card.
+# - This manifest is display-safety focused. It intentionally avoids hash and
+#   tokenization as masking methods. If stable pseudonymous join keys are needed
+#   later, create separate ETL-derived token columns instead of using ABAC masks.
+
+version: 1
+owner: governance
+description: >
+  Display-safety classification for customer, card, staff, device, note, and
+  Gold broker-key columns in the G3 medallion pipeline.
+
+tag_taxonomy:
+  classification:
+    description: Business sensitivity tier used by governance and audit.
+    values:
+      internal: Internal business data with no direct sensitive value.
+      confidential: Sensitive operational or linkage data.
+      restricted: PII, payment data, legal-sensitive data, or access-scoping keys.
+
+  pii_type:
+    description: Semantic data category used to select the correct masking behavior.
+    values:
+      direct_identifier: Person name or direct customer identifier.
+      email: Email address.
+      phone: Phone number.
+      address: Postal address or location detail.
+      date_of_birth: Date of birth.
+      demographic_band: Non-identifying demographic bucket derived from sensitive source data.
+      tax_id: Government/tax identifier.
+      payment_card: Payment card number or card-derived sensitive value.
+      staff_identifier: Employee name, email, or staff linkage.
+      device_identifier: Device or session identifier.
+      network_identifier: IP address or network endpoint.
+      sensitive_free_text: Free text that can contain PII, PAN, legal, or investigation-sensitive content.
+      legal_sensitive: Legal hold or legal/investigation restriction flag.
+      broker_key: Internal key used only to enforce scoped access.
+      source_lineage: Source record lineage that can reveal protected joins or source identities.
+      masked_reference: Already-masked display reference.
+      safe_text: PII-screened text approved for controlled downstream use.
+
+  protection_method:
+    description: Display-safety method. Policy matching should usually use this tag.
+    values:
+      mask_name: Show a minimal name-safe mask.
+      mask_email: Show an email-safe partial mask.
+      mask_phone: Show a phone-safe partial mask.
+      mask_pan: Show only the last four payment-card digits.
+      redact_string: Replace string with a fixed redaction marker.
+      null_string: Return NULL for string fields.
+      null_date: Return NULL for date fields.
+      network_redact: Truncate IPv4 to /24 or redact/hash non-IPv4 in a display-safe form.
+      no_mask: No ABAC mask required; tag is for audit/semantic classification only.
+
+  data_layer:
+    description: Medallion layer where the column exists.
+    values:
+      bronze: Raw append-only landing table.
+      silver: Typed and validated table.
+      gold: Curated dimensional, broker, or AI-ready table.
+
+  policy_domain:
+    description: Governance domain that owns the data risk and policy decision.
+    values:
+      customer: Customer identity or customer-owned data.
+      payment: Payment card or transaction payment data.
+      staff: Employee or staff identity/linkage data.
+      device: Device, session, or network data.
+      investigation: Investigation, note, legal, or case-sensitive data.
+      lineage: Source lineage and record traceability.
+
+columns:
+  # ---------------------------------------------------------------------------
+  # Bronze raw customer PII. Bronze stores all source columns as STRING.
+  # ---------------------------------------------------------------------------
+  - table: bronze.customers
+    column: first_name
+    tags: {classification: restricted, pii_type: direct_identifier, protection_method: mask_name, data_layer: bronze, policy_domain: customer}
+  - table: bronze.customers
+    column: last_name
+    tags: {classification: restricted, pii_type: direct_identifier, protection_method: mask_name, data_layer: bronze, policy_domain: customer}
+  - table: bronze.customers
+    column: email
+    tags: {classification: restricted, pii_type: email, protection_method: mask_email, data_layer: bronze, policy_domain: customer}
+  - table: bronze.customers
+    column: phone
+    tags: {classification: restricted, pii_type: phone, protection_method: mask_phone, data_layer: bronze, policy_domain: customer}
+  - table: bronze.customers
+    column: address
+    tags: {classification: restricted, pii_type: address, protection_method: redact_string, data_layer: bronze, policy_domain: customer}
+  - table: bronze.customers
+    column: dob
+    tags: {classification: restricted, pii_type: date_of_birth, protection_method: null_string, data_layer: bronze, policy_domain: customer}
+  - table: bronze.customers
+    column: tax_id
+    tags: {classification: restricted, pii_type: tax_id, protection_method: null_string, data_layer: bronze, policy_domain: customer}
+
+  - table: bronze.cards
+    column: pan
+    tags: {classification: restricted, pii_type: payment_card, protection_method: mask_pan, data_layer: bronze, policy_domain: payment}
+
+  - table: bronze.employees
+    column: full_name
+    tags: {classification: confidential, pii_type: staff_identifier, protection_method: mask_name, data_layer: bronze, policy_domain: staff}
+  - table: bronze.employees
+    column: email
+    tags: {classification: confidential, pii_type: email, protection_method: mask_email, data_layer: bronze, policy_domain: staff}
+
+  - table: bronze.transaction_devices
+    column: device_id
+    tags: {classification: confidential, pii_type: device_identifier, protection_method: null_string, data_layer: bronze, policy_domain: device}
+  - table: bronze.transaction_devices
+    column: ip
+    tags: {classification: confidential, pii_type: network_identifier, protection_method: network_redact, data_layer: bronze, policy_domain: device}
+
+  - table: bronze.customer_contact_logs
+    column: note
+    tags: {classification: restricted, pii_type: sensitive_free_text, protection_method: redact_string, data_layer: bronze, policy_domain: investigation}
+  - table: bronze.investigation_notes
+    column: note_text
+    tags: {classification: restricted, pii_type: sensitive_free_text, protection_method: redact_string, data_layer: bronze, policy_domain: investigation}
+  - table: bronze.investigation_cases
+    column: legal_hold
+    tags: {classification: restricted, pii_type: legal_sensitive, protection_method: null_string, data_layer: bronze, policy_domain: investigation}
+
+  # ---------------------------------------------------------------------------
+  # Silver raw/typed sensitive columns. These are direct pass-through or typed
+  # versions of Bronze sensitive values and should receive equivalent controls.
+  # ---------------------------------------------------------------------------
+  - table: silver.customers
+    column: first_name
+    tags: {classification: restricted, pii_type: direct_identifier, protection_method: mask_name, data_layer: silver, policy_domain: customer}
+  - table: silver.customers
+    column: last_name
+    tags: {classification: restricted, pii_type: direct_identifier, protection_method: mask_name, data_layer: silver, policy_domain: customer}
+  - table: silver.customers
+    column: email
+    tags: {classification: restricted, pii_type: email, protection_method: mask_email, data_layer: silver, policy_domain: customer}
+  - table: silver.customers
+    column: phone
+    tags: {classification: restricted, pii_type: phone, protection_method: mask_phone, data_layer: silver, policy_domain: customer}
+  - table: silver.customers
+    column: address
+    tags: {classification: restricted, pii_type: address, protection_method: redact_string, data_layer: silver, policy_domain: customer}
+  - table: silver.customers
+    column: dob
+    tags: {classification: restricted, pii_type: date_of_birth, protection_method: null_date, data_layer: silver, policy_domain: customer}
+  - table: silver.customers
+    column: age_band
+    tags: {classification: internal, pii_type: demographic_band, protection_method: no_mask, data_layer: silver, policy_domain: customer}
+  - table: silver.customers
+    column: tax_id
+    tags: {classification: restricted, pii_type: tax_id, protection_method: null_string, data_layer: silver, policy_domain: customer}
+
+  - table: silver.cards
+    column: pan
+    tags: {classification: restricted, pii_type: payment_card, protection_method: mask_pan, data_layer: silver, policy_domain: payment}
+
+  - table: silver.employees
+    column: full_name
+    tags: {classification: confidential, pii_type: staff_identifier, protection_method: mask_name, data_layer: silver, policy_domain: staff}
+  - table: silver.employees
+    column: email
+    tags: {classification: confidential, pii_type: email, protection_method: mask_email, data_layer: silver, policy_domain: staff}
+
+  - table: silver.transaction_devices
+    column: device_id
+    tags: {classification: confidential, pii_type: device_identifier, protection_method: null_string, data_layer: silver, policy_domain: device}
+  - table: silver.transaction_devices
+    column: ip
+    tags: {classification: confidential, pii_type: network_identifier, protection_method: network_redact, data_layer: silver, policy_domain: device}
+
+  - table: silver.customer_contact_logs
+    column: note
+    tags: {classification: restricted, pii_type: sensitive_free_text, protection_method: redact_string, data_layer: silver, policy_domain: investigation}
+  - table: silver.investigation_notes
+    column: note_text
+    tags: {classification: restricted, pii_type: sensitive_free_text, protection_method: redact_string, data_layer: silver, policy_domain: investigation}
+  - table: silver.investigation_cases
+    column: legal_hold
+    tags: {classification: restricted, pii_type: legal_sensitive, protection_method: null_string, data_layer: silver, policy_domain: investigation}
+
+  # ---------------------------------------------------------------------------
+  # Gold broker-key controls. These keys are required for application/broker
+  # scoping but should not be visible to normal users or AI-facing clients.
+  # ---------------------------------------------------------------------------
+  - table: gold.dim_consumer_account
+    column: customer_id
+    tags: {classification: restricted, pii_type: broker_key, protection_method: null_string, data_layer: gold, policy_domain: customer}
+  - table: gold.dim_consumer_account
+    column: account_id
+    tags: {classification: restricted, pii_type: broker_key, protection_method: null_string, data_layer: gold, policy_domain: customer}
+  - table: gold.dim_consumer_account
+    column: source_references
+    tags: {classification: restricted, pii_type: source_lineage, protection_method: no_mask, data_layer: gold, policy_domain: lineage}
+
+  - table: gold.dim_consumer_card
+    column: customer_id
+    tags: {classification: restricted, pii_type: broker_key, protection_method: null_string, data_layer: gold, policy_domain: customer}
+  - table: gold.dim_consumer_card
+    column: account_id
+    tags: {classification: restricted, pii_type: broker_key, protection_method: null_string, data_layer: gold, policy_domain: customer}
+  - table: gold.dim_consumer_card
+    column: card_id
+    tags: {classification: restricted, pii_type: broker_key, protection_method: null_string, data_layer: gold, policy_domain: payment}
+  - table: gold.dim_consumer_card
+    column: card_last_four
+    tags: {classification: confidential, pii_type: payment_card, protection_method: mask_pan, data_layer: gold, policy_domain: payment}
+  - table: gold.dim_consumer_card
+    column: source_references
+    tags: {classification: restricted, pii_type: source_lineage, protection_method: no_mask, data_layer: gold, policy_domain: lineage}
+
+  - table: gold.fact_consumer_transaction
+    column: customer_id
+    tags: {classification: restricted, pii_type: broker_key, protection_method: null_string, data_layer: gold, policy_domain: customer}
+  - table: gold.fact_consumer_transaction
+    column: account_id
+    tags: {classification: restricted, pii_type: broker_key, protection_method: null_string, data_layer: gold, policy_domain: customer}
+  - table: gold.fact_consumer_transaction
+    column: card_id
+    tags: {classification: restricted, pii_type: broker_key, protection_method: null_string, data_layer: gold, policy_domain: payment}
+  - table: gold.fact_consumer_transaction
+    column: source_references
+    tags: {classification: restricted, pii_type: source_lineage, protection_method: no_mask, data_layer: gold, policy_domain: lineage}
+
+  - table: gold.fact_consumer_dispute
+    column: customer_id
+    tags: {classification: restricted, pii_type: broker_key, protection_method: null_string, data_layer: gold, policy_domain: customer}
+  - table: gold.fact_consumer_dispute
+    column: account_id
+    tags: {classification: restricted, pii_type: broker_key, protection_method: null_string, data_layer: gold, policy_domain: customer}
+  - table: gold.fact_consumer_dispute
+    column: card_id
+    tags: {classification: restricted, pii_type: broker_key, protection_method: null_string, data_layer: gold, policy_domain: payment}
+  - table: gold.fact_consumer_dispute
+    column: source_references
+    tags: {classification: restricted, pii_type: source_lineage, protection_method: no_mask, data_layer: gold, policy_domain: lineage}
+
+  # Already masked or screened Gold outputs. These do not need ABAC masks, but
+  # they are tagged for audit and downstream discovery.
+  - table: gold.dim_consumer_account
+    column: account_reference
+    tags: {classification: internal, pii_type: masked_reference, protection_method: no_mask, data_layer: gold, policy_domain: customer}
+  - table: gold.dim_consumer_card
+    column: account_reference
+    tags: {classification: internal, pii_type: masked_reference, protection_method: no_mask, data_layer: gold, policy_domain: customer}
+  - table: gold.dim_consumer_card
+    column: card_reference
+    tags: {classification: internal, pii_type: masked_reference, protection_method: no_mask, data_layer: gold, policy_domain: payment}
+  - table: gold.fact_consumer_transaction
+    column: transaction_reference
+    tags: {classification: internal, pii_type: masked_reference, protection_method: no_mask, data_layer: gold, policy_domain: payment}
+  - table: gold.fact_consumer_transaction
+    column: account_reference
+    tags: {classification: internal, pii_type: masked_reference, protection_method: no_mask, data_layer: gold, policy_domain: customer}
+  - table: gold.fact_consumer_transaction
+    column: card_reference
+    tags: {classification: internal, pii_type: masked_reference, protection_method: no_mask, data_layer: gold, policy_domain: payment}
+  - table: gold.fact_consumer_dispute
+    column: dispute_reference
+    tags: {classification: internal, pii_type: masked_reference, protection_method: no_mask, data_layer: gold, policy_domain: investigation}
+  - table: gold.fact_consumer_dispute
+    column: transaction_reference
+    tags: {classification: internal, pii_type: masked_reference, protection_method: no_mask, data_layer: gold, policy_domain: payment}
+  - table: gold.fact_consumer_dispute
+    column: account_reference
+    tags: {classification: internal, pii_type: masked_reference, protection_method: no_mask, data_layer: gold, policy_domain: customer}
+  - table: gold.fact_consumer_dispute
+    column: card_reference
+    tags: {classification: internal, pii_type: masked_reference, protection_method: no_mask, data_layer: gold, policy_domain: payment}
+  - table: gold.fact_investigation_note
+    column: safe_note_text
+    tags: {classification: internal, pii_type: safe_text, protection_method: no_mask, data_layer: gold, policy_domain: investigation}
